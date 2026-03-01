@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
+import { detectAiMention, generateAiResponse } from "@/lib/ai/assistant"
 
 // 過去メッセージ取得（カーソルベースページネーション）
 export async function GET(request: NextRequest) {
@@ -174,14 +175,23 @@ export async function POST(request: Request) {
       }
     }
 
+    const trimmedContent = content.trim()
+
     const message = await prisma.message.create({
       data: {
         channelId,
         userId: auth.userId,
-        content: content.trim(),
+        content: trimmedContent,
         parentId: parentId || null,
       },
     })
+
+    // @AI メンション検出 → バックグラウンドで AI 応答を生成
+    if (detectAiMention(trimmedContent) && !parentId) {
+      generateAiResponse(channelId, message.id, trimmedContent, auth.userId).catch(
+        (err) => console.error("AI 応答生成エラー:", err)
+      )
+    }
 
     return NextResponse.json({ id: message.id })
   } catch (error) {

@@ -256,6 +256,7 @@ export function MessageView({
           channelId={channel.id}
           onSend={handleSend}
           disabled={sending}
+          members={members}
         />
       </div>
 
@@ -333,8 +334,8 @@ function MessageBubble({
       onMouseLeave={() => { setShowActions(false); setShowEmojiPicker(false) }}
     >
       <Avatar className="h-8 w-8 shrink-0 mt-0.5">
-        <AvatarFallback className="text-xs">
-          {message.user.displayName?.charAt(0)?.toUpperCase() || "?"}
+        <AvatarFallback className={`text-xs ${message.aiGenerated ? "bg-violet-200 text-violet-700 dark:bg-violet-900 dark:text-violet-300" : ""}`}>
+          {message.aiGenerated ? "AI" : (message.user.displayName?.charAt(0)?.toUpperCase() || "?")}
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
@@ -342,6 +343,11 @@ function MessageBubble({
           <span className="text-sm font-medium">
             {message.user.displayName || "不明"}
           </span>
+          {message.aiGenerated && (
+            <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+              AI
+            </span>
+          )}
           <span className="text-xs text-muted-foreground">{time}</span>
           {isEdited && (
             <span className="text-xs text-muted-foreground">（編集済み）</span>
