@@ -1,0 +1,96 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// === ユーザー（Supabase Auth と 1:1）===
+model User {
+  id              String   @id @default(uuid())
+  supabaseUserId  String   @unique
+  email           String
+  displayName     String?
+  avatarUrl       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workspaceMembers WorkspaceMember[]
+  channelMembers   ChannelMember[]
+  messages         Message[]
+}
+
+// === ワークスペース（組織/チーム単位）===
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  iconUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  WorkspaceMember[]
+  channels Channel[]
+}
+
+// === ワークスペースメンバー ===
+model WorkspaceMember {
+  id          String   @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        String   @default("member") // admin | member
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+// === チャンネル ===
+model Channel {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String?  // DM の場合は null
+  type        String   @default("public") // public | group | dm
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members   ChannelMember[]
+  messages  Message[]
+}
+
+// === チャンネルメンバー ===
+model ChannelMember {
+  id        String   @id @default(uuid())
+  channelId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+}
+
+// === メッセージ ===
+model Message {
+  id          String   @id @default(uuid())
+  channelId   String
+  userId      String
+  content     String
+  parentId    String?  // Phase 2: スレッド用（当面 null）
+  aiGenerated Boolean  @default(false) // Phase 2: Chatta 連携用
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  channel Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Message? @relation("ThreadReplies", fields: [parentId], references: [id])
+  replies Message[] @relation("ThreadReplies")
+
+  @@index([channelId, createdAt])
+}
