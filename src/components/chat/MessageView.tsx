@@ -44,7 +44,7 @@ export function MessageView({
     }
   }, [members, currentUserId])
 
-  const { messages, prependMessages, setMessages } = useRealtimeMessages({
+  const { messages, prependMessages, setMessages, appendMessage } = useRealtimeMessages({
     channelId: channel.id,
     initialMessages,
     userMap: userMap.current,
@@ -144,7 +144,7 @@ export function MessageView({
   async function handleSend(content: string) {
     setSending(true)
     try {
-      await fetch("/api/internal/messages", {
+      const res = await fetch("/api/internal/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,6 +152,36 @@ export function MessageView({
           content,
         }),
       })
+      const data = await res.json()
+
+      if (data.id) {
+        // 楽観的更新: Realtime を待たずに即座にメッセージを表示
+        const currentUser = members.find((m) => m.id === currentUserId)
+        const now = new Date().toISOString()
+        const optimisticMessage: MessageWithUser = {
+          id: data.id,
+          content,
+          createdAt: now,
+          updatedAt: now,
+          userId: currentUserId,
+          parentId: null,
+          aiGenerated: false,
+          deletedAt: null,
+          replyCount: 0,
+          reactions: [],
+          user: {
+            id: currentUserId,
+            displayName: currentUser?.displayName || "不明",
+            avatarUrl: currentUser?.avatarUrl || null,
+          },
+        }
+        appendMessage(optimisticMessage)
+
+        // 最下部にスクロール
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        })
+      }
     } catch (error) {
       console.error("メッセージ送信エラー:", error)
     } finally {

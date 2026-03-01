@@ -38,6 +38,13 @@ export function useRealtimeMessages({
     })
   }, [])
 
+  // 楽観的にメッセージを末尾に追加（重複排除用 ID も登録）
+  const appendMessage = useCallback((message: MessageWithUser) => {
+    if (messageIdsRef.current.has(message.id)) return
+    messageIdsRef.current.add(message.id)
+    setMessages((prev) => [...prev, message])
+  }, [])
+
   // 新メッセージ追加（INSERT）
   const handleInsert = useCallback(
     (payload: { new: Record<string, unknown> }) => {
@@ -151,5 +158,5 @@ export function useRealtimeMessages({
     }
   }, [channelId, parentId, handleInsert, handleUpdate])
 
-  return { messages, prependMessages, setMessages }
+  return { messages, prependMessages, setMessages, appendMessage }
 }

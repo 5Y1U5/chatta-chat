@@ -52,7 +52,7 @@ export function ThreadPanel({
     fetchReplies()
   }, [channelId, parentMessage.id])
 
-  const { messages: replies, prependMessages } = useRealtimeMessages({
+  const { messages: replies, prependMessages, appendMessage: appendReply } = useRealtimeMessages({
     channelId,
     parentId: parentMessage.id,
     initialMessages: initialReplies,
@@ -133,7 +133,7 @@ export function ThreadPanel({
   async function handleSend(content: string) {
     setSending(true)
     try {
-      await fetch("/api/internal/messages", {
+      const res = await fetch("/api/internal/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -142,6 +142,34 @@ export function ThreadPanel({
           parentId: parentMessage.id,
         }),
       })
+      const data = await res.json()
+
+      if (data.id) {
+        const currentUser = members.find((m) => m.id === currentUserId)
+        const now = new Date().toISOString()
+        const optimisticReply: MessageWithUser = {
+          id: data.id,
+          content,
+          createdAt: now,
+          updatedAt: now,
+          userId: currentUserId,
+          parentId: parentMessage.id,
+          aiGenerated: false,
+          deletedAt: null,
+          replyCount: 0,
+          reactions: [],
+          user: {
+            id: currentUserId,
+            displayName: currentUser?.displayName || "不明",
+            avatarUrl: currentUser?.avatarUrl || null,
+          },
+        }
+        appendReply(optimisticReply)
+
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        })
+      }
     } catch (error) {
       console.error("スレッド返信エラー:", error)
     } finally {
