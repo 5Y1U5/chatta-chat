@@ -17,6 +17,10 @@ export function InstallBanner() {
   const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
+    // モバイルデバイス（スマホ・タブレット）のみ表示、PCでは非表示
+    const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0
+    if (!isTouchDevice) return
+
     // standalone モードなら表示しない（既にホーム画面から起動中）
     if (window.matchMedia("(display-mode: standalone)").matches) return
     if ("standalone" in navigator && (navigator as unknown as { standalone: boolean }).standalone === true) return
