@@ -1,15 +1,18 @@
 "use client"
 
+import { useMemo } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { NewChannelDialog } from "@/components/chat/NewChannelDialog"
 import { NewDmDialog } from "@/components/chat/NewDmDialog"
+import { useUnreadCounts } from "@/hooks/useUnreadCounts"
 
 type ChannelItem = {
   id: string
   name: string | null
   type: string
+  unreadCount: number
   members: {
     id: string
     displayName: string | null
@@ -39,9 +42,23 @@ export function ChannelList({ channels, workspaceId, currentUserId }: Props) {
   const params = useParams()
   const activeChannelId = params.channelId as string | undefined
 
-  const publicChannels = channels.filter((ch) => ch.type === "public")
-  const groupChannels = channels.filter((ch) => ch.type === "group")
-  const dmChannels = channels.filter((ch) => ch.type === "dm")
+  // Realtime 未読数管理
+  const initialCounts = useMemo(
+    () => channels.map((ch) => ({ channelId: ch.id, count: ch.unreadCount })),
+    [channels]
+  )
+  const channelIds = useMemo(() => channels.map((ch) => ch.id), [channels])
+  const unreadCounts = useUnreadCounts(initialCounts, activeChannelId, channelIds)
+
+  // 未読数をリアルタイム値で上書き
+  const channelsWithLiveCounts = useMemo(
+    () => channels.map((ch) => ({ ...ch, unreadCount: unreadCounts.get(ch.id) || 0 })),
+    [channels, unreadCounts]
+  )
+
+  const publicChannels = channelsWithLiveCounts.filter((ch) => ch.type === "public")
+  const groupChannels = channelsWithLiveCounts.filter((ch) => ch.type === "group")
+  const dmChannels = channelsWithLiveCounts.filter((ch) => ch.type === "dm")
 
   return (
     <div className="hidden w-60 flex-col border-r bg-muted/30 md:flex">
@@ -119,15 +136,21 @@ function ChannelSection({
           href={`/${workspaceId}/channel/${channel.id}`}
           className={cn(
             "mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted",
-            activeChannelId === channel.id && "bg-muted font-medium"
+            activeChannelId === channel.id && "bg-muted font-medium",
+            channel.unreadCount > 0 && activeChannelId !== channel.id && "font-semibold"
           )}
         >
           {prefix && (
             <span className="text-muted-foreground">{prefix}</span>
           )}
-          <span className="truncate">
+          <span className="flex-1 truncate">
             {getChannelDisplayName(channel, currentUserId)}
           </span>
+          {channel.unreadCount > 0 && activeChannelId !== channel.id && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+              {channel.unreadCount > 99 ? "99+" : channel.unreadCount}
+            </span>
+          )}
         </Link>
       ))}
     </div>

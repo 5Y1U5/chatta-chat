@@ -8,6 +8,7 @@ type ChannelItem = {
   id: string
   name: string | null
   type: string
+  unreadCount: number
   members: {
     id: string
     displayName: string | null
@@ -49,20 +50,38 @@ export default async function ChatLayout({
     orderBy: { createdAt: "asc" },
   })
 
+  // 各チャンネルの未読数を計算
   const channels: ChannelItem[] = []
   for (const ch of channelsRaw) {
     const members: ChannelItem["members"] = []
+    let lastReadAt: Date | null = null
+
     for (const m of ch.members) {
       members.push({
         id: m.user.id,
         displayName: m.user.displayName,
         avatarUrl: m.user.avatarUrl,
       })
+      if (m.userId === auth.userId) {
+        lastReadAt = m.lastReadAt
+      }
     }
+
+    // lastReadAt 以降のルートメッセージ数 = 未読数
+    const unreadCount = await prisma.message.count({
+      where: {
+        channelId: ch.id,
+        parentId: null,
+        deletedAt: null,
+        ...(lastReadAt ? { createdAt: { gt: lastReadAt } } : {}),
+      },
+    })
+
     channels.push({
       id: ch.id,
       name: ch.name,
       type: ch.type,
+      unreadCount,
       members,
     })
   }

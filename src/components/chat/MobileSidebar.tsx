@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -10,11 +10,13 @@ import { ProfileDialog } from "@/components/chat/ProfileDialog"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useUnreadCounts } from "@/hooks/useUnreadCounts"
 
 type ChannelItem = {
   id: string
   name: string | null
   type: string
+  unreadCount: number
   members: {
     id: string
     displayName: string | null
@@ -42,9 +44,22 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
   const activeChannelId = params.channelId as string | undefined
   const router = useRouter()
 
-  const publicChannels = channels.filter((ch) => ch.type === "public")
-  const groupChannels = channels.filter((ch) => ch.type === "group")
-  const dmChannels = channels.filter((ch) => ch.type === "dm")
+  // Realtime 未読数管理
+  const initialCounts = useMemo(
+    () => channels.map((ch) => ({ channelId: ch.id, count: ch.unreadCount })),
+    [channels]
+  )
+  const channelIds = useMemo(() => channels.map((ch) => ch.id), [channels])
+  const unreadCounts = useUnreadCounts(initialCounts, activeChannelId, channelIds)
+
+  const channelsWithLiveCounts = useMemo(
+    () => channels.map((ch) => ({ ...ch, unreadCount: unreadCounts.get(ch.id) || 0 })),
+    [channels, unreadCounts]
+  )
+
+  const publicChannels = channelsWithLiveCounts.filter((ch) => ch.type === "public")
+  const groupChannels = channelsWithLiveCounts.filter((ch) => ch.type === "group")
+  const dmChannels = channelsWithLiveCounts.filter((ch) => ch.type === "dm")
 
   async function handleLogout() {
     const supabase = createClient()
@@ -183,13 +198,19 @@ function MobileSection({
           onClick={onNavigate}
           className={cn(
             "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted",
-            activeChannelId === channel.id && "bg-muted font-medium"
+            activeChannelId === channel.id && "bg-muted font-medium",
+            channel.unreadCount > 0 && activeChannelId !== channel.id && "font-semibold"
           )}
         >
           {prefix && <span className="text-muted-foreground">{prefix}</span>}
-          <span className="truncate">
+          <span className="flex-1 truncate">
             {getChannelDisplayName(channel, currentUserId)}
           </span>
+          {channel.unreadCount > 0 && activeChannelId !== channel.id && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+              {channel.unreadCount > 99 ? "99+" : channel.unreadCount}
+            </span>
+          )}
         </Link>
       ))}
     </div>

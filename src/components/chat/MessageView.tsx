@@ -50,15 +50,22 @@ export function MessageView({
     userMap: userMap.current,
   })
 
-  // 初回のみ最下部にスクロール
+  // 初回のみ最下部にスクロール + 既読マーク
   useEffect(() => {
     if (isInitialLoad.current && messages.length > 0) {
       messagesEndRef.current?.scrollIntoView()
       isInitialLoad.current = false
-    }
-  }, [messages])
 
-  // 新メッセージ受信時の自動スクロール（下部付近にいる場合のみ）
+      // チャンネルを開いた時に既読マーク
+      fetch("/api/internal/channels/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId: channel.id }),
+      }).catch(() => {})
+    }
+  }, [messages, channel.id])
+
+  // 新メッセージ受信時の自動スクロール + 既読更新
   const lastMessageCount = useRef(messages.length)
   useEffect(() => {
     if (messages.length > lastMessageCount.current) {
@@ -70,9 +77,16 @@ export function MessageView({
           messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
         }
       }
+
+      // 表示中のチャンネルなので既読を更新
+      fetch("/api/internal/channels/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId: channel.id }),
+      }).catch(() => {})
     }
     lastMessageCount.current = messages.length
-  }, [messages])
+  }, [messages, channel.id])
 
   // 過去メッセージ読み込み
   const loadMore = useCallback(async () => {

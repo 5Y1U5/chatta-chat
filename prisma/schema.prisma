@@ -66,10 +66,11 @@ model Channel {
 
 // === チャンネルメンバー ===
 model ChannelMember {
-  id        String   @id @default(uuid())
-  channelId String
-  userId    String
-  createdAt DateTime @default(now())
+  id         String    @id @default(uuid())
+  channelId  String
+  userId     String
+  lastReadAt DateTime? // 最後にチャンネルを閲覧した日時（未読計算用）
+  createdAt  DateTime  @default(now())
 
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
