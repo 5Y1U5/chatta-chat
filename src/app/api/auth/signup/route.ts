@@ -5,7 +5,7 @@ import { getPrisma } from "@/lib/prisma"
 // inviteCode がある場合は既存ワークスペースに参加
 export async function POST(request: Request) {
   try {
-    const { supabaseUserId, email, displayName, inviteCode } = await request.json()
+    const { supabaseUserId, email, displayName, inviteCode, channelInviteCode } = await request.json()
 
     if (!supabaseUserId || !email) {
       return NextResponse.json(
@@ -70,6 +70,37 @@ export async function POST(request: Request) {
         return NextResponse.json({
           userId: user.id,
           workspaceId: invitedWorkspace.id,
+        })
+      }
+    }
+
+    // チャンネル招待コードがある場合はワークスペース + チャンネルに参加
+    if (channelInviteCode) {
+      const channel = await prisma.channel.findUnique({
+        where: { inviteCode: channelInviteCode },
+      })
+
+      if (channel) {
+        // ワークスペースに参加
+        await prisma.workspaceMember.create({
+          data: {
+            workspaceId: channel.workspaceId,
+            userId: user.id,
+            role: "member",
+          },
+        })
+
+        // チャンネルに参加
+        await prisma.channelMember.create({
+          data: {
+            channelId: channel.id,
+            userId: user.id,
+          },
+        })
+
+        return NextResponse.json({
+          userId: user.id,
+          workspaceId: channel.workspaceId,
         })
       }
     }

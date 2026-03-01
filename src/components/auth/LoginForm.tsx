@@ -26,6 +26,7 @@ export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const inviteCode = searchParams.get("invite")
+  const channelInviteCode = searchParams.get("chinvite")
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -45,7 +46,7 @@ export function LoginForm() {
       }
 
       // 招待コード付きなら招待ページへ、なければトップへ
-      router.push(inviteCode ? `/invite/${inviteCode}` : "/")
+      router.push(inviteCode ? `/invite/${inviteCode}` : channelInviteCode ? `/ch/${channelInviteCode}` : "/")
       router.refresh()
     } catch {
       setError("ログインに失敗しました")
@@ -101,10 +102,10 @@ export function LoginForm() {
             <span className="text-xs text-muted-foreground">または</span>
             <Separator className="flex-1" />
           </div>
-          <GoogleLoginButton next={inviteCode ? `/invite/${inviteCode}` : undefined} />
+          <GoogleLoginButton next={inviteCode ? `/invite/${inviteCode}` : channelInviteCode ? `/ch/${channelInviteCode}` : undefined} />
           <p className="text-sm text-muted-foreground">
             アカウントをお持ちでない方は{" "}
-            <Link href="/signup" className="text-primary hover:underline">
+            <Link href={channelInviteCode ? `/signup?chinvite=${channelInviteCode}` : "/signup"} className="text-primary hover:underline">
               新規登録
             </Link>
           </p>

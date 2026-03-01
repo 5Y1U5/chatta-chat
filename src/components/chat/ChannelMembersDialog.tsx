@@ -31,6 +31,9 @@ export function ChannelMembersDialog({ channelId, channelType, currentUserId }: 
   const [workspaceMembers, setWorkspaceMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [inviteLink, setInviteLink] = useState("")
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -54,6 +57,29 @@ export function ChannelMembersDialog({ channelId, channelType, currentUserId }: 
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleGenerateInvite() {
+    setInviteLoading(true)
+    try {
+      const res = await fetch("/api/internal/channels/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId }),
+      })
+      if (res.ok) {
+        const { inviteCode } = await res.json()
+        setInviteLink(`${window.location.origin}/ch/${inviteCode}`)
+      }
+    } finally {
+      setInviteLoading(false)
+    }
+  }
+
+  async function handleCopyInvite() {
+    await navigator.clipboard.writeText(inviteLink)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   // チャンネルに未参加のワークスペースメンバー
@@ -132,6 +158,41 @@ export function ChannelMembersDialog({ channelId, channelType, currentUserId }: 
           </DialogDescription>
         </DialogHeader>
         <div className="py-2 space-y-4">
+          {/* 招待リンク */}
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-2 px-1">
+              招待リンク
+            </h4>
+            {inviteLink ? (
+              <div className="flex gap-2 px-1">
+                <input
+                  readOnly
+                  value={inviteLink}
+                  className="flex-1 rounded-md border bg-muted px-3 py-1.5 text-sm select-all min-w-0"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyInvite}
+                  className="shrink-0"
+                >
+                  {copied ? "コピー済み" : "コピー"}
+                </Button>
+              </div>
+            ) : (
+              <div className="px-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateInvite}
+                  disabled={inviteLoading}
+                >
+                  {inviteLoading ? "生成中..." : "招待リンクを生成"}
+                </Button>
+              </div>
+            )}
+          </div>
+
           {loading ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               読み込み中...

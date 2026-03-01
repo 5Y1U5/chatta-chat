@@ -22,11 +22,14 @@ export async function GET(request: Request) {
         try {
           // 招待リンク経由の場合、inviteCode を抽出
           let inviteCode: string | undefined
+          let channelInviteCode: string | undefined
           if (next.startsWith("/invite/")) {
             inviteCode = next.replace("/invite/", "")
+          } else if (next.startsWith("/ch/")) {
+            channelInviteCode = next.replace("/ch/", "")
           }
 
-          await ensureDbUser(user.id, user.email || "", user.user_metadata?.full_name || user.user_metadata?.name, inviteCode)
+          await ensureDbUser(user.id, user.email || "", user.user_metadata?.full_name || user.user_metadata?.name, inviteCode, channelInviteCode)
         } catch (e) {
           console.error("DB ユーザー作成エラー:", e)
         }
@@ -41,7 +44,7 @@ export async function GET(request: Request) {
 
 // DB ユーザーが存在しなければ作成（Google ログイン用）
 // inviteCode がある場合は既存ワークスペースに参加
-async function ensureDbUser(supabaseUserId: string, email: string, displayName?: string, inviteCode?: string) {
+async function ensureDbUser(supabaseUserId: string, email: string, displayName?: string, inviteCode?: string, channelInviteCode?: string) {
   const prisma = getPrisma()
 
   const existing = await prisma.user.findUnique({
@@ -89,6 +92,32 @@ async function ensureDbUser(supabaseUserId: string, email: string, displayName?:
           skipDuplicates: true,
         })
       }
+
+      return
+    }
+  }
+
+  // チャンネル招待コードがある場合はワークスペース + チャンネルに参加
+  if (channelInviteCode) {
+    const channel = await prisma.channel.findUnique({
+      where: { inviteCode: channelInviteCode },
+    })
+
+    if (channel) {
+      await prisma.workspaceMember.create({
+        data: {
+          workspaceId: channel.workspaceId,
+          userId: user.id,
+          role: "member",
+        },
+      })
+
+      await prisma.channelMember.create({
+        data: {
+          channelId: channel.id,
+          userId: user.id,
+        },
+      })
 
       return
     }

@@ -28,6 +28,7 @@ export function SignupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const inviteCode = searchParams.get("invite")
+  const channelInviteCode = searchParams.get("chinvite")
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -70,6 +71,7 @@ export function SignupForm() {
           email,
           displayName,
           ...(inviteCode && { inviteCode }),
+          ...(channelInviteCode && { channelInviteCode }),
         }),
       })
 
@@ -164,10 +166,10 @@ export function SignupForm() {
             <span className="text-xs text-muted-foreground">または</span>
             <Separator className="flex-1" />
           </div>
-          <GoogleLoginButton next={inviteCode ? `/invite/${inviteCode}` : undefined} />
+          <GoogleLoginButton next={inviteCode ? `/invite/${inviteCode}` : channelInviteCode ? `/ch/${channelInviteCode}` : undefined} />
           <p className="text-sm text-muted-foreground">
             すでにアカウントをお持ちの方は{" "}
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href={channelInviteCode ? `/login?chinvite=${channelInviteCode}` : "/login"} className="text-primary hover:underline">
               ログイン
             </Link>
           </p>

@@ -57,6 +57,7 @@ model Channel {
   workspaceId String
   name        String?  // DM の場合は null
   type        String   @default("public") // public | group | dm
+  inviteCode  String?  @unique // チャンネル招待コード
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
