@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 import { detectAiMention, generateAiResponse } from "@/lib/ai/assistant"
@@ -186,11 +186,16 @@ export async function POST(request: Request) {
       },
     })
 
-    // @AI メンション検出 → バックグラウンドで AI 応答を生成
+    // @AI メンション検出 → レスポンス送信後に AI 応答を生成
+    // after() で Vercel サーバーレス環境でもバックグラウンド処理を完了させる
     if (detectAiMention(trimmedContent) && !parentId) {
-      generateAiResponse(channelId, message.id, trimmedContent, auth.userId).catch(
-        (err) => console.error("AI 応答生成エラー:", err)
-      )
+      after(async () => {
+        try {
+          await generateAiResponse(channelId, message.id, trimmedContent, auth.userId)
+        } catch (err) {
+          console.error("AI 応答生成エラー:", err)
+        }
+      })
     }
 
     return NextResponse.json({ id: message.id })
