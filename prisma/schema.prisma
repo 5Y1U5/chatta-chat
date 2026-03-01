@@ -21,6 +21,7 @@ model User {
   workspaceMembers WorkspaceMember[]
   channelMembers   ChannelMember[]
   messages         Message[]
+  reactions        Reaction[]
 }
 
 // === ワークスペース（組織/チーム単位）===
@@ -88,10 +89,26 @@ model Message {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  channel Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent  Message? @relation("ThreadReplies", fields: [parentId], references: [id])
-  replies Message[] @relation("ThreadReplies")
+  channel   Channel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Message?   @relation("ThreadReplies", fields: [parentId], references: [id])
+  replies   Message[]  @relation("ThreadReplies")
+  reactions Reaction[]
 
   @@index([channelId, createdAt])
+}
+
+// === リアクション ===
+model Reaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }

@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageInput } from "@/components/chat/MessageInput"
 import { ThreadPanel } from "@/components/chat/ThreadPanel"
+import { EmojiPicker } from "@/components/chat/EmojiPicker"
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
-import type { MessageWithUser, ChannelMemberInfo, ChannelInfo } from "@/types/chat"
+import type { MessageWithUser, ChannelMemberInfo, ChannelInfo, ReactionInfo } from "@/types/chat"
 
 type Props = {
   channel: ChannelInfo
@@ -43,7 +44,7 @@ export function MessageView({
     }
   }, [members, currentUserId])
 
-  const { messages, prependMessages } = useRealtimeMessages({
+  const { messages, prependMessages, setMessages } = useRealtimeMessages({
     channelId: channel.id,
     initialMessages,
     userMap: userMap.current,
@@ -92,7 +93,6 @@ export function MessageView({
         prependMessages(data.messages)
         setHasMore(data.hasMore)
 
-        // スクロール位置を維持
         requestAnimationFrame(() => {
           if (container) {
             container.scrollTop = container.scrollHeight - prevScrollHeight
@@ -169,6 +169,47 @@ export function MessageView({
     }
   }
 
+  // リアクショントグル
+  async function handleReaction(messageId: string, emoji: string) {
+    try {
+      const res = await fetch("/api/internal/reactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId, emoji }),
+      })
+      const data = await res.json()
+
+      // 楽観的更新
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m
+          const reactions = [...(m.reactions || [])]
+          const idx = reactions.findIndex((r) => r.emoji === emoji)
+
+          if (data.action === "added") {
+            if (idx >= 0) {
+              reactions[idx] = { ...reactions[idx], count: reactions[idx].count + 1, userReacted: true }
+            } else {
+              reactions.push({ emoji, count: 1, userReacted: true })
+            }
+          } else {
+            if (idx >= 0) {
+              if (reactions[idx].count <= 1) {
+                reactions.splice(idx, 1)
+              } else {
+                reactions[idx] = { ...reactions[idx], count: reactions[idx].count - 1, userReacted: false }
+              }
+            }
+          }
+
+          return { ...m, reactions }
+        })
+      )
+    } catch (error) {
+      console.error("リアクションエラー:", error)
+    }
+  }
+
   // アクティブスレッドの親メッセージ
   const activeThreadMessage = activeThreadId
     ? messages.find((m) => m.id === activeThreadId)
@@ -203,6 +244,7 @@ export function MessageView({
                 onReply={() => setActiveThreadId(message.id)}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onReaction={handleReaction}
               />
             ))
           )}
@@ -239,14 +281,17 @@ function MessageBubble({
   onReply,
   onEdit,
   onDelete,
+  onReaction,
 }: {
   message: MessageWithUser
   isOwn: boolean
   onReply: () => void
   onEdit: (messageId: string, content: string) => void
   onDelete: (messageId: string) => void
+  onReaction: (messageId: string, emoji: string) => void
 }) {
   const [showActions, setShowActions] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editContent, setEditContent] = useState(message.content)
 
@@ -285,7 +330,7 @@ function MessageBubble({
     <div
       className="group relative flex gap-3 py-1.5 hover:bg-muted/50 rounded-md px-1 -mx-1"
       onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
+      onMouseLeave={() => { setShowActions(false); setShowEmojiPicker(false) }}
     >
       <Avatar className="h-8 w-8 shrink-0 mt-0.5">
         <AvatarFallback className="text-xs">
@@ -332,6 +377,24 @@ function MessageBubble({
           </p>
         )}
 
+        {/* リアクション表示 */}
+        {!isDeleted && message.reactions && message.reactions.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {message.reactions.map((r) => (
+              <button
+                key={r.emoji}
+                onClick={() => onReaction(message.id, r.emoji)}
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs hover:bg-muted ${
+                  r.userReacted ? "border-primary/50 bg-primary/10" : "border-border"
+                }`}
+              >
+                <span>{r.emoji}</span>
+                <span className="text-muted-foreground">{r.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* 返信数バッジ */}
         {!isDeleted && (message.replyCount || 0) > 0 && (
           <button
@@ -349,6 +412,23 @@ function MessageBubble({
       {/* アクションメニュー */}
       {showActions && !isDeleted && !editing && (
         <div className="absolute -top-3 right-1 flex gap-0.5 rounded-md border bg-background shadow-sm">
+          {/* リアクション */}
+          <div className="relative">
+            <ActionButton title="リアクション" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                <line x1="9" y1="9" x2="9.01" y2="9" />
+                <line x1="15" y1="9" x2="15.01" y2="9" />
+              </svg>
+            </ActionButton>
+            {showEmojiPicker && (
+              <EmojiPicker
+                onSelect={(emoji) => onReaction(message.id, emoji)}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+            )}
+          </div>
           <ActionButton title="返信" onClick={onReply}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />

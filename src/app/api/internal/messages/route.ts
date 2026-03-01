@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         user: true,
+        reactions: true,
         _count: { select: { replies: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -79,9 +80,23 @@ export async function GET(request: NextRequest) {
       aiGenerated: boolean
       deletedAt: string | null
       replyCount: number
+      reactions: { emoji: string; count: number; userReacted: boolean }[]
       user: { id: string; displayName: string | null; avatarUrl: string | null }
     }[] = []
     for (const m of messagesRaw) {
+      // リアクション集計
+      const emojiMap = new Map<string, { count: number; userReacted: boolean }>()
+      for (const r of m.reactions) {
+        const entry = emojiMap.get(r.emoji) || { count: 0, userReacted: false }
+        entry.count++
+        if (r.userId === auth.userId) entry.userReacted = true
+        emojiMap.set(r.emoji, entry)
+      }
+      const reactions: { emoji: string; count: number; userReacted: boolean }[] = []
+      for (const [emoji, info] of emojiMap) {
+        reactions.push({ emoji, count: info.count, userReacted: info.userReacted })
+      }
+
       messages.push({
         id: m.id,
         content: m.content,
@@ -92,6 +107,7 @@ export async function GET(request: NextRequest) {
         aiGenerated: m.aiGenerated,
         deletedAt: m.deletedAt?.toISOString() || null,
         replyCount: m._count.replies,
+        reactions,
         user: {
           id: m.user.id,
           displayName: m.user.displayName,

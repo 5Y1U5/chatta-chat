@@ -9,11 +9,19 @@ export type MessageWithUser = {
   aiGenerated?: boolean
   deletedAt?: string | null
   replyCount?: number
+  reactions?: ReactionInfo[]
   user: {
     id: string
     displayName: string | null
     avatarUrl: string | null
   }
+}
+
+// リアクション集計情報
+export type ReactionInfo = {
+  emoji: string
+  count: number
+  userReacted: boolean // 現在のユーザーがリアクション済みか
 }
 
 // チャンネルメンバー情報

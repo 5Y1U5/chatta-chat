@@ -2,7 +2,25 @@ import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { MessageView } from "@/components/chat/MessageView"
-import type { MessageWithUser, ChannelMemberInfo } from "@/types/chat"
+import type { MessageWithUser, ChannelMemberInfo, ReactionInfo } from "@/types/chat"
+
+function aggregateReactions(
+  reactions: { emoji: string; userId: string }[],
+  currentUserId: string
+): ReactionInfo[] {
+  const emojiMap = new Map<string, { count: number; userReacted: boolean }>()
+  for (const r of reactions) {
+    const entry = emojiMap.get(r.emoji) || { count: 0, userReacted: false }
+    entry.count++
+    if (r.userId === currentUserId) entry.userReacted = true
+    emojiMap.set(r.emoji, entry)
+  }
+  const result: ReactionInfo[] = []
+  for (const [emoji, info] of emojiMap) {
+    result.push({ emoji, count: info.count, userReacted: info.userReacted })
+  }
+  return result
+}
 
 export default async function ChannelPage({
   params,
@@ -35,6 +53,7 @@ export default async function ChannelPage({
     },
     include: {
       user: true,
+      reactions: true,
       _count: { select: { replies: true } },
     },
     orderBy: { createdAt: "asc" },
@@ -53,6 +72,7 @@ export default async function ChannelPage({
       aiGenerated: m.aiGenerated,
       deletedAt: null,
       replyCount: m._count.replies,
+      reactions: aggregateReactions(m.reactions, auth.userId),
       user: {
         id: m.user.id,
         displayName: m.user.displayName,
