@@ -19,6 +19,7 @@ import {
 export function SignupForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [passwordConfirm, setPasswordConfirm] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -27,6 +28,12 @@ export function SignupForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
+
+    if (password !== passwordConfirm) {
+      setError("パスワードが一致しません")
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -125,8 +132,25 @@ export function SignupForm() {
               required
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="passwordConfirm">パスワード（確認）</Label>
+            <Input
+              id="passwordConfirm"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              placeholder="もう一度入力"
+              minLength={8}
+              required
+            />
+            {passwordConfirm && (
+              <p className={`text-xs ${password === passwordConfirm ? "text-green-600" : "text-destructive"}`}>
+                {password === passwordConfirm ? "パスワードが一致しています" : "パスワードが一致しません"}
+              </p>
+            )}
+          </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-4">
+        <CardFooter className="flex flex-col gap-4 pt-2">
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "登録中..." : "アカウント作成"}
           </Button>
