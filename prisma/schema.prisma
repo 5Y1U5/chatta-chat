@@ -86,6 +86,9 @@ model Message {
   content     String
   parentId    String?  // スレッド返信の親メッセージID
   aiGenerated Boolean  @default(false) // AI 生成メッセージフラグ
+  fileUrl     String?  // 添付ファイルの URL
+  fileName    String?  // 添付ファイル名
+  fileType    String?  // MIME タイプ（image/png 等）
   deletedAt   DateTime? // ソフトデリート（null = 有効）
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

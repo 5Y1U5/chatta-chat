@@ -81,6 +81,9 @@ export async function GET(request: NextRequest) {
       aiGenerated: boolean
       deletedAt: string | null
       replyCount: number
+      fileUrl: string | null
+      fileName: string | null
+      fileType: string | null
       reactions: { emoji: string; count: number; userReacted: boolean }[]
       user: { id: string; displayName: string | null; avatarUrl: string | null }
     }[] = []
@@ -108,6 +111,9 @@ export async function GET(request: NextRequest) {
         aiGenerated: m.aiGenerated,
         deletedAt: m.deletedAt?.toISOString() || null,
         replyCount: m._count.replies,
+        fileUrl: m.fileUrl,
+        fileName: m.fileName,
+        fileType: m.fileType,
         reactions,
         user: {
           id: m.user.id,
@@ -134,9 +140,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     const auth = await requireAuth()
-    const { channelId, content, parentId } = await request.json()
+    const { channelId, content, parentId, fileUrl, fileName, fileType } = await request.json()
 
-    if (!channelId || !content?.trim()) {
+    if (!channelId || (!content?.trim() && !fileUrl)) {
       return NextResponse.json(
         { error: "チャンネルIDとメッセージ内容は必須です" },
         { status: 400 }
@@ -175,14 +181,17 @@ export async function POST(request: Request) {
       }
     }
 
-    const trimmedContent = content.trim()
+    const trimmedContent = (content || "").trim()
 
     const message = await prisma.message.create({
       data: {
         channelId,
         userId: auth.userId,
-        content: trimmedContent,
+        content: trimmedContent || (fileName ? `[ファイル] ${fileName}` : ""),
         parentId: parentId || null,
+        fileUrl: fileUrl || null,
+        fileName: fileName || null,
+        fileType: fileType || null,
       },
     })
 

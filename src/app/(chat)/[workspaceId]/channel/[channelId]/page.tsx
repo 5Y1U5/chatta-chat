@@ -72,6 +72,9 @@ export default async function ChannelPage({
       aiGenerated: m.aiGenerated,
       deletedAt: null,
       replyCount: m._count.replies,
+      fileUrl: m.fileUrl,
+      fileName: m.fileName,
+      fileType: m.fileType,
       reactions: aggregateReactions(m.reactions, auth.userId),
       user: {
         id: m.user.id,

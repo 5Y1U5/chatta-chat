@@ -9,6 +9,9 @@ export type MessageWithUser = {
   aiGenerated?: boolean
   deletedAt?: string | null
   replyCount?: number
+  fileUrl?: string | null
+  fileName?: string | null
+  fileType?: string | null
   reactions?: ReactionInfo[]
   user: {
     id: string

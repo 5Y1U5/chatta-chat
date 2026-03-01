@@ -5,36 +5,81 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import type { ChannelMemberInfo } from "@/types/chat"
 
+export type FileAttachment = {
+  fileUrl: string
+  fileName: string
+  fileType: string
+}
+
 type Props = {
   channelId: string
-  onSend: (content: string) => void
+  onSend: (content: string, file?: FileAttachment) => void
   disabled?: boolean
   placeholder?: string
   members?: ChannelMemberInfo[]
 }
 
-export function MessageInput({ onSend, disabled, placeholder, members }: Props) {
+export function MessageInput({ channelId, onSend, disabled, placeholder, members }: Props) {
   const [content, setContent] = useState("")
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState("")
   const [mentionIndex, setMentionIndex] = useState(0)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // メンション候補リスト
   const mentionCandidates = getMentionCandidates(mentionQuery, members || [])
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const trimmed = content.trim()
-    if (!trimmed) return
+    if (!trimmed && !pendingFile) return
 
-    onSend(trimmed)
+    let fileAttachment: FileAttachment | undefined
+
+    // ファイルがある場合はアップロード
+    if (pendingFile) {
+      setUploading(true)
+      try {
+        const formData = new FormData()
+        formData.append("file", pendingFile)
+
+        const res = await fetch("/api/internal/upload", {
+          method: "POST",
+          body: formData,
+        })
+        const data = await res.json()
+
+        if (data.error) {
+          console.error("アップロードエラー:", data.error)
+          setUploading(false)
+          return
+        }
+
+        fileAttachment = {
+          fileUrl: data.fileUrl,
+          fileName: data.fileName,
+          fileType: data.fileType,
+        }
+      } catch (error) {
+        console.error("アップロードエラー:", error)
+        setUploading(false)
+        return
+      } finally {
+        setUploading(false)
+      }
+    }
+
+    onSend(trimmed, fileAttachment)
     setContent("")
+    setPendingFile(null)
     setShowMentions(false)
 
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
-  }, [content, onSend])
+  }, [content, pendingFile, onSend])
 
   function handleKeyDown(e: React.KeyboardEvent) {
     // メンション候補表示中のキー操作
@@ -108,6 +153,19 @@ export function MessageInput({ onSend, disabled, placeholder, members }: Props) 
     })
   }
 
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert("ファイルサイズは10MB以下にしてください")
+        return
+      }
+      setPendingFile(file)
+    }
+    // input をリセット（同じファイルを再選択可能に）
+    e.target.value = ""
+  }
+
   // クリック外でメンション候補を閉じる
   useEffect(() => {
     if (!showMentions) return
@@ -117,6 +175,8 @@ export function MessageInput({ onSend, disabled, placeholder, members }: Props) 
     document.addEventListener("click", handleClick)
     return () => document.removeEventListener("click", handleClick)
   }, [showMentions])
+
+  const isImage = pendingFile?.type.startsWith("image/")
 
   return (
     <div className="relative border-t p-4">
@@ -149,7 +209,54 @@ export function MessageInput({ onSend, disabled, placeholder, members }: Props) 
         </div>
       )}
 
+      {/* ファイルプレビュー */}
+      {pendingFile && (
+        <div className="mb-2 flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
+          {isImage ? (
+            <img
+              src={URL.createObjectURL(pendingFile)}
+              alt={pendingFile.name}
+              className="h-12 w-12 rounded object-cover"
+            />
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-muted-foreground">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+          )}
+          <span className="flex-1 truncate text-sm">{pendingFile.name}</span>
+          <button
+            onClick={() => setPendingFile(null)}
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <div className="flex gap-2">
+        {/* ファイル添付ボタン */}
+        <button
+          title="ファイルを添付"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={disabled || uploading}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+          </svg>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={handleFileSelect}
+          className="hidden"
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
+        />
+
         <Textarea
           ref={textareaRef}
           value={content}
@@ -158,28 +265,24 @@ export function MessageInput({ onSend, disabled, placeholder, members }: Props) 
           placeholder={placeholder || "メッセージを入力... (@AI でAIに質問)"}
           className="min-h-[40px] max-h-[120px] resize-none"
           rows={1}
-          disabled={disabled}
+          disabled={disabled || uploading}
         />
         <Button
           onClick={handleSend}
-          disabled={!content.trim() || disabled}
+          disabled={(!content.trim() && !pendingFile) || disabled || uploading}
           size="icon"
           className="shrink-0"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
+          {uploading ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          )}
         </Button>
       </div>
     </div>

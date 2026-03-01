@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback, useState } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { MessageInput } from "@/components/chat/MessageInput"
+import { MessageInput, type FileAttachment } from "@/components/chat/MessageInput"
 import { ThreadPanel } from "@/components/chat/ThreadPanel"
 import { EmojiPicker } from "@/components/chat/EmojiPicker"
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
@@ -141,7 +141,7 @@ export function MessageView({
       ? members.find((m) => m.id !== currentUserId)?.displayName || "DM"
       : `# ${channel.name || "名前なし"}`
 
-  async function handleSend(content: string) {
+  async function handleSend(content: string, file?: FileAttachment) {
     setSending(true)
     try {
       const res = await fetch("/api/internal/messages", {
@@ -150,6 +150,7 @@ export function MessageView({
         body: JSON.stringify({
           channelId: channel.id,
           content,
+          ...(file ? { fileUrl: file.fileUrl, fileName: file.fileName, fileType: file.fileType } : {}),
         }),
       })
       const data = await res.json()
@@ -160,7 +161,7 @@ export function MessageView({
         const now = new Date().toISOString()
         const optimisticMessage: MessageWithUser = {
           id: data.id,
-          content,
+          content: content || (file ? `[ファイル] ${file.fileName}` : ""),
           createdAt: now,
           updatedAt: now,
           userId: currentUserId,
@@ -168,6 +169,9 @@ export function MessageView({
           aiGenerated: false,
           deletedAt: null,
           replyCount: 0,
+          fileUrl: file?.fileUrl || null,
+          fileName: file?.fileName || null,
+          fileType: file?.fileType || null,
           reactions: [],
           user: {
             id: currentUserId,
@@ -422,9 +426,27 @@ function MessageBubble({
             </div>
           </div>
         ) : (
-          <p className="text-sm whitespace-pre-wrap break-words">
-            {message.content}
-          </p>
+          <>
+            {message.content && !message.fileUrl && (
+              <p className="text-sm whitespace-pre-wrap break-words">
+                {message.content}
+              </p>
+            )}
+            {message.content && message.fileUrl && !message.content.startsWith("[ファイル]") && (
+              <p className="text-sm whitespace-pre-wrap break-words">
+                {message.content}
+              </p>
+            )}
+          </>
+        )}
+
+        {/* ファイル添付表示 */}
+        {!isDeleted && message.fileUrl && (
+          <FilePreview
+            fileUrl={message.fileUrl}
+            fileName={message.fileName || "ファイル"}
+            fileType={message.fileType || ""}
+          />
         )}
 
         {/* リアクション表示 */}
@@ -523,5 +545,51 @@ function ActionButton({
     >
       {children}
     </button>
+  )
+}
+
+// ファイルプレビュー
+function FilePreview({
+  fileUrl,
+  fileName,
+  fileType,
+}: {
+  fileUrl: string
+  fileName: string
+  fileType: string
+}) {
+  const isImage = fileType.startsWith("image/")
+
+  if (isImage) {
+    return (
+      <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
+        <img
+          src={fileUrl}
+          alt={fileName}
+          className="max-h-64 max-w-xs rounded-md border object-contain"
+          loading="lazy"
+        />
+      </a>
+    )
+  }
+
+  return (
+    <a
+      href={fileUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-1 inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm hover:bg-muted"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-muted-foreground">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+      </svg>
+      <span className="truncate">{fileName}</span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-muted-foreground">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    </a>
   )
 }
