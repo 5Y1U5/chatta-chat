@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,8 @@ export function LoginForm() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteCode = searchParams.get("invite")
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -42,7 +44,8 @@ export function LoginForm() {
         return
       }
 
-      router.push("/")
+      // 招待コード付きなら招待ページへ、なければトップへ
+      router.push(inviteCode ? `/invite/${inviteCode}` : "/")
       router.refresh()
     } catch {
       setError("ログインに失敗しました")
@@ -98,7 +101,7 @@ export function LoginForm() {
             <span className="text-xs text-muted-foreground">または</span>
             <Separator className="flex-1" />
           </div>
-          <GoogleLoginButton />
+          <GoogleLoginButton next={inviteCode ? `/invite/${inviteCode}` : undefined} />
           <p className="text-sm text-muted-foreground">
             アカウントをお持ちでない方は{" "}
             <Link href="/signup" className="text-primary hover:underline">

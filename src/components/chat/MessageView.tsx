@@ -10,6 +10,7 @@ import { EmojiPicker } from "@/components/chat/EmojiPicker"
 import { TypingIndicator } from "@/components/chat/TypingIndicator"
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
+import { ChannelMembersDialog } from "@/components/chat/ChannelMembersDialog"
 import type { MessageWithUser, ChannelMemberInfo, ChannelInfo, ReactionInfo } from "@/types/chat"
 
 type Props = {
@@ -278,8 +279,13 @@ export function MessageView({
       {/* メインチャットエリア */}
       <div className={`flex h-full flex-1 flex-col ${activeThreadId ? "border-r" : ""}`}>
         {/* チャンネルヘッダー */}
-        <div className="flex h-12 items-center border-b px-4 font-semibold">
-          {channelDisplayName}
+        <div className="flex h-12 items-center justify-between border-b px-4 font-semibold">
+          <span>{channelDisplayName}</span>
+          <ChannelMembersDialog
+            channelId={channel.id}
+            channelType={channel.type}
+            currentUserId={currentUserId}
+          />
         </div>
 
         {/* メッセージ一覧 */}

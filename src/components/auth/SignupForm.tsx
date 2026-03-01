@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,8 @@ export function SignupForm() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteCode = searchParams.get("invite")
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -59,7 +61,7 @@ export function SignupForm() {
         return
       }
 
-      // 2. DB にユーザー + ワークスペースを作成
+      // 2. DB にユーザー + ワークスペースを作成（招待コード付きなら既存ワークスペースに参加）
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,6 +69,7 @@ export function SignupForm() {
           supabaseUserId: authData.user.id,
           email,
           displayName,
+          ...(inviteCode && { inviteCode }),
         }),
       })
 
@@ -161,7 +164,7 @@ export function SignupForm() {
             <span className="text-xs text-muted-foreground">または</span>
             <Separator className="flex-1" />
           </div>
-          <GoogleLoginButton />
+          <GoogleLoginButton next={inviteCode ? `/invite/${inviteCode}` : undefined} />
           <p className="text-sm text-muted-foreground">
             すでにアカウントをお持ちの方は{" "}
             <Link href="/login" className="text-primary hover:underline">

@@ -4,18 +4,24 @@ import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
-export function GoogleLoginButton() {
+type Props = {
+  next?: string // OAuth 後のリダイレクト先（招待リンク対応）
+}
+
+export function GoogleLoginButton({ next }: Props) {
   const [loading, setLoading] = useState(false)
 
   async function handleGoogleLogin() {
     setLoading(true)
     const supabase = createClient()
 
+    const redirectTo = next
+      ? `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(next)}`
+      : `${window.location.origin}/api/auth/callback`
+
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/api/auth/callback`,
-      },
+      options: { redirectTo },
     })
   }
 

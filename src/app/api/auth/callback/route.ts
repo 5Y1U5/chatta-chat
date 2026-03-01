@@ -20,7 +20,13 @@ export async function GET(request: Request) {
 
       if (user) {
         try {
-          await ensureDbUser(user.id, user.email || "", user.user_metadata?.full_name || user.user_metadata?.name)
+          // 招待リンク経由の場合、inviteCode を抽出
+          let inviteCode: string | undefined
+          if (next.startsWith("/invite/")) {
+            inviteCode = next.replace("/invite/", "")
+          }
+
+          await ensureDbUser(user.id, user.email || "", user.user_metadata?.full_name || user.user_metadata?.name, inviteCode)
         } catch (e) {
           console.error("DB ユーザー作成エラー:", e)
         }
@@ -34,7 +40,8 @@ export async function GET(request: Request) {
 }
 
 // DB ユーザーが存在しなければ作成（Google ログイン用）
-async function ensureDbUser(supabaseUserId: string, email: string, displayName?: string) {
+// inviteCode がある場合は既存ワークスペースに参加
+async function ensureDbUser(supabaseUserId: string, email: string, displayName?: string, inviteCode?: string) {
   const prisma = getPrisma()
 
   const existing = await prisma.user.findUnique({
@@ -53,6 +60,41 @@ async function ensureDbUser(supabaseUserId: string, email: string, displayName?:
     },
   })
 
+  // 招待コードがある場合は既存ワークスペースに参加
+  if (inviteCode) {
+    const invitedWorkspace = await prisma.workspace.findUnique({
+      where: { inviteCode },
+    })
+
+    if (invitedWorkspace) {
+      await prisma.workspaceMember.create({
+        data: {
+          workspaceId: invitedWorkspace.id,
+          userId: user.id,
+          role: "member",
+        },
+      })
+
+      const publicChannels = await prisma.channel.findMany({
+        where: { workspaceId: invitedWorkspace.id, type: "public" },
+        select: { id: true },
+      })
+
+      if (publicChannels.length > 0) {
+        await prisma.channelMember.createMany({
+          data: publicChannels.map((ch) => ({
+            channelId: ch.id,
+            userId: user.id,
+          })),
+          skipDuplicates: true,
+        })
+      }
+
+      return
+    }
+  }
+
+  // 招待コードなし or 無効 → 自分のワークスペースを作成
   const workspace = await prisma.workspace.create({
     data: {
       name: `${name}のワークスペース`,

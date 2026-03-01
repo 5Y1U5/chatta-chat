@@ -26,11 +26,12 @@ model User {
 
 // === ワークスペース（組織/チーム単位）===
 model Workspace {
-  id        String   @id @default(uuid())
-  name      String
-  iconUrl   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  name       String
+  iconUrl    String?
+  inviteCode String?  @unique // ワークスペース招待コード
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   members  WorkspaceMember[]
   channels Channel[]

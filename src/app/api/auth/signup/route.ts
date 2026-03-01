@@ -2,9 +2,10 @@ import { NextResponse } from "next/server"
 import { getPrisma } from "@/lib/prisma"
 
 // サインアップ後に DB ユーザー + ワークスペース + #general チャンネルを作成
+// inviteCode がある場合は既存ワークスペースに参加
 export async function POST(request: Request) {
   try {
-    const { supabaseUserId, email, displayName } = await request.json()
+    const { supabaseUserId, email, displayName, inviteCode } = await request.json()
 
     if (!supabaseUserId || !email) {
       return NextResponse.json(
@@ -35,7 +36,45 @@ export async function POST(request: Request) {
       },
     })
 
-    // Workspace 作成
+    // 招待コードがある場合は既存ワークスペースに参加
+    if (inviteCode) {
+      const invitedWorkspace = await prisma.workspace.findUnique({
+        where: { inviteCode },
+      })
+
+      if (invitedWorkspace) {
+        await prisma.workspaceMember.create({
+          data: {
+            workspaceId: invitedWorkspace.id,
+            userId: user.id,
+            role: "member",
+          },
+        })
+
+        // 全 public チャンネルに自動参加
+        const publicChannels = await prisma.channel.findMany({
+          where: { workspaceId: invitedWorkspace.id, type: "public" },
+          select: { id: true },
+        })
+
+        if (publicChannels.length > 0) {
+          await prisma.channelMember.createMany({
+            data: publicChannels.map((ch) => ({
+              channelId: ch.id,
+              userId: user.id,
+            })),
+            skipDuplicates: true,
+          })
+        }
+
+        return NextResponse.json({
+          userId: user.id,
+          workspaceId: invitedWorkspace.id,
+        })
+      }
+    }
+
+    // 招待コードなし or 無効 → 自分のワークスペースを作成
     const workspace = await prisma.workspace.create({
       data: {
         name: `${displayName || email.split("@")[0]}のワークスペース`,

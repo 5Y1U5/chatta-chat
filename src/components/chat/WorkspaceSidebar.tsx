@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ProfileDialog } from "@/components/chat/ProfileDialog"
+import { InviteDialog } from "@/components/chat/InviteDialog"
 
 type Props = {
   workspace: {
@@ -36,6 +37,9 @@ export function WorkspaceSidebar({ workspace }: Props) {
       </Avatar>
 
       <Separator className="w-8" />
+
+      {/* メンバー招待 */}
+      <InviteDialog />
 
       {/* スペーサー */}
       <div className="flex-1" />
