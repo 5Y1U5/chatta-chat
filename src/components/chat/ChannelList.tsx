@@ -1,11 +1,12 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { NewChannelDialog } from "@/components/chat/NewChannelDialog"
 import { NewDmDialog } from "@/components/chat/NewDmDialog"
+import { SearchModal } from "@/components/chat/SearchModal"
 import { useUnreadCounts } from "@/hooks/useUnreadCounts"
 
 type ChannelItem = {
@@ -56,6 +57,8 @@ export function ChannelList({ channels, workspaceId, currentUserId }: Props) {
     [channels, unreadCounts]
   )
 
+  const [searchOpen, setSearchOpen] = useState(false)
+
   const publicChannels = channelsWithLiveCounts.filter((ch) => ch.type === "public")
   const groupChannels = channelsWithLiveCounts.filter((ch) => ch.type === "group")
   const dmChannels = channelsWithLiveCounts.filter((ch) => ch.type === "dm")
@@ -63,9 +66,21 @@ export function ChannelList({ channels, workspaceId, currentUserId }: Props) {
   return (
     <div className="hidden w-60 flex-col border-r bg-muted/30 md:flex">
       {/* ヘッダー */}
-      <div className="flex h-12 items-center px-4 font-semibold border-b">
-        チャンネル
+      <div className="flex h-12 items-center justify-between px-4 font-semibold border-b">
+        <span>チャンネル</span>
+        <button
+          title="検索"
+          onClick={() => setSearchOpen(true)}
+          className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </button>
       </div>
+
+      <SearchModal workspaceId={workspaceId} open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <div className="flex-1 overflow-y-auto py-2">
         {/* パブリックチャンネル */}

@@ -11,6 +11,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useUnreadCounts } from "@/hooks/useUnreadCounts"
+import { SearchModal } from "@/components/chat/SearchModal"
 
 type ChannelItem = {
   id: string
@@ -40,6 +41,7 @@ function getChannelDisplayName(channel: ChannelItem, currentUserId: string): str
 
 export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
   const [open, setOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const params = useParams()
   const activeChannelId = params.channelId as string | undefined
   const router = useRouter()
@@ -102,13 +104,21 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
           />
           <div className="fixed inset-y-0 left-0 z-50 w-72 bg-background border-r shadow-lg flex flex-col">
             <div className="flex h-12 items-center justify-between px-4 border-b font-semibold">
-              チャンネル
+              <span>チャンネル</span>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setOpen(false); setSearchOpen(true) }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </Button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto py-2">
@@ -162,6 +172,8 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
           </div>
         </>
       )}
+
+      <SearchModal workspaceId={workspaceId} open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   )
 }
