@@ -1,69 +1,92 @@
 # chatta-chat
 
-AI ネイティブなチャットコミュニケーションツール。Slack/Chatwork のような汎用チャットに AI が最初から組み込まれた設計。
+AI ネイティブなチャットコミュニケーションツール。Slack/Chatwork のような汎用チャットに AI が最初から組み込まれた設計。社内向けツールとして展開中。
+
+## 用語
+
+| コード内 | UI 表示 | 説明 |
+|---------|---------|------|
+| channel (public) | グループチャット | 複数人のチャットルーム |
+| channel (dm) | ダイレクトメッセージ | 1対1のチャット |
+| general | マイチャット | 新規ワークスペース作成時のデフォルトグループチャット名 |
 
 ## 技術スタック
 
 | 項目 | 選択 |
 |------|------|
-| フレームワーク | Next.js (App Router) + TypeScript |
+| フレームワーク | Next.js 16.1.6 (App Router) + TypeScript |
 | DB | Supabase (PostgreSQL) |
-| リアルタイム | Supabase Realtime (postgres_changes) |
-| ORM | Prisma + PrismaPg adapter |
-| 認証 | Supabase Auth |
-| UI | shadcn/ui + Tailwind CSS |
+| リアルタイム | Supabase Realtime (postgres_changes + Presence) |
+| ORM | Prisma 7.x + PrismaPg adapter（出力先: `src/generated/prisma`） |
+| 認証 | Supabase Auth (Email + Google OAuth) |
+| AI | Anthropic Claude API (`@anthropic-ai/sdk`) |
+| UI | shadcn/ui + Tailwind CSS v4 |
 | バリデーション | Zod v4 |
 | ホスティング | Vercel |
+| PWA | manifest.json + 最小 Service Worker |
 
 ## ディレクトリ構成
 
 ```
 src/
 ├── app/
-│   ├── (auth)/login, signup         # 認証ページ
-│   ├── (chat)/                      # 3カラムレイアウト
+│   ├── (auth)/login, signup           # 認証ページ（Suspense ラッパー必須）
+│   ├── (chat)/                        # 3カラムレイアウト（h-dvh）
 │   │   └── [workspaceId]/
-│   │       └── channel/[channelId]/ # メッセージビュー
+│   │       └── channel/[channelId]/   # メッセージビュー + スレッド
+│   ├── invite/[code]/                 # ワークスペース招待ランディング
+│   ├── ch/[code]/                     # グループチャット招待ランディング
 │   └── api/
-│       ├── auth/signup, callback
-│       └── internal/channels, messages
+│       ├── auth/signup, callback      # 認証 + 招待コード処理
+│       └── internal/                  # 内部 API（認証必須）
+│           ├── channels/              # CRUD + invite + join + members + read
+│           ├── messages/              # CRUD + search
+│           ├── dm/                    # DM 作成
+│           ├── members/               # ワークスペースメンバー一覧
+│           ├── profile/               # プロフィール更新
+│           ├── reactions/             # リアクション
+│           ├── upload/                # ファイルアップロード
+│           └── workspaces/invite,join # ワークスペース招待
 ├── components/
 │   ├── ui/           # shadcn
-│   ├── auth/         # LoginForm, SignupForm
-│   └── chat/         # WorkspaceSidebar, ChannelList, MessageView, MessageInput
+│   ├── auth/         # LoginForm, SignupForm, GoogleLoginButton
+│   ├── chat/         # WorkspaceSidebar, ChannelList, MessageView, MessageInput, etc.
+│   └── pwa/          # InstallBanner, ServiceWorkerRegister
 ├── hooks/
-│   └── useRealtimeMessages.ts
+│   ├── useRealtimeMessages.ts    # メッセージのリアルタイム購読
+│   ├── useUnreadCounts.ts        # 未読数管理
+│   └── useTypingIndicator.ts     # タイピングインジケータ（Presence）
 ├── lib/
 │   ├── supabase/     # client, server, middleware, admin
-│   ├── prisma.ts     # シングルトン（Chatta 流用）
-│   ├── auth.ts       # getAuthContext（workspaceId 版）
+│   ├── ai/           # assistant.ts, claude.ts, providers.ts
+│   ├── prisma.ts     # シングルトン
+│   ├── auth.ts       # requireAuth / getAuthContext
 │   └── config.ts     # 環境変数管理
+├── generated/prisma/ # Prisma 生成ファイル（.gitignore 対象）
 └── types/chat.ts
+public/
+├── manifest.json     # PWA マニフェスト
+├── sw.js             # Service Worker
+└── icons/            # PWA アイコン（192, 512, apple-touch）
 ```
 
 ## DB モデル
 
 - **User**: Supabase Auth と 1:1。email, displayName, avatarUrl
-- **Workspace**: 組織/チーム単位。name, iconUrl
+- **Workspace**: 組織/チーム単位。name, iconUrl, inviteCode (unique)
 - **WorkspaceMember**: User と Workspace の中間テーブル。role (admin/member)
-- **Channel**: type (dm/group/public)。workspaceId で所属
-- **ChannelMember**: User と Channel の中間テーブル
-- **Message**: channelId, userId, content。parentId (スレッド用、Phase 2)、aiGenerated (Phase 2)
+- **Channel**: type (dm/group/public), inviteCode (unique)。workspaceId で所属
+- **ChannelMember**: User と Channel の中間テーブル。lastReadAt (既読管理)
+- **Message**: channelId, userId, content, parentId (スレッド), aiGenerated, fileUrl/fileName/fileType
+- **Reaction**: messageId, userId, emoji
 
 ## コマンド
 
 ```bash
-# 開発サーバー
-npm run dev
-
-# Prisma マイグレーション
-npx prisma migrate dev --name <name>
-
-# Prisma クライアント生成
-npx prisma generate
-
-# ビルド
-npm run build
+npm run dev              # 開発サーバー
+npm run build            # prisma generate && next build
+npx prisma db push       # スキーマ反映（migrate dev ではなく db push を使用）
+npx prisma generate      # クライアント生成
 ```
 
 ## 環境変数
@@ -72,18 +95,22 @@ npm run build
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-DATABASE_URL=          # Supabase pooler (transaction mode)
-DIRECT_URL=            # Supabase direct connection
+DATABASE_URL=            # Supabase pooler (transaction mode)
+DIRECT_URL=              # Supabase direct connection
+ANTHROPIC_API_KEY=       # Claude API キー
 ```
 
-## Supabase Realtime
+## 主要な実装パターン
 
-- `postgres_changes` で `messages` テーブルの INSERT を購読
-- `filter: channel_id=eq.${channelId}` で対象チャンネルに絞り込み
-- Supabase 側で `ALTER PUBLICATION supabase_realtime ADD TABLE messages;` が必要
+- **モバイル対応**: `h-dvh`（`h-screen` ではなく）、`shrink-0` でヘッダー固定、`min-h-0` で flex overflow 制御
+- **Prisma 出力先**: `src/generated/prisma`。`.gitignore` 対象のため、ビルド時に `prisma generate` 必須
+- **`useSearchParams()`**: 使用するコンポーネントは `<Suspense>` でラップ必須（Next.js 要件）
+- **招待フロー**: `inviteCode` 12文字（`crypto.randomUUID().replace(/-/g, "").slice(0, 12)`）
+- **AI チャット**: `@AI` メンション → `after()` でバックグラウンド応答生成 → Realtime で配信。失敗時はエラーメッセージをチャットに投稿
+- **Realtime**: `postgres_changes` で messages テーブル購読。Presence でタイピングインジケータ
 
 ## コーディング規約
 
 - TypeScript strict モード
 - 会話・コミット・コメントはすべて日本語
-- feature ブランチで開発 → main へマージ
+- feature ブランチで開発 → main へマージ（main に直接コミットしない）
