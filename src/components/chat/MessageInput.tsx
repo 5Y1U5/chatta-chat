@@ -17,9 +17,10 @@ type Props = {
   disabled?: boolean
   placeholder?: string
   members?: ChannelMemberInfo[]
+  onTyping?: () => void
 }
 
-export function MessageInput({ channelId, onSend, disabled, placeholder, members }: Props) {
+export function MessageInput({ channelId, onSend, disabled, placeholder, members, onTyping }: Props) {
   const [content, setContent] = useState("")
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState("")
@@ -115,6 +116,9 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const value = e.target.value
     setContent(value)
+
+    // タイピング通知
+    if (value.trim() && onTyping) onTyping()
 
     // @ の後のテキストを検出
     const cursorPos = e.target.selectionStart

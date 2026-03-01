@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { MessageInput, type FileAttachment } from "@/components/chat/MessageInput"
 import { ThreadPanel } from "@/components/chat/ThreadPanel"
 import { EmojiPicker } from "@/components/chat/EmojiPicker"
+import { TypingIndicator } from "@/components/chat/TypingIndicator"
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
+import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import type { MessageWithUser, ChannelMemberInfo, ChannelInfo, ReactionInfo } from "@/types/chat"
 
 type Props = {
@@ -49,6 +51,13 @@ export function MessageView({
     initialMessages,
     userMap: userMap.current,
   })
+
+  const currentDisplayName = members.find((m) => m.id === currentUserId)?.displayName || "不明"
+  const { typingUsers, startTyping, stopTyping } = useTypingIndicator(
+    channel.id,
+    currentUserId,
+    currentDisplayName
+  )
 
   // 初回のみ最下部にスクロール + 既読マーク
   useEffect(() => {
@@ -142,6 +151,7 @@ export function MessageView({
       : `# ${channel.name || "名前なし"}`
 
   async function handleSend(content: string, file?: FileAttachment) {
+    stopTyping()
     setSending(true)
     try {
       const res = await fetch("/api/internal/messages", {
@@ -299,12 +309,16 @@ export function MessageView({
           <div ref={messagesEndRef} />
         </div>
 
+        {/* タイピングインジケータ */}
+        <TypingIndicator typingUsers={typingUsers} />
+
         {/* 入力エリア */}
         <MessageInput
           channelId={channel.id}
           onSend={handleSend}
           disabled={sending}
           members={members}
+          onTyping={startTyping}
         />
       </div>
 
