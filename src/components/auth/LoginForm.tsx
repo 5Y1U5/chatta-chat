@@ -15,6 +15,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { GoogleLoginButton } from "@/components/auth/GoogleLoginButton"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
@@ -91,6 +93,12 @@ export function LoginForm() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "ログイン中..." : "ログイン"}
           </Button>
+          <div className="flex w-full items-center gap-3">
+            <Separator className="flex-1" />
+            <span className="text-xs text-muted-foreground">または</span>
+            <Separator className="flex-1" />
+          </div>
+          <GoogleLoginButton />
           <p className="text-sm text-muted-foreground">
             アカウントをお持ちでない方は{" "}
             <Link href="/signup" className="text-primary hover:underline">

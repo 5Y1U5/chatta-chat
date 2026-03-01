@@ -13,9 +13,9 @@ const globalForPrisma = globalThis as unknown as {
 export function getPrisma(): PrismaClient {
   if (!globalForPrisma._prisma) {
     const pool = new pg.Pool({
-      connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL,
-      max: 5,
-      idleTimeoutMillis: 30000,
+      connectionString: process.env.DATABASE_URL || process.env.DIRECT_URL,
+      max: 3,
+      idleTimeoutMillis: 10000,
       connectionTimeoutMillis: 10000,
     })
     globalForPrisma._pool = pool
