@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { NewChannelDialog } from "@/components/chat/NewChannelDialog"
 import { NewDmDialog } from "@/components/chat/NewDmDialog"
 import { ProfileDialog } from "@/components/chat/ProfileDialog"
+import { InviteDialog } from "@/components/chat/InviteDialog"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -159,7 +160,9 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
 
             {/* フッター */}
             <div className="flex items-center gap-2 border-t p-3">
+              <InviteDialog />
               <ProfileDialog />
+              <div className="flex-1" />
               <Button
                 variant="ghost"
                 size="sm"

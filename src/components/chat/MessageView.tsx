@@ -279,7 +279,7 @@ export function MessageView({
       {/* メインチャットエリア */}
       <div className={`flex h-full flex-1 flex-col ${activeThreadId ? "border-r" : ""}`}>
         {/* チャンネルヘッダー */}
-        <div className="flex h-12 items-center justify-between border-b px-4 font-semibold">
+        <div className="flex h-12 shrink-0 items-center justify-between border-b px-4 font-semibold">
           <span>{channelDisplayName}</span>
           <ChannelMembersDialog
             channelId={channel.id}

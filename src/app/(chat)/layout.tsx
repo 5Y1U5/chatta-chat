@@ -101,7 +101,7 @@ export default async function ChatLayout({
 
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* モバイルヘッダー */}
-        <div className="flex h-12 items-center gap-2 border-b px-3 md:hidden">
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
           <MobileSidebar
             channels={channels}
             workspaceId={activeWorkspaceId}
@@ -109,7 +109,9 @@ export default async function ChatLayout({
           />
           <span className="font-semibold text-sm truncate">chatta-chat</span>
         </div>
-        {children}
+        <div className="flex-1 overflow-hidden">
+          {children}
+        </div>
       </main>
     </div>
   )
