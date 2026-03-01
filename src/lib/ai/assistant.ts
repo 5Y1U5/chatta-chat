@@ -32,62 +32,81 @@ export async function generateAiResponse(
 ) {
   const prisma = getPrisma()
 
-  // 直近の会話コンテキストを取得（最新10件）
-  const recentMessages = await prisma.message.findMany({
-    where: {
-      channelId,
-      parentId: null,
-      deletedAt: null,
-    },
-    include: { user: true },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-  })
+  try {
+    // 直近の会話コンテキストを取得（最新10件）
+    const recentMessages = await prisma.message.findMany({
+      where: {
+        channelId,
+        parentId: null,
+        deletedAt: null,
+      },
+      include: { user: true },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    })
 
-  // 古い順に並べる
-  recentMessages.reverse()
+    // 古い順に並べる
+    recentMessages.reverse()
 
-  // Claude API 用のメッセージ配列を構築
-  type ClaudeMessage = { role: "user" | "assistant"; content: string }
-  const messages: ClaudeMessage[] = []
+    // Claude API 用のメッセージ配列を構築
+    type ClaudeMessage = { role: "user" | "assistant"; content: string }
+    const messages: ClaudeMessage[] = []
 
-  for (const msg of recentMessages) {
-    if (msg.aiGenerated) {
-      messages.push({ role: "assistant", content: msg.content })
-    } else {
-      const name = msg.user.displayName || "ユーザー"
-      const content = msg.id === triggerMessageId
-        ? `${name}: ${extractQuestion(msg.content)}`
-        : `${name}: ${msg.content}`
-      messages.push({ role: "user", content })
+    for (const msg of recentMessages) {
+      if (msg.aiGenerated) {
+        messages.push({ role: "assistant", content: msg.content })
+      } else {
+        const name = msg.user.displayName || "ユーザー"
+        const content = msg.id === triggerMessageId
+          ? `${name}: ${extractQuestion(msg.content)}`
+          : `${name}: ${msg.content}`
+        messages.push({ role: "user", content })
+      }
+    }
+
+    // 直近メッセージがなければトリガーメッセージだけ
+    if (messages.length === 0) {
+      messages.push({ role: "user", content: extractQuestion(triggerContent) })
+    }
+
+    // 末尾が assistant の場合、Claude API がエラーになるので調整
+    if (messages[messages.length - 1].role === "assistant") {
+      messages.push({ role: "user", content: extractQuestion(triggerContent) })
+    }
+
+    // Claude API 呼び出し
+    const response = await callClaude(SYSTEM_PROMPT, messages)
+
+    // AI 用ユーザーを取得 or 作成
+    const aiUser = await getOrCreateAiUser(channelId)
+
+    // 応答をメッセージとして保存
+    await prisma.message.create({
+      data: {
+        channelId,
+        userId: aiUser.id,
+        content: response,
+        aiGenerated: true,
+      },
+    })
+  } catch (err) {
+    console.error("AI 応答生成の内部エラー:", err)
+    // エラー時はエラーメッセージをチャットに投稿（ユーザーに見えるように）
+    try {
+      const aiUser = await getOrCreateAiUser(channelId)
+      const errorDetail = err instanceof Error ? err.message : "不明なエラー"
+      await prisma.message.create({
+        data: {
+          channelId,
+          userId: aiUser.id,
+          content: `AI 応答の生成に失敗しました: ${errorDetail}`,
+          aiGenerated: true,
+        },
+      })
+    } catch (innerErr) {
+      console.error("AI エラーメッセージ投稿も失敗:", innerErr)
     }
   }
-
-  // 直近メッセージがなければトリガーメッセージだけ
-  if (messages.length === 0) {
-    messages.push({ role: "user", content: extractQuestion(triggerContent) })
-  }
-
-  // 末尾が assistant の場合、Claude API がエラーになるので調整
-  if (messages[messages.length - 1].role === "assistant") {
-    messages.push({ role: "user", content: extractQuestion(triggerContent) })
-  }
-
-  // Claude API 呼び出し
-  const response = await callClaude(SYSTEM_PROMPT, messages)
-
-  // AI 用ユーザーを取得 or 作成
-  const aiUser = await getOrCreateAiUser(channelId)
-
-  // 応答をメッセージとして保存
-  await prisma.message.create({
-    data: {
-      channelId,
-      userId: aiUser.id,
-      content: response,
-      aiGenerated: true,
-    },
-  })
 }
 
 // AI ユーザーを取得（なければ作成）
