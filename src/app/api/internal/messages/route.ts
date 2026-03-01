@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     if (!membership) {
       return NextResponse.json(
-        { error: "このチャンネルのメンバーではありません" },
+        { error: "このグループチャットのメンバーではありません" },
         { status: 403 }
       )
     }
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
 
     if (!channelId || (!content?.trim() && !fileUrl)) {
       return NextResponse.json(
-        { error: "チャンネルIDとメッセージ内容は必須です" },
+        { error: "グループチャットIDとメッセージ内容は必須です" },
         { status: 400 }
       )
     }
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
 
     if (!membership) {
       return NextResponse.json(
-        { error: "このチャンネルのメンバーではありません" },
+        { error: "このグループチャットのメンバーではありません" },
         { status: 403 }
       )
     }

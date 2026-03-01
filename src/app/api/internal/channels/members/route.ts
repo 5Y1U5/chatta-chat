@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 
-// チャンネルメンバー一覧取得
+// グループチャットメンバー一覧取得
 export async function GET(request: Request) {
   try {
     const auth = await requireAuth()
@@ -18,14 +18,14 @@ export async function GET(request: Request) {
 
     const prisma = getPrisma()
 
-    // チャンネルが自分のワークスペースに属するか確認
+    // グループチャットが自分のワークスペースに属するか確認
     const channel = await prisma.channel.findFirst({
       where: { id: channelId, workspaceId: auth.workspaceId },
     })
 
     if (!channel) {
       return NextResponse.json(
-        { error: "チャンネルが見つかりません" },
+        { error: "グループチャットが見つかりません" },
         { status: 404 }
       )
     }
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       }))
     )
   } catch (error) {
-    console.error("チャンネルメンバー取得エラー:", error)
+    console.error("グループチャットメンバー取得エラー:", error)
     return NextResponse.json(
       { error: "サーバーエラーが発生しました" },
       { status: 500 }
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
   }
 }
 
-// チャンネルにメンバー追加
+// グループチャットにメンバー追加
 export async function POST(request: Request) {
   try {
     const auth = await requireAuth()
@@ -71,14 +71,14 @@ export async function POST(request: Request) {
 
     const prisma = getPrisma()
 
-    // チャンネルが自分のワークスペースに属するか確認
+    // グループチャットが自分のワークスペースに属するか確認
     const channel = await prisma.channel.findFirst({
       where: { id: channelId, workspaceId: auth.workspaceId },
     })
 
     if (!channel) {
       return NextResponse.json(
-        { error: "チャンネルが見つかりません" },
+        { error: "グループチャットが見つかりません" },
         { status: 404 }
       )
     }
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("チャンネルメンバー追加エラー:", error)
+    console.error("グループチャットメンバー追加エラー:", error)
     return NextResponse.json(
       { error: "サーバーエラーが発生しました" },
       { status: 500 }
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
   }
 }
 
-// チャンネルからメンバー削除
+// グループチャットからメンバー削除
 export async function DELETE(request: Request) {
   try {
     const auth = await requireAuth()
@@ -129,14 +129,14 @@ export async function DELETE(request: Request) {
 
     const prisma = getPrisma()
 
-    // チャンネルが自分のワークスペースに属するか確認
+    // グループチャットが自分のワークスペースに属するか確認
     const channel = await prisma.channel.findFirst({
       where: { id: channelId, workspaceId: auth.workspaceId },
     })
 
     if (!channel) {
       return NextResponse.json(
-        { error: "チャンネルが見つかりません" },
+        { error: "グループチャットが見つかりません" },
         { status: 404 }
       )
     }
@@ -147,7 +147,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("チャンネルメンバー削除エラー:", error)
+    console.error("グループチャットメンバー削除エラー:", error)
     return NextResponse.json(
       { error: "サーバーエラーが発生しました" },
       { status: 500 }

@@ -105,7 +105,7 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
           />
           <div className="fixed inset-y-0 left-0 z-50 w-72 bg-background border-r shadow-lg flex flex-col">
             <div className="flex h-12 items-center justify-between px-4 border-b font-semibold">
-              <span>チャンネル</span>
+              <span>グループチャット</span>
               <div className="flex items-center gap-1">
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setOpen(false); setSearchOpen(true) }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -125,7 +125,7 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
             <div className="flex-1 overflow-y-auto py-2">
               {/* パブリックチャンネル */}
               <MobileSection
-                label="チャンネル"
+                label="グループチャット"
                 channels={publicChannels}
                 workspaceId={workspaceId}
                 currentUserId={currentUserId}

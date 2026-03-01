@@ -42,7 +42,7 @@ export function NewChannelDialog({ workspaceId }: Props) {
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.error || "チャンネル作成に失敗しました")
+        setError(data.error || "グループチャット作成に失敗しました")
         return
       }
 
@@ -52,7 +52,7 @@ export function NewChannelDialog({ workspaceId }: Props) {
       router.push(`/${workspaceId}/channel/${id}`)
       router.refresh()
     } catch {
-      setError("チャンネル作成に失敗しました")
+      setError("グループチャット作成に失敗しました")
     } finally {
       setLoading(false)
     }
@@ -71,9 +71,9 @@ export function NewChannelDialog({ workspaceId }: Props) {
       <DialogContent>
         <form onSubmit={handleCreate}>
           <DialogHeader>
-            <DialogTitle>チャンネルを作成</DialogTitle>
+            <DialogTitle>グループチャットを作成</DialogTitle>
             <DialogDescription>
-              新しいパブリックチャンネルを作成します
+              新しいグループチャットを作成します
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -83,7 +83,7 @@ export function NewChannelDialog({ workspaceId }: Props) {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="channelName">チャンネル名</Label>
+              <Label htmlFor="channelName">グループチャット名</Label>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">#</span>
                 <Input

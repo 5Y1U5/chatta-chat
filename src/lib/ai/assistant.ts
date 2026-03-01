@@ -4,7 +4,7 @@ import { callClaude } from "./claude"
 import { getPrisma } from "@/lib/prisma"
 
 const SYSTEM_PROMPT = `あなたは chatta-chat のAIアシスタントです。
-チャンネル内で @AI とメンションされた時に応答します。
+グループチャット内で @AI とメンションされた時に応答します。
 
 ルール:
 - 簡潔で親しみやすい口調で回答してください

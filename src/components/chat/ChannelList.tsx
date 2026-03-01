@@ -67,7 +67,7 @@ export function ChannelList({ channels, workspaceId, currentUserId }: Props) {
     <div className="hidden w-60 flex-col border-r bg-muted/30 md:flex">
       {/* ヘッダー */}
       <div className="flex h-12 items-center justify-between px-4 font-semibold border-b">
-        <span>チャンネル</span>
+        <span>グループチャット</span>
         <button
           title="検索"
           onClick={() => setSearchOpen(true)}
@@ -85,7 +85,7 @@ export function ChannelList({ channels, workspaceId, currentUserId }: Props) {
       <div className="flex-1 overflow-y-auto py-2">
         {/* パブリックチャンネル */}
         <ChannelSection
-          label="チャンネル"
+          label="グループチャット"
           channels={publicChannels}
           workspaceId={workspaceId}
           currentUserId={currentUserId}

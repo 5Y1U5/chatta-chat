@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 
-// チャンネル作成
+// グループチャット作成
 export async function POST(request: Request) {
   try {
     const auth = await requireAuth()
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
 
     if (!name?.trim() && type !== "dm") {
       return NextResponse.json(
-        { error: "チャンネル名は必須です" },
+        { error: "グループチャット名は必須です" },
         { status: 400 }
       )
     }
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ id: channel.id })
   } catch (error) {
-    console.error("チャンネル作成エラー:", error)
+    console.error("グループチャット作成エラー:", error)
     return NextResponse.json(
       { error: "サーバーエラーが発生しました" },
       { status: 500 }

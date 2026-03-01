@@ -141,7 +141,7 @@ async function ensureDbUser(supabaseUserId: string, email: string, displayName?:
   const generalChannel = await prisma.channel.create({
     data: {
       workspaceId: workspace.id,
-      name: "general",
+      name: "マイチャット",
       type: "public",
     },
   })

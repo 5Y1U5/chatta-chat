@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 
-// ワークスペースのルート → #general チャンネルにリダイレクト
+// ワークスペースのルート → マイチャットにリダイレクト
 export default async function WorkspacePage({
   params,
 }: {
@@ -15,7 +15,7 @@ export default async function WorkspacePage({
   const generalChannel = await prisma.channel.findFirst({
     where: {
       workspaceId,
-      name: "general",
+      name: "マイチャット",
       type: "public",
     },
     select: { id: true },
@@ -25,7 +25,7 @@ export default async function WorkspacePage({
     redirect(`/${workspaceId}/channel/${generalChannel.id}`)
   }
 
-  // #general が見つからない場合は最初のチャンネルにリダイレクト
+  // マイチャットが見つからない場合は最初のグループチャットにリダイレクト
   const firstChannel = await prisma.channel.findFirst({
     where: { workspaceId },
     select: { id: true },
@@ -38,7 +38,7 @@ export default async function WorkspacePage({
 
   return (
     <div className="flex h-full items-center justify-center text-muted-foreground">
-      チャンネルがありません
+      グループチャットがありません
     </div>
   )
 }

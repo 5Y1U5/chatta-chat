@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getPrisma } from "@/lib/prisma"
 
-// サインアップ後に DB ユーザー + ワークスペース + #general チャンネルを作成
+// サインアップ後に DB ユーザー + ワークスペース + マイチャットを作成
 // inviteCode がある場合は既存ワークスペースに参加
 export async function POST(request: Request) {
   try {
@@ -121,11 +121,11 @@ export async function POST(request: Request) {
       },
     })
 
-    // #general チャンネルを自動作成
+    // マイチャットを自動作成
     const generalChannel = await prisma.channel.create({
       data: {
         workspaceId: workspace.id,
-        name: "general",
+        name: "マイチャット",
         type: "public",
       },
     })

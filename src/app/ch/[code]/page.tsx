@@ -76,9 +76,9 @@ export default function ChannelInvitePage({ params }: PageProps) {
       <div className="w-full max-w-md px-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">チャンネルへの招待</CardTitle>
+            <CardTitle className="text-2xl">グループチャットへの招待</CardTitle>
             <CardDescription>
-              招待リンクからチャンネルに参加します
+              招待リンクからグループチャットに参加します
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -89,7 +89,7 @@ export default function ChannelInvitePage({ params }: PageProps) {
             )}
             {status === "done" && (
               <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-700">
-                チャンネルに参加しました。リダイレクトしています...
+                グループチャットに参加しました。リダイレクトしています...
               </div>
             )}
           </CardContent>
@@ -100,7 +100,7 @@ export default function ChannelInvitePage({ params }: PageProps) {
                 onClick={handleJoin}
                 disabled={status === "joining" || status === "done"}
               >
-                {status === "joining" ? "参加中..." : "チャンネルに参加する"}
+                {status === "joining" ? "参加中..." : "グループチャットに参加する"}
               </Button>
             ) : (
               <>

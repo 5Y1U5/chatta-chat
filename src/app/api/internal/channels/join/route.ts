@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 
-// 招待コードでチャンネルに参加（ワークスペース未参加なら自動参加）
+// 招待コードでグループチャットに参加（ワークスペース未参加なら自動参加）
 export async function POST(request: Request) {
   try {
     const auth = await requireAuth()
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
     const prisma = getPrisma()
 
-    // 招待コードでチャンネルを検索
+    // 招待コードでグループチャットを検索
     const channel = await prisma.channel.findUnique({
       where: { inviteCode },
       include: { workspace: true },
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       })
     }
 
-    // 既にチャンネルメンバーか確認
+    // 既にグループチャットメンバーか確認
     const existingMember = await prisma.channelMember.findUnique({
       where: {
         channelId_userId: {
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       })
     }
 
-    // チャンネルメンバーに追加
+    // グループチャットメンバーに追加
     await prisma.channelMember.create({
       data: {
         channelId: channel.id,
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
       already: false,
     })
   } catch (error) {
-    console.error("チャンネル参加エラー:", error)
+    console.error("グループチャット参加エラー:", error)
     return NextResponse.json(
       { error: "サーバーエラーが発生しました" },
       { status: 500 }

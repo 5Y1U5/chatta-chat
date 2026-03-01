@@ -152,7 +152,7 @@ export function ChannelMembersDialog({ channelId, channelType, currentUserId }: 
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>チャンネルメンバー</DialogTitle>
+          <DialogTitle>グループチャットメンバー</DialogTitle>
           <DialogDescription>
             メンバーの追加・削除ができます
           </DialogDescription>

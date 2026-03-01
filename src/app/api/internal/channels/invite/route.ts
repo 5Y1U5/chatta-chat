@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 
-// チャンネル招待コード生成/取得
+// グループチャット招待コード生成/取得
 export async function POST(request: Request) {
   try {
     const auth = await requireAuth()
@@ -17,14 +17,14 @@ export async function POST(request: Request) {
 
     const prisma = getPrisma()
 
-    // チャンネルが自分のワークスペースに属するか確認
+    // グループチャットが自分のワークスペースに属するか確認
     const channel = await prisma.channel.findFirst({
       where: { id: channelId, workspaceId: auth.workspaceId },
     })
 
     if (!channel) {
       return NextResponse.json(
-        { error: "チャンネルが見つかりません" },
+        { error: "グループチャットが見つかりません" },
         { status: 404 }
       )
     }
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       channelName: channel.name,
     })
   } catch (error) {
-    console.error("チャンネル招待コード生成エラー:", error)
+    console.error("グループチャット招待コード生成エラー:", error)
     return NextResponse.json(
       { error: "サーバーエラーが発生しました" },
       { status: 500 }
