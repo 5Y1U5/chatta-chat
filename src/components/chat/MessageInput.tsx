@@ -183,7 +183,7 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
   const isImage = pendingFile?.type.startsWith("image/")
 
   return (
-    <div className="relative border-t p-4">
+    <div className="relative shrink-0 border-t p-4">
       {/* メンション候補ポップアップ */}
       {showMentions && mentionCandidates.length > 0 && (
         <div className="absolute bottom-full left-4 right-4 mb-1 max-h-48 overflow-y-auto rounded-lg border bg-background shadow-lg z-50">

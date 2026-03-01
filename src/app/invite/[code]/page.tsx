@@ -65,14 +65,14 @@ export default function InvitePage({ params }: PageProps) {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-dvh items-center justify-center overflow-auto bg-background">
         <p className="text-muted-foreground">読み込み中...</p>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="flex min-h-dvh items-center justify-center overflow-auto bg-background">
       <div className="w-full max-w-md px-4">
         <Card>
           <CardHeader>

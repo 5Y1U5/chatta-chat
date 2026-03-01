@@ -123,4 +123,11 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* モバイルブラウザで画面全体のスクロールを防止 */
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    /* iOS Safari でのバウンススクロール防止 */
+    overscroll-behavior: none;
+  }
 }
