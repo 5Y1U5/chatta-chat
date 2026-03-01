@@ -8,9 +8,10 @@ type Props = {
   channelId: string
   onSend: (content: string) => void
   disabled?: boolean
+  placeholder?: string
 }
 
-export function MessageInput({ onSend, disabled }: Props) {
+export function MessageInput({ onSend, disabled, placeholder }: Props) {
   const [content, setContent] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -43,7 +44,7 @@ export function MessageInput({ onSend, disabled }: Props) {
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="メッセージを入力..."
+          placeholder={placeholder || "メッセージを入力..."}
           className="min-h-[40px] max-h-[120px] resize-none"
           rows={1}
           disabled={disabled}

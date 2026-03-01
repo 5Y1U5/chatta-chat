@@ -2,7 +2,10 @@
 
 import { useRef, useEffect, useCallback, useState } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { MessageInput } from "@/components/chat/MessageInput"
+import { ThreadPanel } from "@/components/chat/ThreadPanel"
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
 import type { MessageWithUser, ChannelMemberInfo, ChannelInfo } from "@/types/chat"
 
@@ -23,6 +26,7 @@ export function MessageView({
   const [sending, setSending] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(initialMessages.length >= 50)
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isInitialLoad = useRef(true)
@@ -141,59 +145,148 @@ export function MessageView({
     }
   }
 
+  // メッセージ編集
+  async function handleEdit(messageId: string, newContent: string) {
+    try {
+      await fetch("/api/internal/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId, content: newContent }),
+      })
+    } catch (error) {
+      console.error("メッセージ編集エラー:", error)
+    }
+  }
+
+  // メッセージ削除
+  async function handleDelete(messageId: string) {
+    try {
+      await fetch(`/api/internal/messages?messageId=${messageId}`, {
+        method: "DELETE",
+      })
+    } catch (error) {
+      console.error("メッセージ削除エラー:", error)
+    }
+  }
+
+  // アクティブスレッドの親メッセージ
+  const activeThreadMessage = activeThreadId
+    ? messages.find((m) => m.id === activeThreadId)
+    : null
+
   return (
-    <div className="flex h-full flex-col">
-      {/* チャンネルヘッダー */}
-      <div className="flex h-12 items-center border-b px-4 font-semibold">
-        {channelDisplayName}
+    <div className="flex h-full">
+      {/* メインチャットエリア */}
+      <div className={`flex h-full flex-1 flex-col ${activeThreadId ? "border-r" : ""}`}>
+        {/* チャンネルヘッダー */}
+        <div className="flex h-12 items-center border-b px-4 font-semibold">
+          {channelDisplayName}
+        </div>
+
+        {/* メッセージ一覧 */}
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-2">
+          {loadingMore && (
+            <div className="py-2 text-center text-xs text-muted-foreground">
+              読み込み中...
+            </div>
+          )}
+          {messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              まだメッセージがありません。最初のメッセージを送信しましょう！
+            </div>
+          ) : (
+            messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isOwn={message.userId === currentUserId}
+                onReply={() => setActiveThreadId(message.id)}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* 入力エリア */}
+        <MessageInput
+          channelId={channel.id}
+          onSend={handleSend}
+          disabled={sending}
+        />
       </div>
 
-      {/* メッセージ一覧 */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-2">
-        {loadingMore && (
-          <div className="py-2 text-center text-xs text-muted-foreground">
-            読み込み中...
-          </div>
-        )}
-        {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            まだメッセージがありません。最初のメッセージを送信しましょう！
-          </div>
-        ) : (
-          messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              isOwn={message.userId === currentUserId}
-            />
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* 入力エリア */}
-      <MessageInput
-        channelId={channel.id}
-        onSend={handleSend}
-        disabled={sending}
-      />
+      {/* スレッドパネル */}
+      {activeThreadId && activeThreadMessage && (
+        <ThreadPanel
+          channelId={channel.id}
+          parentMessage={activeThreadMessage}
+          members={members}
+          currentUserId={currentUserId}
+          userMap={userMap.current}
+          onClose={() => setActiveThreadId(null)}
+        />
+      )}
     </div>
   )
 }
 
+// メッセージバブル
 function MessageBubble({
   message,
+  isOwn,
+  onReply,
+  onEdit,
+  onDelete,
 }: {
   message: MessageWithUser
   isOwn: boolean
+  onReply: () => void
+  onEdit: (messageId: string, content: string) => void
+  onDelete: (messageId: string) => void
 }) {
+  const [showActions, setShowActions] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editContent, setEditContent] = useState(message.content)
+
   const time = new Date(message.createdAt).toLocaleTimeString("ja-JP", {
     hour: "2-digit",
     minute: "2-digit",
   })
 
+  const isEdited =
+    message.updatedAt &&
+    message.createdAt !== message.updatedAt &&
+    !message.deletedAt
+
+  const isDeleted = !!message.deletedAt
+
+  function handleSaveEdit() {
+    const trimmed = editContent.trim()
+    if (trimmed && trimmed !== message.content) {
+      onEdit(message.id, trimmed)
+    }
+    setEditing(false)
+  }
+
+  function handleKeyDownEdit(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSaveEdit()
+    }
+    if (e.key === "Escape") {
+      setEditing(false)
+      setEditContent(message.content)
+    }
+  }
+
   return (
-    <div className="flex gap-3 py-1.5">
+    <div
+      className="group relative flex gap-3 py-1.5 hover:bg-muted/50 rounded-md px-1 -mx-1"
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
       <Avatar className="h-8 w-8 shrink-0 mt-0.5">
         <AvatarFallback className="text-xs">
           {message.user.displayName?.charAt(0)?.toUpperCase() || "?"}
@@ -205,11 +298,100 @@ function MessageBubble({
             {message.user.displayName || "不明"}
           </span>
           <span className="text-xs text-muted-foreground">{time}</span>
+          {isEdited && (
+            <span className="text-xs text-muted-foreground">（編集済み）</span>
+          )}
         </div>
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {message.content}
-        </p>
+
+        {isDeleted ? (
+          <p className="text-sm italic text-muted-foreground">
+            このメッセージは削除されました
+          </p>
+        ) : editing ? (
+          <div className="mt-1 space-y-1">
+            <Textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              onKeyDown={handleKeyDownEdit}
+              className="min-h-[36px] max-h-[120px] resize-none text-sm"
+              rows={1}
+              autoFocus
+            />
+            <div className="flex gap-1">
+              <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setEditContent(message.content) }}>
+                キャンセル
+              </Button>
+              <Button size="sm" onClick={handleSaveEdit}>
+                保存
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm whitespace-pre-wrap break-words">
+            {message.content}
+          </p>
+        )}
+
+        {/* 返信数バッジ */}
+        {!isDeleted && (message.replyCount || 0) > 0 && (
+          <button
+            onClick={onReply}
+            className="mt-1 flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            {message.replyCount} 件の返信
+          </button>
+        )}
       </div>
+
+      {/* アクションメニュー */}
+      {showActions && !isDeleted && !editing && (
+        <div className="absolute -top-3 right-1 flex gap-0.5 rounded-md border bg-background shadow-sm">
+          <ActionButton title="返信" onClick={onReply}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          </ActionButton>
+          {isOwn && (
+            <ActionButton title="編集" onClick={() => { setEditing(true); setEditContent(message.content) }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </ActionButton>
+          )}
+          {isOwn && (
+            <ActionButton title="削除" onClick={() => onDelete(message.id)}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </ActionButton>
+          )}
+        </div>
+      )}
     </div>
+  )
+}
+
+function ActionButton({
+  children,
+  title,
+  onClick,
+}: {
+  children: React.ReactNode
+  title: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+    >
+      {children}
+    </button>
   )
 }

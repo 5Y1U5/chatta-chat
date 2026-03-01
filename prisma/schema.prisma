@@ -82,8 +82,9 @@ model Message {
   channelId   String
   userId      String
   content     String
-  parentId    String?  // Phase 2: スレッド用（当面 null）
-  aiGenerated Boolean  @default(false) // Phase 2: Chatta 連携用
+  parentId    String?  // スレッド返信の親メッセージID
+  aiGenerated Boolean  @default(false) // AI 生成メッセージフラグ
+  deletedAt   DateTime? // ソフトデリート（null = 有効）
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

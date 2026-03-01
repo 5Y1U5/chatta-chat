@@ -3,7 +3,12 @@ export type MessageWithUser = {
   id: string
   content: string
   createdAt: string
+  updatedAt?: string
   userId: string
+  parentId?: string | null
+  aiGenerated?: boolean
+  deletedAt?: string | null
+  replyCount?: number
   user: {
     id: string
     displayName: string | null

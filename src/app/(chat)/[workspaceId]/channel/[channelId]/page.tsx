@@ -26,10 +26,17 @@ export default async function ChannelPage({
     notFound()
   }
 
-  // 最新50件のメッセージを取得
+  // ルートメッセージのみ取得（parentId: null）、削除済みを除外
   const messagesRaw = await prisma.message.findMany({
-    where: { channelId },
-    include: { user: true },
+    where: {
+      channelId,
+      parentId: null,
+      deletedAt: null,
+    },
+    include: {
+      user: true,
+      _count: { select: { replies: true } },
+    },
     orderBy: { createdAt: "asc" },
     take: 50,
   })
@@ -40,7 +47,12 @@ export default async function ChannelPage({
       id: m.id,
       content: m.content,
       createdAt: m.createdAt.toISOString(),
+      updatedAt: m.updatedAt.toISOString(),
       userId: m.userId,
+      parentId: m.parentId,
+      aiGenerated: m.aiGenerated,
+      deletedAt: null,
+      replyCount: m._count.replies,
       user: {
         id: m.user.id,
         displayName: m.user.displayName,
