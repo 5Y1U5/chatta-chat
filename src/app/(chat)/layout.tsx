@@ -3,6 +3,7 @@ import { getPrisma } from "@/lib/prisma"
 import { WorkspaceSidebar } from "@/components/chat/WorkspaceSidebar"
 import { ChannelList } from "@/components/chat/ChannelList"
 import { MobileSidebar } from "@/components/chat/MobileSidebar"
+import { InstallBanner } from "@/components/pwa/InstallBanner"
 
 type ChannelItem = {
   id: string
@@ -100,6 +101,7 @@ export default async function ChatLayout({
       />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <InstallBanner />
         {/* モバイルヘッダー */}
         <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
           <MobileSidebar
