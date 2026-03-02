@@ -19,10 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { ChannelInfo } from "@/types/chat"
-
 type Props = {
-  channel: ChannelInfo
+  channel: { id: string; name: string | null; type: string }
   workspaceId: string
 }
 
@@ -34,8 +32,10 @@ export function ChannelSettingsMenu({ channel, workspaceId }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  // マイチャット・DM はメニュー非表示
-  const isMyChat = channel.name === "マイチャット" && channel.type === "public"
+  // マイチャット・general・DM はメニュー非表示
+  const isMyChat =
+    (channel.name === "マイチャット" || channel.name === "general") &&
+    channel.type === "public"
   if (isMyChat || channel.type === "dm") return null
 
   async function handleRename(e: React.FormEvent) {
@@ -100,7 +100,7 @@ export function ChannelSettingsMenu({ channel, workspaceId }: Props) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="1" />

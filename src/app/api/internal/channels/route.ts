@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 
-// マイチャット判定
+// マイチャット判定（"general" は旧デフォルト名）
 function isMyChat(name: string | null, type: string): boolean {
-  return name === "マイチャット" && type === "public"
+  return (name === "マイチャット" || name === "general") && type === "public"
 }
 
 // グループチャット作成

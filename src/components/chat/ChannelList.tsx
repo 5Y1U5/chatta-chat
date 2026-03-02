@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { NewChannelDialog } from "@/components/chat/NewChannelDialog"
 import { NewDmDialog } from "@/components/chat/NewDmDialog"
 import { SearchModal } from "@/components/chat/SearchModal"
+import { ChannelSettingsMenu } from "@/components/chat/ChannelSettingsMenu"
 import { useUnreadCounts } from "@/hooks/useUnreadCounts"
 
 type ChannelItem = {
@@ -146,27 +147,37 @@ function ChannelSection({
         {action}
       </div>
       {channels.map((channel) => (
-        <Link
+        <div
           key={channel.id}
-          href={`/${workspaceId}/channel/${channel.id}`}
-          className={cn(
-            "mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted",
-            activeChannelId === channel.id && "bg-muted font-medium",
-            channel.unreadCount > 0 && activeChannelId !== channel.id && "font-semibold"
-          )}
+          className="group/item mx-2 flex items-center rounded-md hover:bg-muted"
         >
-          {prefix && (
-            <span className="text-muted-foreground">{prefix}</span>
-          )}
-          <span className="flex-1 truncate">
-            {getChannelDisplayName(channel, currentUserId)}
-          </span>
-          {channel.unreadCount > 0 && activeChannelId !== channel.id && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
-              {channel.unreadCount > 99 ? "99+" : channel.unreadCount}
+          <Link
+            href={`/${workspaceId}/channel/${channel.id}`}
+            className={cn(
+              "flex flex-1 items-center gap-2 rounded-md px-2 py-1 text-sm min-w-0",
+              activeChannelId === channel.id && "bg-muted font-medium",
+              channel.unreadCount > 0 && activeChannelId !== channel.id && "font-semibold"
+            )}
+          >
+            {prefix && (
+              <span className="text-muted-foreground">{prefix}</span>
+            )}
+            <span className="flex-1 truncate">
+              {getChannelDisplayName(channel, currentUserId)}
             </span>
-          )}
-        </Link>
+            {channel.unreadCount > 0 && activeChannelId !== channel.id && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                {channel.unreadCount > 99 ? "99+" : channel.unreadCount}
+              </span>
+            )}
+          </Link>
+          <div className="hidden shrink-0 group-hover/item:block">
+            <ChannelSettingsMenu
+              channel={{ id: channel.id, name: channel.name, type: channel.type }}
+              workspaceId={workspaceId}
+            />
+          </div>
+        </div>
       ))}
     </div>
   )

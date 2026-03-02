@@ -11,7 +11,6 @@ import { TypingIndicator } from "@/components/chat/TypingIndicator"
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import { ChannelMembersDialog } from "@/components/chat/ChannelMembersDialog"
-import { ChannelSettingsMenu } from "@/components/chat/ChannelSettingsMenu"
 import type { MessageWithUser, ChannelMemberInfo, ChannelInfo, ReactionInfo } from "@/types/chat"
 
 type Props = {
@@ -282,14 +281,11 @@ export function MessageView({
         {/* チャンネルヘッダー */}
         <div className="flex h-12 shrink-0 items-center justify-between border-b px-4 font-semibold">
           <span>{channelDisplayName}</span>
-          <div className="flex items-center gap-1">
-            <ChannelSettingsMenu channel={channel} workspaceId={channel.workspaceId} />
-            <ChannelMembersDialog
-              channelId={channel.id}
-              channelType={channel.type}
-              currentUserId={currentUserId}
-            />
-          </div>
+          <ChannelMembersDialog
+            channelId={channel.id}
+            channelType={channel.type}
+            currentUserId={currentUserId}
+          />
         </div>
 
         {/* メッセージ一覧 */}
