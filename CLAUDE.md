@@ -109,6 +109,15 @@ ANTHROPIC_API_KEY=       # Claude API キー
 - **AI チャット**: `@AI` メンション → `after()` でバックグラウンド応答生成 → Realtime で配信。失敗時はエラーメッセージをチャットに投稿
 - **Realtime**: `postgres_changes` で messages テーブル購読。Presence でタイピングインジケータ
 
+## デプロイ・マージフロー
+
+1. feature ブランチにコミット & プッシュ
+2. Vercel のプレビュー URL を提示（`https://chatta-chat-<hash>-5y1u5s-projects.vercel.app` 形式）
+3. ユーザーが動作確認 → マージ指示を待つ
+4. 指示を受けてから main にマージ & プッシュ
+
+**重要**: main へのマージはユーザーの明示的な指示があるまで行わない
+
 ## コーディング規約
 
 - TypeScript strict モード
