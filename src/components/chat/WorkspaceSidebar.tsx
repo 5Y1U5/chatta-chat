@@ -51,7 +51,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
         variant="ghost"
         size="icon"
         className={cn(
-          "h-9 w-9 text-muted-foreground hover:text-foreground",
+          "h-9 w-9 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground hover:scale-110 active:scale-95",
           isChatActive && "bg-muted text-foreground"
         )}
         onClick={() => router.push(`/${workspaceId}`)}
@@ -67,7 +67,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
         variant="ghost"
         size="icon"
         className={cn(
-          "h-9 w-9 text-muted-foreground hover:text-foreground",
+          "h-9 w-9 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground hover:scale-110 active:scale-95",
           isTasksActive && "bg-muted text-foreground"
         )}
         onClick={() => router.push(`/${workspaceId}/tasks`)}
@@ -84,7 +84,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
         variant="ghost"
         size="icon"
         className={cn(
-          "relative h-9 w-9 text-muted-foreground hover:text-foreground",
+          "relative h-9 w-9 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground hover:scale-110 active:scale-95",
           isInboxActive && "bg-muted text-foreground"
         )}
         onClick={() => router.push(`/${workspaceId}/inbox`)}
@@ -106,7 +106,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
         variant="ghost"
         size="icon"
         className={cn(
-          "h-9 w-9 text-muted-foreground hover:text-foreground",
+          "h-9 w-9 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground hover:scale-110 active:scale-95",
           isDashboardActive && "bg-muted text-foreground"
         )}
         onClick={() => router.push(`/${workspaceId}/dashboard`)}
@@ -135,7 +135,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
       <Button
         variant="ghost"
         size="icon"
-        className="h-9 w-9 text-muted-foreground hover:text-foreground"
+        className="h-9 w-9 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground hover:scale-110 active:scale-95"
         onClick={handleLogout}
         title="ログアウト"
       >

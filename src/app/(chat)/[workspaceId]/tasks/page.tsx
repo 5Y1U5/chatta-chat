@@ -35,9 +35,12 @@ export default async function MyTasksPage({
     orderBy: { name: "asc" },
   })
 
-  // ワークスペースメンバー一覧（担当者選択用）
+  // ワークスペースメンバー一覧（担当者選択用、AIユーザーを除外）
   const members = await prisma.workspaceMember.findMany({
-    where: { workspaceId },
+    where: {
+      workspaceId,
+      user: { email: { not: "ai@chatta-chat.local" } },
+    },
     include: { user: { select: userSelect } },
   })
 
