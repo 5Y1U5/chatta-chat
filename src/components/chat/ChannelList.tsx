@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { NewChannelDialog } from "@/components/chat/NewChannelDialog"
 import { NewDmDialog } from "@/components/chat/NewDmDialog"
@@ -50,7 +50,12 @@ function getChannelDisplayName(
 
 export function ChannelList({ channels, workspaceId, currentUserId, projects = [] }: Props) {
   const params = useParams()
+  const pathname = usePathname()
   const activeChannelId = params.channelId as string | undefined
+
+  // チャット関連ページ（チャンネル表示 or ワークスペースルート）のみ表示
+  const isChatPage = pathname === `/${workspaceId}` || pathname.includes("/channel/")
+  if (!isChatPage) return null
 
   // Realtime 未読数管理
   const initialCounts = useMemo(
