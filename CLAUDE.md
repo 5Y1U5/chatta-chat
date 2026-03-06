@@ -33,24 +33,35 @@ src/
 │   ├── (auth)/login, signup           # 認証ページ（Suspense ラッパー必須）
 │   ├── (chat)/                        # 3カラムレイアウト（h-dvh）
 │   │   └── [workspaceId]/
-│   │       └── channel/[channelId]/   # メッセージビュー + スレッド
+│   │       ├── channel/[channelId]/   # メッセージビュー + スレッド
+│   │       ├── tasks/                 # マイタスク一覧
+│   │       ├── inbox/                 # 受信トレイ（通知一覧）
+│   │       ├── projects/              # プロジェクト一覧
+│   │       └── dashboard/             # ダッシュボード（タスク統計）
 │   ├── invite/[code]/                 # ワークスペース招待ランディング
 │   ├── ch/[code]/                     # グループチャット招待ランディング
 │   └── api/
 │       ├── auth/signup, callback      # 認証 + 招待コード処理
 │       └── internal/                  # 内部 API（認証必須）
-│           ├── channels/              # CRUD + invite + join + members + read
-│           ├── messages/              # CRUD + search
+│           ├── channels/              # CRUD + invite + join + members + read + memories
+│           ├── messages/              # CRUD + search + summarize + minutes
 │           ├── dm/                    # DM 作成
 │           ├── members/               # ワークスペースメンバー一覧
 │           ├── profile/               # プロフィール更新
 │           ├── reactions/             # リアクション
 │           ├── upload/                # ファイルアップロード
-│           └── workspaces/invite,join # ワークスペース招待
+│           ├── workspaces/invite,join # ワークスペース招待
+│           ├── projects/              # プロジェクト CRUD
+│           ├── tasks/                 # タスク CRUD + ステータス更新 + comments
+│           ├── notifications/         # 通知一覧 + 既読更新
+│           └── ai/suggest-reply       # AI 返信候補生成
 ├── components/
 │   ├── ui/           # shadcn
 │   ├── auth/         # LoginForm, SignupForm, GoogleLoginButton
-│   ├── chat/         # WorkspaceSidebar, ChannelList, MessageView, MessageInput, etc.
+│   ├── chat/         # WorkspaceSidebar, ChannelList, MessageView, MessageInput,
+│   │                 # SummarizeDialog, MinutesDialog, MemoryPanel, VoiceRecorder
+│   ├── task/         # TaskListView, TaskItem, TaskDetailPanel, CreateTaskDialog,
+│   │                 # InboxView, ProjectListView, DashboardView
 │   └── pwa/          # InstallBanner, ServiceWorkerRegister
 ├── hooks/
 │   ├── useRealtimeMessages.ts    # メッセージのリアルタイム購読
@@ -58,12 +69,13 @@ src/
 │   └── useTypingIndicator.ts     # タイピングインジケータ（Presence）
 ├── lib/
 │   ├── supabase/     # client, server, middleware, admin
-│   ├── ai/           # assistant.ts, claude.ts, providers.ts
+│   ├── ai/           # assistant.ts, claude.ts, providers.ts, detect-important.ts
+│   ├── recurrence.ts # RRULE パース・生成・次回日時計算（繰り返しタスク）
 │   ├── prisma.ts     # シングルトン
 │   ├── auth.ts       # requireAuth / getAuthContext
 │   └── config.ts     # 環境変数管理
 ├── generated/prisma/ # Prisma 生成ファイル（.gitignore 対象）
-└── types/chat.ts
+└── types/chat.ts     # MessageWithUser, TaskInfo, ProjectInfo, NotificationInfo 等
 public/
 ├── manifest.json     # PWA マニフェスト
 ├── sw.js             # Service Worker
@@ -72,6 +84,7 @@ public/
 
 ## DB モデル
 
+### チャット系
 - **User**: Supabase Auth と 1:1。email, displayName, avatarUrl
 - **Workspace**: 組織/チーム単位。name, iconUrl, inviteCode (unique)
 - **WorkspaceMember**: User と Workspace の中間テーブル。role (admin/member)
@@ -79,6 +92,13 @@ public/
 - **ChannelMember**: User と Channel の中間テーブル。lastReadAt (既読管理)
 - **Message**: channelId, userId, content, parentId (スレッド), aiGenerated, fileUrl/fileName/fileType
 - **Reaction**: messageId, userId, emoji
+- **ChannelMemory**: AI が自動検出した重要事項（decision/deadline/action/info）
+
+### タスク管理系
+- **Project**: workspaceId, name, description, color, archived
+- **Task**: workspaceId, projectId, parentTaskId（サブタスク）, title, description, status (todo/in_progress/done), priority (none/low/medium/high), assigneeId, creatorId, dueDate, recurrenceRule (RRULE文字列), nextOccurrence
+- **TaskComment**: taskId, userId, content
+- **Notification**: workspaceId, userId, actorId, type (task_assigned/task_completed/task_commented), title, taskId, projectId, read
 
 ## コマンド
 
@@ -107,6 +127,9 @@ ANTHROPIC_API_KEY=       # Claude API キー
 - **`useSearchParams()`**: 使用するコンポーネントは `<Suspense>` でラップ必須（Next.js 要件）
 - **招待フロー**: `inviteCode` 12文字（`crypto.randomUUID().replace(/-/g, "").slice(0, 12)`）
 - **AI チャット**: `@AI` メンション → `after()` でバックグラウンド応答生成 → Realtime で配信。失敗時はエラーメッセージをチャットに投稿
+- **AI 機能**: 返信候補生成、会話要約、議事録生成、重要事項自動検出（5メッセージごとにバッチ分析）
+- **繰り返しタスク**: RFC 5545 RRULE 形式。`rrule` ライブラリで処理。完了時に次回タスクを自動生成
+- **AIユーザー除外**: タスク担当者選択時に `ai@chatta-chat.local` をフィルタ
 - **Realtime**: `postgres_changes` で messages テーブル購読。Presence でタイピングインジケータ
 
 ## デプロイ・マージフロー
