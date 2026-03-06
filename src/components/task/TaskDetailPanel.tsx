@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { RECURRENCE_PRESETS, presetToRRule, rruleToText, type RecurrencePreset } from "@/lib/recurrence"
 import type { TaskInfo, TaskCommentInfo } from "@/types/chat"
 
 type Props = {
@@ -214,6 +215,32 @@ export function TaskDetailPanel({
                     )}
                     {p.name}
                   </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        {/* 繰り返し */}
+        <Field label={`繰り返し${task.recurrenceRule ? ` (${rruleToText(task.recurrenceRule)})` : ""}`}>
+          <Select
+            value={task.recurrenceRule ? "_current" : "none"}
+            onValueChange={(v) => {
+              if (v === "_current") return
+              const preset = v as RecurrencePreset
+              const rule = presetToRRule(preset, task.dueDate ? new Date(task.dueDate) : undefined)
+              handleUpdate("recurrenceRule", rule)
+            }}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue>
+                {task.recurrenceRule ? rruleToText(task.recurrenceRule) : "繰り返しなし"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {RECURRENCE_PRESETS.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  {p.label}
                 </SelectItem>
               ))}
             </SelectContent>

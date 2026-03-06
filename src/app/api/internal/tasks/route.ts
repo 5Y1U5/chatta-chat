@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
+import { getNextOccurrence } from "@/lib/recurrence"
 
 const userSelect = {
   id: true,
@@ -203,8 +204,26 @@ export async function PATCH(request: Request) {
       if (updates.status === "done") {
         data.completedAt = new Date()
 
-        // 繰り返しタスクの場合、次回タスクを自動生成（後で実装）
-        // TODO: recurrenceRule がある場合の処理
+        // 繰り返しタスクの場合、次回タスクを自動生成
+        if (task.recurrenceRule) {
+          const nextDate = getNextOccurrence(task.recurrenceRule, new Date())
+          if (nextDate) {
+            await prisma.task.create({
+              data: {
+                workspaceId: task.workspaceId,
+                title: task.title,
+                description: task.description,
+                projectId: task.projectId,
+                assigneeId: task.assigneeId,
+                creatorId: task.creatorId,
+                priority: task.priority,
+                dueDate: nextDate,
+                recurrenceRule: task.recurrenceRule,
+                nextOccurrence: nextDate,
+              },
+            })
+          }
+        }
 
         // 作成者に完了通知（自分以外の場合）
         if (task.creatorId !== auth.userId) {

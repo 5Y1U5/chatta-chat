@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { RECURRENCE_PRESETS, presetToRRule, type RecurrencePreset } from "@/lib/recurrence"
 
 type Props = {
   open: boolean
@@ -31,6 +32,7 @@ export function CreateTaskDialog({
   const [assigneeId, setAssigneeId] = useState("")
   const [priority, setPriority] = useState("medium")
   const [dueDate, setDueDate] = useState("")
+  const [recurrence, setRecurrence] = useState<RecurrencePreset>("none")
   const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,6 +50,7 @@ export function CreateTaskDialog({
         assigneeId: assigneeId || null,
         priority,
         dueDate: dueDate || null,
+        recurrenceRule: presetToRRule(recurrence, dueDate ? new Date(dueDate) : undefined),
       }),
     })
 
@@ -58,6 +61,7 @@ export function CreateTaskDialog({
       setAssigneeId("")
       setPriority("medium")
       setDueDate("")
+      setRecurrence("none")
       onCreated()
     }
     setSubmitting(false)
@@ -145,6 +149,22 @@ export function CreateTaskDialog({
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
               />
+            </div>
+
+            <div className="col-span-2">
+              <label className="text-xs text-muted-foreground mb-1 block">繰り返し</label>
+              <Select value={recurrence} onValueChange={(v) => setRecurrence(v as RecurrencePreset)}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RECURRENCE_PRESETS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
