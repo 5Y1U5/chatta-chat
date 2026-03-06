@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { DatePicker } from "@/components/ui/date-picker"
 import { RECURRENCE_PRESETS, presetToRRule, rruleToText, type RecurrencePreset } from "@/lib/recurrence"
 import type { TaskInfo, TaskCommentInfo } from "@/types/chat"
 
@@ -122,7 +123,7 @@ export function TaskDetailPanel({
   }
 
   return (
-    <div className="w-80 shrink-0 border-l flex flex-col overflow-hidden lg:w-96">
+    <div className="w-80 shrink-0 border-l flex flex-col overflow-hidden min-w-0 lg:w-96">
       {/* ヘッダー */}
       <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
         <span className="text-sm font-semibold truncate">{task.title}</span>
@@ -174,11 +175,10 @@ export function TaskDetailPanel({
 
         {/* 期日 */}
         <Field label="期日">
-          <Input
-            type="date"
-            className="h-8 text-sm"
-            value={task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : ""}
-            onChange={(e) => handleUpdate("dueDate", e.target.value || null)}
+          <DatePicker
+            value={task.dueDate ? new Date(task.dueDate) : undefined}
+            onChange={(date) => handleUpdate("dueDate", date ? date.toISOString().split("T")[0] : null)}
+            className="w-full"
           />
         </Field>
 
@@ -250,7 +250,7 @@ export function TaskDetailPanel({
         {/* 説明 */}
         <Field label="説明">
           <Textarea
-            className="text-sm min-h-20 resize-none"
+            className="text-sm min-h-20 resize-none break-all"
             placeholder="タスクの説明を入力..."
             value={description}
             onChange={(e) => {

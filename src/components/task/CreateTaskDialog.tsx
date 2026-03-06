@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DatePicker } from "@/components/ui/date-picker"
 import { RECURRENCE_PRESETS, presetToRRule, type RecurrencePreset } from "@/lib/recurrence"
 
 type Props = {
@@ -31,7 +32,7 @@ export function CreateTaskDialog({
   const [projectId, setProjectId] = useState(defaultProjectId || "")
   const [assigneeId, setAssigneeId] = useState("")
   const [priority, setPriority] = useState("medium")
-  const [dueDate, setDueDate] = useState("")
+  const [dueDate, setDueDate] = useState<Date | undefined>(undefined)
   const [recurrence, setRecurrence] = useState<RecurrencePreset>("none")
   const [submitting, setSubmitting] = useState(false)
 
@@ -49,8 +50,8 @@ export function CreateTaskDialog({
         projectId: projectId || null,
         assigneeId: assigneeId || null,
         priority,
-        dueDate: dueDate || null,
-        recurrenceRule: presetToRRule(recurrence, dueDate ? new Date(dueDate) : undefined),
+        dueDate: dueDate ? dueDate.toISOString().split("T")[0] : null,
+        recurrenceRule: presetToRRule(recurrence, dueDate),
       }),
     })
 
@@ -60,7 +61,7 @@ export function CreateTaskDialog({
       setProjectId(defaultProjectId || "")
       setAssigneeId("")
       setPriority("medium")
-      setDueDate("")
+      setDueDate(undefined)
       setRecurrence("none")
       onCreated()
     }
@@ -69,11 +70,11 @@ export function CreateTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md overflow-hidden">
         <DialogHeader>
           <DialogTitle>タスクを作成</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 min-w-0">
           <div>
             <Input
               placeholder="タスク名"
@@ -88,7 +89,7 @@ export function CreateTaskDialog({
               placeholder="説明（任意）"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="min-h-16 resize-none"
+              className="min-h-24 resize-none"
             />
           </div>
 
@@ -143,11 +144,10 @@ export function CreateTaskDialog({
 
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">期日</label>
-              <Input
-                type="date"
-                className="h-8 text-sm"
+              <DatePicker
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={setDueDate}
+                className="w-full"
               />
             </div>
 
