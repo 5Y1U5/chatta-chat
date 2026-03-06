@@ -12,6 +12,9 @@ import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import { ChannelMembersDialog } from "@/components/chat/ChannelMembersDialog"
 import { SummarizeDialog } from "@/components/chat/SummarizeDialog"
+import { MemoryPanel } from "@/components/chat/MemoryPanel"
+import { MinutesDialog } from "@/components/chat/MinutesDialog"
+import { VoiceRecorder } from "@/components/chat/VoiceRecorder"
 import type { MessageWithUser, ChannelMemberInfo, ChannelInfo, ReactionInfo } from "@/types/chat"
 
 type Props = {
@@ -283,7 +286,10 @@ export function MessageView({
         <div className="flex h-12 shrink-0 items-center justify-between border-b px-4 font-semibold">
           <span>{channelDisplayName}</span>
           <div className="flex items-center gap-1">
+            <MemoryPanel channelId={channel.id} />
             <SummarizeDialog channelId={channel.id} />
+            <MinutesDialog channelId={channel.id} />
+            <VoiceRecorder channelId={channel.id} />
             <ChannelMembersDialog
               channelId={channel.id}
               channelType={channel.type}

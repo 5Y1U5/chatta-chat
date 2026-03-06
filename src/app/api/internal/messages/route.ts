@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 import { detectAiMention, generateAiResponse } from "@/lib/ai/assistant"
+import { detectImportantItems } from "@/lib/ai/detect-important"
 
 // 過去メッセージ取得（カーソルベースページネーション）
 export async function GET(request: NextRequest) {
@@ -203,6 +204,32 @@ export async function POST(request: Request) {
           await generateAiResponse(channelId, message.id, trimmedContent, auth.userId)
         } catch (err) {
           console.error("AI 応答生成エラー:", err)
+        }
+      })
+    }
+
+    // 重要事項の自動検出（5メッセージごとにバッチ分析、スレッド返信は除外）
+    if (!parentId) {
+      after(async () => {
+        try {
+          const recentCount = await prisma.message.count({
+            where: { channelId, parentId: null, deletedAt: null },
+          })
+          // 5の倍数のときにバッチ分析
+          if (recentCount % 5 === 0) {
+            const recentMessages = await prisma.message.findMany({
+              where: { channelId, parentId: null, deletedAt: null, aiGenerated: false },
+              orderBy: { createdAt: "desc" },
+              take: 5,
+              select: { id: true },
+            })
+            await detectImportantItems(
+              channelId,
+              recentMessages.map((m) => m.id)
+            )
+          }
+        } catch (err) {
+          console.error("重要事項検出エラー:", err)
         }
       })
     }

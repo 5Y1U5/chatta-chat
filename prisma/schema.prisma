@@ -71,6 +71,7 @@ model Channel {
   workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   members   ChannelMember[]
   messages  Message[]
+  memories  ChannelMemory[]
 }
 
 // === チャンネルメンバー ===
@@ -124,6 +125,20 @@ model Reaction {
 
   @@unique([messageId, userId, emoji])
   @@index([messageId])
+}
+
+// === チャンネル重要事項メモリ ===
+model ChannelMemory {
+  id              String   @id @default(uuid())
+  channelId       String
+  content         String   // 検出された重要事項
+  category        String   // decision | deadline | action | info
+  sourceMessageId String?  // 検出元メッセージID
+  detectedAt      DateTime @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, detectedAt])
 }
 
 // === プロジェクト ===

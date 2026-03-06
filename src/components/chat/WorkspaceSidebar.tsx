@@ -23,7 +23,8 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
   const router = useRouter()
   const pathname = usePathname()
 
-  const isChatActive = pathname.includes("/channel/")
+  const isDashboardActive = pathname.includes("/dashboard")
+  const isChatActive = pathname.includes("/channel/") && !isDashboardActive
   const isTasksActive = pathname.includes("/tasks")
   const isInboxActive = pathname.includes("/inbox")
 
@@ -98,6 +99,25 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
             {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
           </span>
         )}
+      </Button>
+
+      {/* ダッシュボード */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "h-9 w-9 text-muted-foreground hover:text-foreground",
+          isDashboardActive && "bg-muted text-foreground"
+        )}
+        onClick={() => router.push(`/${workspaceId}/dashboard`)}
+        title="ダッシュボード"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+        </svg>
       </Button>
 
       <Separator className="w-8" />

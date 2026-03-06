@@ -27,6 +27,8 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
   const [mentionIndex, setMentionIndex] = useState(0)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -180,10 +182,60 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
     return () => document.removeEventListener("click", handleClick)
   }, [showMentions])
 
+  async function handleAiSuggest() {
+    setLoadingSuggestions(true)
+    setAiSuggestions([])
+    try {
+      const res = await fetch("/api/internal/ai/suggest-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAiSuggestions(data.suggestions || [])
+      }
+    } catch {
+      // エラーは静かに無視
+    } finally {
+      setLoadingSuggestions(false)
+    }
+  }
+
+  function selectSuggestion(text: string) {
+    setContent(text)
+    setAiSuggestions([])
+    textareaRef.current?.focus()
+  }
+
   const isImage = pendingFile?.type.startsWith("image/")
 
   return (
     <div className="relative shrink-0 border-t p-4">
+      {/* AI 返信候補 */}
+      {aiSuggestions.length > 0 && (
+        <div className="mb-2 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">AI が提案する返信:</span>
+            <button
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+              onClick={() => setAiSuggestions([])}
+            >
+              閉じる
+            </button>
+          </div>
+          {aiSuggestions.map((s, i) => (
+            <button
+              key={i}
+              className="w-full rounded-md border bg-muted/30 px-3 py-1.5 text-left text-sm hover:bg-muted/60 transition-colors"
+              onClick={() => selectSuggestion(s)}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* メンション候補ポップアップ */}
       {showMentions && mentionCandidates.length > 0 && (
         <div className="absolute bottom-full left-4 right-4 mb-1 max-h-48 overflow-y-auto rounded-lg border bg-background shadow-lg z-50">
@@ -260,6 +312,24 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
           className="hidden"
           accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
         />
+
+        {/* AI 返信提案ボタン */}
+        <button
+          title="AIで返信を作成"
+          onClick={handleAiSuggest}
+          disabled={disabled || loadingSuggestions}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
+        >
+          {loadingSuggestions ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+            </svg>
+          )}
+        </button>
 
         <Textarea
           ref={textareaRef}
