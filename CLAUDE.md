@@ -56,7 +56,7 @@ src/
 │           ├── notifications/         # 通知一覧 + 既読更新
 │           └── ai/suggest-reply       # AI 返信候補生成
 ├── components/
-│   ├── ui/           # shadcn
+│   ├── ui/           # shadcn（Calendar, DatePicker, Popover 等）
 │   ├── auth/         # LoginForm, SignupForm, GoogleLoginButton
 │   ├── chat/         # WorkspaceSidebar, ChannelList, MessageView, MessageInput,
 │   │                 # SummarizeDialog, MinutesDialog, MemoryPanel, VoiceRecorder
@@ -131,6 +131,9 @@ ANTHROPIC_API_KEY=       # Claude API キー
 - **繰り返しタスク**: RFC 5545 RRULE 形式。`rrule` ライブラリで処理。完了時に次回タスクを自動生成
 - **AIユーザー除外**: タスク担当者選択時に `ai@chatta-chat.local` をフィルタ
 - **Realtime**: `postgres_changes` で messages テーブル購読。Presence でタイピングインジケータ
+- **サイドバー**: WorkspaceSidebar はトグルで展開/折りたたみ可能（展開時: アイコン+ラベル、折りたたみ時: アイコンのみ）
+- **ChannelList 表示条件**: チャットページ（ワークスペースルート or `/channel/`）のみ表示。タスク・受信トレイ・ダッシュボード等では非表示
+- **DatePicker**: `<input type="date">` ではなく `DatePicker` コンポーネント（ボタン+カレンダーポップオーバー）を使用。`date-fns` + `react-day-picker` ベース
 
 ## デプロイ・マージフロー
 
