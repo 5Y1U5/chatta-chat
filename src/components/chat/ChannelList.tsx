@@ -22,10 +22,18 @@ type ChannelItem = {
   }[]
 }
 
+type ProjectItem = {
+  id: string
+  name: string
+  color: string | null
+  _count: { tasks: number }
+}
+
 type Props = {
   channels: ChannelItem[]
   workspaceId: string
   currentUserId: string
+  projects?: ProjectItem[]
 }
 
 // DM の場合は相手の名前を表示
@@ -40,7 +48,7 @@ function getChannelDisplayName(
   return channel.name || "名前なし"
 }
 
-export function ChannelList({ channels, workspaceId, currentUserId }: Props) {
+export function ChannelList({ channels, workspaceId, currentUserId, projects = [] }: Props) {
   const params = useParams()
   const activeChannelId = params.channelId as string | undefined
 
@@ -116,6 +124,41 @@ export function ChannelList({ channels, workspaceId, currentUserId }: Props) {
           activeChannelId={activeChannelId}
           action={<NewDmDialog workspaceId={workspaceId} />}
         />
+
+        {/* プロジェクト */}
+        {projects.length > 0 && (
+          <div className="mb-2">
+            <div className="flex items-center justify-between px-4 py-1">
+              <span className="text-xs font-medium text-muted-foreground uppercase">
+                プロジェクト
+              </span>
+              <Link
+                href={`/${workspaceId}/projects`}
+                className="flex h-5 w-5 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                title="プロジェクト管理"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </Link>
+            </div>
+            {projects.map((project) => (
+              <Link
+                key={project.id}
+                href={`/${workspaceId}/tasks?projectId=${project.id}`}
+                className="mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted"
+              >
+                <span
+                  className="h-2 w-2 rounded-full shrink-0"
+                  style={{ backgroundColor: project.color || "#6B7280" }}
+                />
+                <span className="flex-1 truncate">{project.name}</span>
+                <span className="text-[10px] text-muted-foreground">{project._count.tasks}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

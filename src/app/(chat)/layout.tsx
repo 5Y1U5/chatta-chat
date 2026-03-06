@@ -87,17 +87,31 @@ export default async function ChatLayout({
     })
   }
 
+  // 未読通知数
+  const unreadNotificationCount = await prisma.notification.count({
+    where: { userId: auth.userId, read: false },
+  })
+
+  // プロジェクト一覧（サイドバー用）
+  const projectsRaw = await prisma.project.findMany({
+    where: { workspaceId: activeWorkspaceId, archived: false },
+    include: { _count: { select: { tasks: true } } },
+    orderBy: { name: "asc" },
+  })
+
   return (
     <div className="flex h-dvh overflow-hidden">
       <WorkspaceSidebar
         workspace={workspace ? { id: workspace.id, name: workspace.name, iconUrl: workspace.iconUrl } : null}
         workspaceId={activeWorkspaceId}
+        unreadNotificationCount={unreadNotificationCount}
       />
 
       <ChannelList
         channels={channels}
         workspaceId={activeWorkspaceId}
         currentUserId={auth.userId}
+        projects={JSON.parse(JSON.stringify(projectsRaw))}
       />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">

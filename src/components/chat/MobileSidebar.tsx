@@ -123,6 +123,32 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
             </div>
 
             <div className="flex-1 overflow-y-auto py-2">
+              {/* ナビゲーション */}
+              <div className="mb-3 px-2 space-y-1">
+                <Link
+                  href={`/${workspaceId}/tasks`}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 11l3 3L22 4" />
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                  </svg>
+                  マイタスク
+                </Link>
+                <Link
+                  href={`/${workspaceId}/inbox`}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+                    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                  </svg>
+                  受信トレイ
+                </Link>
+              </div>
+
               {/* パブリックチャンネル */}
               <MobileSection
                 label="グループチャット"
