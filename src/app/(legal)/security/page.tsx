@@ -190,7 +190,6 @@ export default function SecurityPage() {
         </p>
         <p className="mt-2">
           株式会社i-Style<br />
-          所在地: 〒921-8025 石川県金沢市増泉4-1-10<br />
           メール: <a href="mailto:support@i-styleinc.com" className="text-primary underline">support@i-styleinc.com</a>
         </p>
       </div>
