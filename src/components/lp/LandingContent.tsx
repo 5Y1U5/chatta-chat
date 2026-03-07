@@ -263,7 +263,7 @@ const plans = [
 
 export function LandingContent() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="h-dvh overflow-y-auto bg-background text-foreground">
       {/* ヒーローアニメーション用CSS */}
       <style>{`
         @keyframes heroFloat {
