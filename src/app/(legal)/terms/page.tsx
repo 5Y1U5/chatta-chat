@@ -198,7 +198,7 @@ export default function TermsPage() {
       </p>
       <p>
         株式会社i-Style<br />
-        メール: <a href="mailto:support@i-styleinc.com" className="text-primary underline">support@i-styleinc.com</a>
+        <a href="https://i-styleinc.com/contact" target="_blank" rel="noopener noreferrer" className="text-primary underline">お問い合わせフォーム</a>
       </p>
     </article>
   )
