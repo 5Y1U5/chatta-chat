@@ -288,7 +288,7 @@ export function LandingContent() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link href="/lp">
-            <img src="/logo.webp" alt="ChattaChat" className="h-14 w-auto" />
+            <img src="/logo.webp" alt="ChattaChat" className="h-10 w-auto" />
           </Link>
           <div className="flex items-center gap-3">
             <Link href="#pricing" className="hidden text-sm text-muted-foreground hover:text-foreground sm:block">
