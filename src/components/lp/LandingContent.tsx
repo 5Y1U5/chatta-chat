@@ -693,9 +693,9 @@ export function LandingContent() {
           <div className="flex flex-col items-center justify-between gap-4 text-sm text-muted-foreground sm:flex-row">
             <p>&copy; 2026 i-Style Inc.</p>
             <div className="flex gap-4">
-              <Link href="#" className="hover:text-foreground">利用規約</Link>
-              <Link href="#" className="hover:text-foreground">プライバシーポリシー</Link>
-              <Link href="#" className="hover:text-foreground">特定商取引法に基づく表記</Link>
+              <Link href="/terms" className="hover:text-foreground">利用規約</Link>
+              <Link href="/privacy" className="hover:text-foreground">プライバシーポリシー</Link>
+              <Link href="/security" className="hover:text-foreground">セキュリティ</Link>
             </div>
           </div>
         </div>
