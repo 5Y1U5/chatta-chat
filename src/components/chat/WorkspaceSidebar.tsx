@@ -21,7 +21,7 @@ type Props = {
 }
 
 export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCount = 0 }: Props) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
 

@@ -15,14 +15,14 @@ AI ネイティブなチャットコミュニケーションツール。Slack/Ch
 | 項目 | 選択 |
 |------|------|
 | フレームワーク | Next.js 16.1.6 (App Router) + TypeScript |
-| DB | Supabase (PostgreSQL) |
+| DB | Supabase Pro (PostgreSQL) |
 | リアルタイム | Supabase Realtime (postgres_changes + Presence) |
 | ORM | Prisma 7.x + PrismaPg adapter（出力先: `src/generated/prisma`） |
 | 認証 | Supabase Auth (Email + Google OAuth) |
 | AI | Anthropic Claude API (`@anthropic-ai/sdk`) |
 | UI | shadcn/ui + Tailwind CSS v4 |
 | バリデーション | Zod v4 |
-| ホスティング | Vercel |
+| ホスティング | Vercel (Pro) |
 | PWA | manifest.json + 最小 Service Worker |
 
 ## ディレクトリ構成
@@ -143,6 +143,10 @@ ANTHROPIC_API_KEY=       # Claude API キー
 4. 指示を受けてから main にマージ & プッシュ
 
 **重要**: main へのマージはユーザーの明示的な指示があるまで行わない
+
+## 事業開始チェックリスト
+
+`tasks/business-launch-checklist.md` に、電気通信事業届出・利用規約・料金プラン等の事業化に必要なタスク一覧を管理。
 
 ## コーディング規約
 
