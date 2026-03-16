@@ -192,6 +192,7 @@ model Task {
   completedAt    DateTime? // 完了日時
   recurrenceRule String?   // RFC 5545 RRULE 形式（例: "FREQ=WEEKLY;BYDAY=MO"）
   nextOccurrence DateTime? // 次回繰り返し発生日
+  sortOrder      Int       @default(0) // 手動並び替え用（小さいほど上）
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

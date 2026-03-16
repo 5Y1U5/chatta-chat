@@ -33,6 +33,7 @@ export default async function ProjectsPage({
       projects={JSON.parse(JSON.stringify(projects))}
       members={membersRaw.map((m) => m.user)}
       workspaceId={workspaceId}
+      currentUserId={auth.userId}
     />
   )
 }

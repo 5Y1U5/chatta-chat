@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const tasks = await prisma.task.findMany({
       where,
       include: taskInclude,
-      orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     })
 
     return NextResponse.json(tasks)
@@ -229,6 +229,7 @@ export async function PATCH(request: Request) {
       data.dueDate = updates.dueDate ? new Date(updates.dueDate) : null
     if (updates.recurrenceRule !== undefined)
       data.recurrenceRule = updates.recurrenceRule || null
+    if (updates.sortOrder !== undefined) data.sortOrder = updates.sortOrder
 
     // ステータス変更のハンドリング
     if (updates.status !== undefined) {
