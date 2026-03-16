@@ -1,6 +1,21 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { Button } from "@/components/ui/button"
 import { TaskItem } from "@/components/task/TaskItem"
 import { TaskDetailPanel } from "@/components/task/TaskDetailPanel"
@@ -20,6 +35,24 @@ type Props = {
   initialSelectedTaskId?: string
 }
 
+// 優先度の重み（小さいほど上）
+const PRIORITY_WEIGHT: Record<string, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+}
+
+// 優先度 → sortOrder → 作成日時の順でソート
+function sortByPriority(tasks: TaskInfo[]): TaskInfo[] {
+  return [...tasks].sort((a, b) => {
+    const pa = PRIORITY_WEIGHT[a.priority] ?? 1
+    const pb = PRIORITY_WEIGHT[b.priority] ?? 1
+    if (pa !== pb) return pa - pb
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+}
+
 export function TaskListView({
   tasks: initialTasks,
   projects,
@@ -35,9 +68,9 @@ export function TaskListView({
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId || null)
   const [createOpen, setCreateOpen] = useState(false)
 
-  const todoTasks = tasks.filter((t) => t.status === "todo")
-  const inProgressTasks = tasks.filter((t) => t.status === "in_progress")
-  const doneTasks = tasks.filter((t) => t.status === "done")
+  const todoTasks = sortByPriority(tasks.filter((t) => t.status === "todo"))
+  const inProgressTasks = sortByPriority(tasks.filter((t) => t.status === "in_progress"))
+  const doneTasks = sortByPriority(tasks.filter((t) => t.status === "done"))
 
   // 今日完了したタスク
   const now = new Date()
@@ -76,6 +109,15 @@ export function TaskListView({
     }
   }
 
+  const handleReorder = useCallback(async (reorderedTasks: TaskInfo[]) => {
+    const taskIds = reorderedTasks.map((t) => t.id)
+    await fetch("/api/internal/tasks/reorder", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskIds }),
+    })
+  }, [])
+
   const handleTaskCreated = async () => {
     await refreshTasks()
     setCreateOpen(false)
@@ -99,18 +141,24 @@ export function TaskListView({
           <TaskSection
             label="未着手"
             tasks={todoTasks}
+            allTasks={tasks}
+            setTasks={setTasks}
             onSelect={setSelectedTaskId}
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
+            onReorder={handleReorder}
           />
 
           {/* 進行中 */}
           <TaskSection
             label="進行中"
             tasks={inProgressTasks}
+            allTasks={tasks}
+            setTasks={setTasks}
             onSelect={setSelectedTaskId}
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
+            onReorder={handleReorder}
           />
 
           {/* 今日完了 */}
@@ -118,9 +166,12 @@ export function TaskListView({
             <TaskSection
               label="今日完了"
               tasks={completedTodayTasks}
+              allTasks={tasks}
+              setTasks={setTasks}
               onSelect={setSelectedTaskId}
               selectedId={selectedTaskId}
               onStatusChange={handleStatusChange}
+              onReorder={handleReorder}
             />
           )}
 
@@ -128,9 +179,12 @@ export function TaskListView({
           <TaskSection
             label="完了"
             tasks={doneTasks}
+            allTasks={tasks}
+            setTasks={setTasks}
             onSelect={setSelectedTaskId}
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
+            onReorder={handleReorder}
             defaultCollapsed
           />
 
@@ -172,6 +226,59 @@ export function TaskListView({
         members={members}
         defaultProjectId={projectId}
         workspaceId={workspaceId}
+        currentUserId={currentUserId}
+      />
+    </div>
+  )
+}
+
+// ドラッグ可能なタスクアイテム
+function SortableTaskItem({
+  task,
+  isSelected,
+  onSelect,
+  onStatusChange,
+}: {
+  task: TaskInfo
+  isSelected: boolean
+  onSelect: () => void
+  onStatusChange: (taskId: string, status: string) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      {/* ドラッグハンドル */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group/drag hover:opacity-100 z-10 touch-none"
+        style={{ left: "-24px" }}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+          <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
+          <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
+        </svg>
+      </div>
+      <TaskItem
+        task={task}
+        isSelected={isSelected}
+        onSelect={onSelect}
+        onStatusChange={onStatusChange}
       />
     </div>
   )
@@ -180,19 +287,59 @@ export function TaskListView({
 function TaskSection({
   label,
   tasks,
+  allTasks,
+  setTasks,
   onSelect,
   selectedId,
   onStatusChange,
+  onReorder,
   defaultCollapsed = false,
 }: {
   label: string
   tasks: TaskInfo[]
+  allTasks: TaskInfo[]
+  setTasks: React.Dispatch<React.SetStateAction<TaskInfo[]>>
   onSelect: (id: string) => void
   selectedId: string | null
   onStatusChange: (taskId: string, status: string) => void
+  onReorder: (tasks: TaskInfo[]) => void
   defaultCollapsed?: boolean
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = tasks.findIndex((t) => t.id === active.id)
+    const newIndex = tasks.findIndex((t) => t.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    // セクション内のタスクを並び替え
+    const reordered = [...tasks]
+    const [moved] = reordered.splice(oldIndex, 1)
+    reordered.splice(newIndex, 0, moved)
+
+    // sortOrder を振り直す
+    const updatedSection = reordered.map((t, i) => ({ ...t, sortOrder: i }))
+
+    // 全タスクの state を更新（このセクションのタスクだけ入れ替え）
+    const sectionIds = new Set(tasks.map((t) => t.id))
+    const otherTasks = allTasks.filter((t) => !sectionIds.has(t.id))
+    setTasks([...otherTasks, ...updatedSection])
+
+    // サーバーに保存
+    onReorder(updatedSection)
+  }
 
   if (tasks.length === 0 && defaultCollapsed) return null
 
@@ -220,18 +367,28 @@ function TaskSection({
         <span className="text-xs">({tasks.length})</span>
       </button>
       {!collapsed && (
-        <div className="space-y-1">
-          {tasks.map((task, i) => (
-            <div key={task.id} className="stagger-item" style={{ animationDelay: `${i * 30}ms` }}>
-              <TaskItem
-                task={task}
-                isSelected={selectedId === task.id}
-                onSelect={() => onSelect(task.id)}
-                onStatusChange={onStatusChange}
-              />
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={tasks.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-1 pl-6">
+              {tasks.map((task) => (
+                <SortableTaskItem
+                  key={task.id}
+                  task={task}
+                  isSelected={selectedId === task.id}
+                  onSelect={() => onSelect(task.id)}
+                  onStatusChange={onStatusChange}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   )

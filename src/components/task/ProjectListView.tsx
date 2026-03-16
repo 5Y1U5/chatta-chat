@@ -22,9 +22,10 @@ type Props = {
   projects: ProjectInfo[]
   members: { id: string; displayName: string | null; avatarUrl: string | null }[]
   workspaceId: string
+  currentUserId?: string
 }
 
-export function ProjectListView({ projects: initial, members, workspaceId }: Props) {
+export function ProjectListView({ projects: initial, members, workspaceId, currentUserId }: Props) {
   const router = useRouter()
   const [projects, setProjects] = useState(initial)
   const [createOpen, setCreateOpen] = useState(false)
@@ -185,6 +186,7 @@ export function ProjectListView({ projects: initial, members, workspaceId }: Pro
         members={members}
         defaultProjectId={createTaskProjectId || undefined}
         workspaceId={workspaceId}
+        currentUserId={currentUserId}
       />
 
       {/* メンバー管理ダイアログ */}

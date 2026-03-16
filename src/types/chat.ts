@@ -72,6 +72,7 @@ export type TaskInfo = {
   dueDate: string | null
   completedAt: string | null
   recurrenceRule: string | null
+  sortOrder: number
   createdAt: string
   updatedAt: string
   assignee: {
