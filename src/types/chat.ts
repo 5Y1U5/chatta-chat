@@ -90,7 +90,7 @@ export type TaskInfo = {
     color: string | null
   } | null
   subTasks?: TaskInfo[]
-  _count?: { subTasks: number; comments: number }
+  _count?: { subTasks: number; comments: number; members?: number }
 }
 
 // タスクコメント情報

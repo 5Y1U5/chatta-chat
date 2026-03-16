@@ -50,7 +50,7 @@ export function CreateTaskDialog({
         projectId: projectId || null,
         assigneeId: assigneeId || null,
         priority,
-        dueDate: dueDate ? dueDate.toISOString().split("T")[0] : null,
+        dueDate: dueDate ? `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}-${String(dueDate.getDate()).padStart(2, "0")}` : null,
         recurrenceRule: presetToRRule(recurrence, dueDate),
       }),
     })

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -41,7 +42,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
     {
       label: "チャット",
       active: isChatActive,
-      onClick: () => router.push(`/${workspaceId}`),
+      href: `/${workspaceId}`,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -51,7 +52,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
     {
       label: "マイタスク",
       active: isTasksActive,
-      onClick: () => router.push(`/${workspaceId}/tasks`),
+      href: `/${workspaceId}/tasks`,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 11l3 3L22 4" />
@@ -62,7 +63,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
     {
       label: "受信トレイ",
       active: isInboxActive,
-      onClick: () => router.push(`/${workspaceId}/inbox`),
+      href: `/${workspaceId}/inbox`,
       badge: unreadNotificationCount,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -74,7 +75,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
     {
       label: "ダッシュボード",
       active: isDashboardActive,
-      onClick: () => router.push(`/${workspaceId}/dashboard`),
+      href: `/${workspaceId}/dashboard`,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="3" width="7" height="7" />
@@ -134,18 +135,17 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
 
       {/* ナビゲーション */}
       {navItems.map((item) => (
-        <Button
+        <Link
           key={item.label}
-          variant="ghost"
+          href={item.href}
+          prefetch={true}
           className={cn(
-            "relative text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95",
+            "relative inline-flex items-center rounded-md text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95",
             expanded
               ? "h-9 justify-start gap-2 px-2 text-sm"
-              : "h-9 w-9 hover:scale-110",
+              : "h-9 w-9 justify-center hover:scale-110",
             item.active && "bg-muted text-foreground"
           )}
-          size={expanded ? "sm" : "icon"}
-          onClick={item.onClick}
           title={expanded ? undefined : item.label}
         >
           <span className="shrink-0">{item.icon}</span>
@@ -158,7 +158,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
               {item.badge > 9 ? "9+" : item.badge}
             </span>
           )}
-        </Button>
+        </Link>
       ))}
 
       <Separator className={expanded ? "" : "w-8 mx-auto"} />

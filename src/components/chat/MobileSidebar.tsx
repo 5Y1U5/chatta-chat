@@ -9,7 +9,7 @@ import { NewDmDialog } from "@/components/chat/NewDmDialog"
 import { ProfileDialog } from "@/components/chat/ProfileDialog"
 import { InviteDialog } from "@/components/chat/InviteDialog"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useUnreadCounts } from "@/hooks/useUnreadCounts"
 import { SearchModal } from "@/components/chat/SearchModal"
@@ -44,8 +44,13 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
   const [open, setOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const params = useParams()
+  const pathname = usePathname()
   const activeChannelId = params.channelId as string | undefined
   const router = useRouter()
+
+  const isTasksActive = pathname.includes("/tasks")
+  const isInboxActive = pathname.includes("/inbox")
+  const isDashboardActive = pathname.includes("/dashboard")
 
   // Realtime 未読数管理
   const initialCounts = useMemo(
@@ -71,13 +76,14 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
     router.refresh()
   }
 
+  const handleClose = () => setOpen(false)
+
   return (
     <div className="md:hidden">
-      {/* ハンバーガーボタン（チャンネルヘッダーに埋め込む） */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8"
+      {/* ハンバーガーボタン */}
+      <button
+        type="button"
+        className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted active:bg-muted/80 transition-colors touch-manipulation"
         onClick={() => setOpen(!open)}
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -94,31 +100,39 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
             </>
           )}
         </svg>
-      </Button>
+      </button>
 
       {/* オーバーレイ */}
       {open && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/50"
-            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-40 bg-black/50 animate-in fade-in-0 duration-200"
+            onClick={handleClose}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-72 bg-background border-r shadow-lg flex flex-col">
+          <div className="fixed inset-y-0 left-0 z-50 w-72 bg-background border-r shadow-lg flex flex-col animate-in slide-in-from-left duration-200">
             <div className="flex h-12 items-center justify-between px-4 border-b font-semibold">
-              <span>グループチャット</span>
+              <span>メニュー</span>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setOpen(false); setSearchOpen(true) }}>
+                <button
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted active:bg-muted/80 transition-colors touch-manipulation"
+                  onClick={() => { handleClose(); setSearchOpen(true) }}
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="8" />
                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
-                </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </Button>
+                </button>
+                <button
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted active:bg-muted/80 transition-colors touch-manipulation"
+                  onClick={handleClose}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -127,8 +141,11 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
               <div className="mb-3 px-2 space-y-1">
                 <Link
                   href={`/${workspaceId}/tasks`}
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                  onClick={handleClose}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-2.5 text-sm touch-manipulation active:bg-muted/80 transition-colors",
+                    isTasksActive ? "bg-muted font-medium" : "hover:bg-muted"
+                  )}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 11l3 3L22 4" />
@@ -138,14 +155,41 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
                 </Link>
                 <Link
                   href={`/${workspaceId}/inbox`}
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                  onClick={handleClose}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-2.5 text-sm touch-manipulation active:bg-muted/80 transition-colors",
+                    isInboxActive ? "bg-muted font-medium" : "hover:bg-muted"
+                  )}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
                     <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
                   </svg>
                   受信トレイ
+                </Link>
+                <Link
+                  href={`/${workspaceId}/dashboard`}
+                  onClick={handleClose}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-2.5 text-sm touch-manipulation active:bg-muted/80 transition-colors",
+                    isDashboardActive ? "bg-muted font-medium" : "hover:bg-muted"
+                  )}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                  </svg>
+                  ダッシュボード
+                </Link>
+                <Link
+                  href={`/${workspaceId}/projects`}
+                  onClick={handleClose}
+                  className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm hover:bg-muted touch-manipulation active:bg-muted/80 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  プロジェクト
                 </Link>
               </div>
 
@@ -158,7 +202,7 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
                 activeChannelId={activeChannelId}
                 prefix="#"
                 action={<NewChannelDialog workspaceId={workspaceId} />}
-                onNavigate={() => setOpen(false)}
+                onNavigate={handleClose}
               />
 
               {groupChannels.length > 0 && (
@@ -169,7 +213,7 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
                   currentUserId={currentUserId}
                   activeChannelId={activeChannelId}
                   prefix="#"
-                  onNavigate={() => setOpen(false)}
+                  onNavigate={handleClose}
                 />
               )}
 
@@ -180,7 +224,7 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
                 currentUserId={currentUserId}
                 activeChannelId={activeChannelId}
                 action={<NewDmDialog workspaceId={workspaceId} />}
-                onNavigate={() => setOpen(false)}
+                onNavigate={handleClose}
               />
             </div>
 
@@ -192,7 +236,7 @@ export function MobileSidebar({ channels, workspaceId, currentUserId }: Props) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground"
+                className="text-muted-foreground touch-manipulation"
                 onClick={handleLogout}
               >
                 ログアウト
@@ -238,7 +282,7 @@ function MobileSection({
           href={`/${workspaceId}/channel/${channel.id}`}
           onClick={onNavigate}
           className={cn(
-            "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted",
+            "mx-2 flex items-center gap-2 rounded-md px-3 py-2.5 text-sm touch-manipulation active:bg-muted/80 transition-colors",
             activeChannelId === channel.id && "bg-muted font-medium",
             channel.unreadCount > 0 && activeChannelId !== channel.id && "font-semibold"
           )}

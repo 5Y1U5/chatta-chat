@@ -51,12 +51,10 @@ export default async function ChatLayout({
     orderBy: { createdAt: "asc" },
   })
 
-  // 各チャンネルの未読数を計算
-  const channels: ChannelItem[] = []
-  for (const ch of channelsRaw) {
+  // 各チャンネルのメンバー情報と lastReadAt を整理
+  const channelInfos = channelsRaw.map((ch) => {
     const members: ChannelItem["members"] = []
     let lastReadAt: Date | null = null
-
     for (const m of ch.members) {
       members.push({
         id: m.user.id,
@@ -67,25 +65,30 @@ export default async function ChatLayout({
         lastReadAt = m.lastReadAt
       }
     }
+    return { ch, members, lastReadAt }
+  })
 
-    // lastReadAt 以降のルートメッセージ数 = 未読数
-    const unreadCount = await prisma.message.count({
-      where: {
-        channelId: ch.id,
-        parentId: null,
-        deletedAt: null,
-        ...(lastReadAt ? { createdAt: { gt: lastReadAt } } : {}),
-      },
-    })
+  // 未読数を一括取得（N+1 回避）
+  const unreadCounts = await Promise.all(
+    channelInfos.map(({ ch, lastReadAt }) =>
+      prisma.message.count({
+        where: {
+          channelId: ch.id,
+          parentId: null,
+          deletedAt: null,
+          ...(lastReadAt ? { createdAt: { gt: lastReadAt } } : {}),
+        },
+      })
+    )
+  )
 
-    channels.push({
-      id: ch.id,
-      name: ch.name,
-      type: ch.type,
-      unreadCount,
-      members,
-    })
-  }
+  const channels: ChannelItem[] = channelInfos.map(({ ch, members }, i) => ({
+    id: ch.id,
+    name: ch.name,
+    type: ch.type,
+    unreadCount: unreadCounts[i],
+    members,
+  }))
 
   // 未読通知数
   const unreadNotificationCount = await prisma.notification.count({

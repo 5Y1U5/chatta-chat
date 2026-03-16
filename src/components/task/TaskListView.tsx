@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { TaskItem } from "@/components/task/TaskItem"
 import { TaskDetailPanel } from "@/components/task/TaskDetailPanel"
@@ -29,7 +28,6 @@ export function TaskListView({
   projectId,
   projectName,
 }: Props) {
-  const router = useRouter()
   const [tasks, setTasks] = useState(initialTasks)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -37,6 +35,14 @@ export function TaskListView({
   const todoTasks = tasks.filter((t) => t.status === "todo")
   const inProgressTasks = tasks.filter((t) => t.status === "in_progress")
   const doneTasks = tasks.filter((t) => t.status === "done")
+
+  // 今日完了したタスク
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const completedTodayTasks = doneTasks.filter((t) => {
+    if (!t.completedAt) return false
+    return new Date(t.completedAt).getTime() >= todayStart
+  })
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null
 
@@ -64,14 +70,12 @@ export function TaskListView({
     })
     if (res.ok) {
       await refreshTasks()
-      router.refresh()
     }
   }
 
   const handleTaskCreated = async () => {
     await refreshTasks()
     setCreateOpen(false)
-    router.refresh()
   }
 
   const title = viewMode === "my-tasks" ? "マイタスク" : projectName || "プロジェクト"
@@ -105,6 +109,17 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
           />
+
+          {/* 今日完了 */}
+          {completedTodayTasks.length > 0 && (
+            <TaskSection
+              label="今日完了"
+              tasks={completedTodayTasks}
+              onSelect={setSelectedTaskId}
+              selectedId={selectedTaskId}
+              onStatusChange={handleStatusChange}
+            />
+          )}
 
           {/* 完了 */}
           <TaskSection
