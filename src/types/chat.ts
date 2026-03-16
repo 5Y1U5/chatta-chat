@@ -73,6 +73,9 @@ export type TaskInfo = {
   completedAt: string | null
   recurrenceRule: string | null
   sortOrder: number
+  fileUrl: string | null
+  fileName: string | null
+  fileType: string | null
   createdAt: string
   updatedAt: string
   assignee: {

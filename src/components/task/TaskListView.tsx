@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import {
   DndContext,
   closestCenter,
@@ -64,6 +65,7 @@ export function TaskListView({
   projectName,
   initialSelectedTaskId,
 }: Props) {
+  const isMobile = useIsMobile()
   const [tasks, setTasks] = useState(initialTasks)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId || null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -131,9 +133,11 @@ export function TaskListView({
       <div className="flex flex-1 flex-col overflow-hidden">
         <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
           <h1 className="text-lg font-semibold">{title}</h1>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            タスクを追加
-          </Button>
+          {!isMobile && (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              タスクを追加
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -215,6 +219,18 @@ export function TaskListView({
           onClose={() => setSelectedTaskId(null)}
           onUpdate={refreshTasks}
         />
+      )}
+
+      {/* モバイル用 FAB（右下固定） */}
+      {isMobile && (
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
       )}
 
       {/* タスク作成ダイアログ */}
