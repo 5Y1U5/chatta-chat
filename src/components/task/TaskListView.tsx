@@ -18,10 +18,12 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { TaskItem } from "@/components/task/TaskItem"
 import { TaskDetailPanel } from "@/components/task/TaskDetailPanel"
 import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
 import { EmptyState } from "@/components/ui/empty-state"
+import { cn } from "@/lib/utils"
 import type { TaskInfo } from "@/types/chat"
 
 type Props = {
@@ -54,6 +56,14 @@ function sortByPriority(tasks: TaskInfo[]): TaskInfo[] {
   })
 }
 
+// ステータスドットの色
+const statusDotColors: Record<string, string> = {
+  todo: "bg-gray-400",
+  in_progress: "bg-blue-500",
+  done: "bg-green-500",
+  completed_today: "bg-green-500",
+}
+
 export function TaskListView({
   tasks: initialTasks,
   projects,
@@ -80,6 +90,16 @@ export function TaskListView({
   const completedTodayTasks = doneTasks.filter((t) => {
     if (!t.completedAt) return false
     return new Date(t.completedAt).getTime() >= todayStart
+  })
+
+  // 未完了タスク数と本日期限タスク数
+  const incompleteTasks = tasks.filter((t) => t.status !== "done")
+  const todayDueTasks = incompleteTasks.filter((t) => {
+    if (!t.dueDate) return false
+    const dueParts = t.dueDate.slice(0, 10).split("-")
+    const dueDay = new Date(Number(dueParts[0]), Number(dueParts[1]) - 1, Number(dueParts[2]))
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    return dueDay.getTime() === today.getTime()
   })
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null
@@ -125,25 +145,58 @@ export function TaskListView({
     setCreateOpen(false)
   }
 
+  // インラインタスク追加
+  const handleInlineCreate = async (title: string, status: string) => {
+    await fetch("/api/internal/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: title.trim(),
+        status,
+        workspaceId,
+        assigneeId: viewMode === "my-tasks" ? currentUserId : undefined,
+        projectId: projectId || undefined,
+      }),
+    })
+    await refreshTasks()
+  }
+
   const title = viewMode === "my-tasks" ? "マイタスク" : projectName || "プロジェクト"
 
   return (
     <div className="flex h-full page-enter">
       {/* タスクリスト */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
-          <h1 className="text-lg font-semibold">{title}</h1>
-          {!isMobile && (
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              タスクを追加
-            </Button>
+        {/* ヘッダー */}
+        <div className="shrink-0 border-b py-4 px-5">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold">{title}</h1>
+            {!isMobile && (
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                タスクを追加
+              </Button>
+            )}
+          </div>
+          {incompleteTasks.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              未完了 {incompleteTasks.length}件
+              {todayDueTasks.length > 0 && (
+                <span className="ml-1">
+                  ・ 本日期限 <span className="text-red-500 font-medium">{todayDueTasks.length}件</span>
+                </span>
+              )}
+            </p>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4">
           {/* 未着手 */}
           <TaskSection
             label="未着手"
+            sectionStatus="todo"
             tasks={todoTasks}
             allTasks={tasks}
             setTasks={setTasks}
@@ -151,11 +204,13 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
+            onInlineCreate={!isMobile ? handleInlineCreate : undefined}
           />
 
           {/* 進行中 */}
           <TaskSection
             label="進行中"
+            sectionStatus="in_progress"
             tasks={inProgressTasks}
             allTasks={tasks}
             setTasks={setTasks}
@@ -163,12 +218,14 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
+            onInlineCreate={!isMobile ? handleInlineCreate : undefined}
           />
 
           {/* 今日完了 */}
           {completedTodayTasks.length > 0 && (
             <TaskSection
               label="今日完了"
+              sectionStatus="done"
               tasks={completedTodayTasks}
               allTasks={tasks}
               setTasks={setTasks}
@@ -182,6 +239,7 @@ export function TaskListView({
           {/* 完了 */}
           <TaskSection
             label="完了"
+            sectionStatus="done"
             tasks={doneTasks}
             allTasks={tasks}
             setTasks={setTasks}
@@ -277,13 +335,13 @@ function SortableTaskItem({
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="relative">
+    <div ref={setNodeRef} style={style} className="relative group/sortable">
       {/* ドラッグハンドル */}
       <div
         {...attributes}
         {...listeners}
-        className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group/drag hover:opacity-100 z-10 touch-none"
-        style={{ left: "-24px" }}
+        className="absolute left-0 top-0 bottom-0 w-5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 z-10 touch-none"
+        style={{ left: "-20px" }}
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
           <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
@@ -300,8 +358,73 @@ function SortableTaskItem({
   )
 }
 
+// インラインタスク追加コンポーネント
+function InlineAddTask({
+  sectionStatus,
+  onSubmit,
+}: {
+  sectionStatus: string
+  onSubmit: (title: string, status: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!title.trim() || submitting) return
+    setSubmitting(true)
+    await onSubmit(title, sectionStatus)
+    setTitle("")
+    setEditing(false)
+    setSubmitting(false)
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors border-b border-border/50"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        タスクを追加...
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
+      <Input
+        autoFocus
+        className="h-8 text-sm flex-1"
+        placeholder="タスク名を入力..."
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSubmit()
+          if (e.key === "Escape") { setEditing(false); setTitle("") }
+        }}
+        disabled={submitting}
+      />
+      <Button size="sm" className="h-8 shrink-0" onClick={handleSubmit} disabled={!title.trim() || submitting}>
+        追加
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-8 shrink-0"
+        onClick={() => { setEditing(false); setTitle("") }}
+      >
+        キャンセル
+      </Button>
+    </div>
+  )
+}
+
 function TaskSection({
   label,
+  sectionStatus,
   tasks,
   allTasks,
   setTasks,
@@ -309,9 +432,11 @@ function TaskSection({
   selectedId,
   onStatusChange,
   onReorder,
+  onInlineCreate,
   defaultCollapsed = false,
 }: {
   label: string
+  sectionStatus: string
   tasks: TaskInfo[]
   allTasks: TaskInfo[]
   setTasks: React.Dispatch<React.SetStateAction<TaskInfo[]>>
@@ -319,6 +444,7 @@ function TaskSection({
   selectedId: string | null
   onStatusChange: (taskId: string, status: string) => void
   onReorder: (tasks: TaskInfo[]) => void
+  onInlineCreate?: (title: string, status: string) => Promise<void>
   defaultCollapsed?: boolean
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
@@ -359,10 +485,12 @@ function TaskSection({
 
   if (tasks.length === 0 && defaultCollapsed) return null
 
+  const dotColor = statusDotColors[sectionStatus] || "bg-gray-400"
+
   return (
     <div>
       <button
-        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground mb-2"
+        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground mb-1 py-1"
         onClick={() => setCollapsed(!collapsed)}
       >
         <svg
@@ -379,33 +507,45 @@ function TaskSection({
         >
           <polyline points="9 18 15 12 9 6" />
         </svg>
+        {/* ステータスドット */}
+        <span className={cn("h-2 w-2 rounded-full shrink-0", dotColor)} />
         {label}
-        <span className="text-xs">({tasks.length})</span>
+        <span className="bg-muted rounded-full px-2 py-0.5 text-xs">{tasks.length}</span>
       </button>
       {!collapsed && (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={tasks.map((t) => t.id)}
-            strategy={verticalListSortingStrategy}
+        <>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            <div className="space-y-1 pl-6">
-              {tasks.map((task) => (
-                <SortableTaskItem
-                  key={task.id}
-                  task={task}
-                  isSelected={selectedId === task.id}
-                  onSelect={() => onSelect(task.id)}
-                  onStatusChange={onStatusChange}
-                />
-              ))}
+            <SortableContext
+              items={tasks.map((t) => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="pl-2">
+                {tasks.map((task) => (
+                  <SortableTaskItem
+                    key={task.id}
+                    task={task}
+                    isSelected={selectedId === task.id}
+                    onSelect={() => onSelect(task.id)}
+                    onStatusChange={onStatusChange}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+          {/* インラインタスク追加 */}
+          {onInlineCreate && (
+            <div className="pl-2">
+              <InlineAddTask sectionStatus={sectionStatus} onSubmit={onInlineCreate} />
             </div>
-          </SortableContext>
-        </DndContext>
+          )}
+        </>
       )}
+      {/* セクション間区切り線 */}
+      <div className="border-b border-border/30 mt-2" />
     </div>
   )
 }

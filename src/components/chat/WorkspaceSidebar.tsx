@@ -12,6 +12,14 @@ import { InviteDialog } from "@/components/chat/InviteDialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
+type ProjectInfo = {
+  id: string
+  name: string
+  color: string | null
+  totalTasks: number
+  completedTasks: number
+}
+
 type Props = {
   workspace: {
     id: string
@@ -20,9 +28,10 @@ type Props = {
   } | null
   workspaceId: string
   unreadNotificationCount?: number
+  projects?: ProjectInfo[]
 }
 
-export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCount = 0 }: Props) {
+export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCount = 0, projects = [] }: Props) {
   const [expanded, setExpanded] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
@@ -189,6 +198,57 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
           )}
         </Link>
       ))}
+
+      {/* プロジェクト一覧 */}
+      {projects.length > 0 && (
+        <>
+          <Separator className={expanded ? "mt-1" : "w-8 mx-auto mt-1"} />
+          {expanded && (
+            <span className="text-[10px] font-medium text-muted-foreground px-2 mt-1">プロジェクト</span>
+          )}
+          <div className={cn("space-y-0.5 overflow-y-auto max-h-40", expanded ? "" : "flex flex-col items-center")}>
+            {projects.map((project) => {
+              const progress = project.totalTasks > 0 ? (project.completedTasks / project.totalTasks) * 100 : 0
+              return (
+                <Link
+                  key={project.id}
+                  href={`/${workspaceId}/tasks?projectId=${project.id}`}
+                  className={cn(
+                    "flex items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                    expanded
+                      ? "gap-2 px-2 py-1.5 text-xs"
+                      : "h-7 w-7 justify-center"
+                  )}
+                  title={expanded ? undefined : project.name}
+                >
+                  <span
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: project.color || "#94a3b8" }}
+                  />
+                  {expanded && (
+                    <div className="flex-1 min-w-0">
+                      <span className="truncate block">{project.name}</span>
+                      {project.totalTasks > 0 && (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-green-500 transition-all"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <span className="text-[9px] text-muted-foreground shrink-0">
+                            {project.completedTasks}/{project.totalTasks}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       {/* スペーサー */}
       <div className="flex-1" />

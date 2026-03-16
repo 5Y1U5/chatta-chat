@@ -122,6 +122,13 @@ export default async function ChatLayout({
         workspace={workspace ? { id: workspace.id, name: workspace.name, iconUrl: workspace.iconUrl } : null}
         workspaceId={activeWorkspaceId}
         unreadNotificationCount={unreadNotificationCount}
+        projects={projectsWithCompletion.map((p: { id: string; name: string; color: string | null; _count: { tasks: number }; _completedCount: number }) => ({
+          id: p.id,
+          name: p.name,
+          color: p.color,
+          totalTasks: p._count.tasks,
+          completedTasks: p._completedCount,
+        }))}
       />
 
       <ChannelList

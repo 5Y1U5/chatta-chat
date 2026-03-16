@@ -12,13 +12,19 @@ type Props = {
   onStatusChange: (taskId: string, status: string) => void
 }
 
+const priorityBarColors: Record<string, string> = {
+  high: "bg-red-500",
+  medium: "bg-yellow-400",
+  low: "bg-blue-400",
+}
+
 const priorityColors: Record<string, string> = {
   high: "text-red-500",
   medium: "text-yellow-500",
   low: "text-blue-400",
 }
 
-function formatDueDate(dueDate: string | null): { text: string; className: string } | null {
+function formatDueDate(dueDate: string | null): { text: string; className: string; isCritical: boolean } | null {
   if (!dueDate) return null
   // DB の DateTime を "日付のみ" として扱うためローカル日付にパース
   const dueParts = dueDate.slice(0, 10).split("-")
@@ -27,14 +33,15 @@ function formatDueDate(dueDate: string | null): { text: string; className: strin
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const diffDays = Math.floor((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
-  if (diffDays < 0) return { text: "期限切れ", className: "text-red-500 font-medium" }
-  if (diffDays === 0) return { text: "今日", className: "text-orange-500 font-medium" }
-  if (diffDays === 1) return { text: "明日", className: "text-yellow-600" }
-  if (diffDays <= 7) return { text: `${diffDays}日後`, className: "text-muted-foreground" }
+  if (diffDays < 0) return { text: "期限切れ", className: "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-1.5 py-0.5 rounded text-[11px] font-medium", isCritical: true }
+  if (diffDays === 0) return { text: "今日", className: "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-1.5 py-0.5 rounded text-[11px] font-medium", isCritical: true }
+  if (diffDays === 1) return { text: "明日", className: "bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400 px-1.5 py-0.5 rounded text-[11px]", isCritical: false }
+  if (diffDays <= 7) return { text: `${diffDays}日後`, className: "text-muted-foreground text-[11px]", isCritical: false }
 
   return {
     text: `${dueDay.getMonth() + 1}/${dueDay.getDate()}`,
-    className: "text-muted-foreground",
+    className: "text-muted-foreground text-[11px]",
+    isCritical: false,
   }
 }
 
@@ -60,13 +67,22 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-all duration-200",
-        "hover:bg-muted/50 hover:shadow-sm hover:-translate-y-[1px]",
-        isSelected && "bg-muted border-primary/30 shadow-sm",
-        celebrating && "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
+        "group relative flex items-center gap-3 border-b border-border/50 px-3 py-2.5 cursor-pointer transition-colors duration-150",
+        "hover:bg-muted/30",
+        isSelected && "bg-muted/50",
+        celebrating && "bg-green-50 dark:bg-green-950/20"
       )}
       onClick={onSelect}
     >
+      {/* 左端の優先度カラーバー */}
+      <div
+        className={cn(
+          "absolute left-0 top-0 bottom-0 w-[3px] rounded-r-full transition-opacity",
+          priorityBarColors[task.priority] || "bg-transparent",
+          task.priority === "medium" && "opacity-0"
+        )}
+      />
+
       {/* チェックボックス */}
       <button
         onClick={handleCheck}
@@ -145,9 +161,9 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
         </span>
       )}
 
-      {/* 期日 */}
+      {/* 期日バッジ */}
       {dueInfo && !isDone && (
-        <span className={cn("text-xs shrink-0", dueInfo.className)}>
+        <span className={cn("shrink-0", dueInfo.className)}>
           {dueInfo.text}
         </span>
       )}
@@ -162,10 +178,21 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
       {/* 担当者アバター */}
       {task.assignee && (
         <div
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium transition-transform group-hover:scale-110"
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-medium overflow-hidden",
+            !task.assignee.avatarUrl && "bg-muted"
+          )}
           title={task.assignee.displayName || ""}
         >
-          {task.assignee.displayName?.charAt(0) || "?"}
+          {task.assignee.avatarUrl ? (
+            <img
+              src={task.assignee.avatarUrl}
+              alt={task.assignee.displayName || ""}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            task.assignee.displayName?.charAt(0) || "?"
+          )}
         </div>
       )}
     </div>
