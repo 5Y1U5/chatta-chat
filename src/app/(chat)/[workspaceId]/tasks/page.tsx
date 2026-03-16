@@ -4,11 +4,14 @@ import { TaskListView } from "@/components/task/TaskListView"
 
 export default async function MyTasksPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspaceId: string }>
+  searchParams: Promise<{ projectId?: string; taskId?: string }>
 }) {
   const auth = await requireAuth()
   const { workspaceId } = await params
+  const { taskId: initialTaskId } = await searchParams
   const prisma = getPrisma()
 
   const userSelect = { id: true, displayName: true, avatarUrl: true } as const
@@ -52,6 +55,7 @@ export default async function MyTasksPage({
       workspaceId={workspaceId}
       currentUserId={auth.userId}
       viewMode="my-tasks"
+      initialSelectedTaskId={initialTaskId}
     />
   )
 }

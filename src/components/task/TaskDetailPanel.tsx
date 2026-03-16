@@ -220,10 +220,20 @@ export function TaskDetailPanel({
   const subTaskProgress = subTasks.length > 0 ? (completedSubTasks / subTasks.length) * 100 : 0
 
   return (
-    <div className="w-80 shrink-0 border-l flex flex-col overflow-hidden min-w-0 lg:w-96 animate-in slide-in-from-right-5 duration-200">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background md:static md:inset-auto md:z-auto md:w-80 md:shrink-0 md:border-l lg:w-96 animate-in slide-in-from-right-5 duration-200 overflow-hidden">
       {/* ヘッダー */}
       <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
-        <span className="text-sm font-semibold truncate">{task.title}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            className="flex md:hidden h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-muted text-muted-foreground touch-manipulation"
+            onClick={onClose}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <span className="text-sm font-semibold truncate">{task.title}</span>
+        </div>
         <div className="flex items-center gap-1">
           {saving && (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -231,7 +241,7 @@ export function TaskDetailPanel({
               保存中
             </span>
           )}
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+          <Button variant="ghost" size="icon" className="hidden md:flex h-7 w-7" onClick={onClose}>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />

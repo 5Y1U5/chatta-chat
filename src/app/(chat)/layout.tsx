@@ -3,6 +3,8 @@ import { getPrisma } from "@/lib/prisma"
 import { WorkspaceSidebar } from "@/components/chat/WorkspaceSidebar"
 import { ChannelList } from "@/components/chat/ChannelList"
 import { MobileSidebar } from "@/components/chat/MobileSidebar"
+import { MobileBottomNav } from "@/components/chat/MobileBottomNav"
+import { MobilePageTitle } from "@/components/chat/MobilePageTitle"
 import { InstallBanner } from "@/components/pwa/InstallBanner"
 
 type ChannelItem = {
@@ -95,12 +97,24 @@ export default async function ChatLayout({
     where: { userId: auth.userId, read: false },
   })
 
-  // プロジェクト一覧（サイドバー用）
+  // プロジェクト一覧（サイドバー用）- 完了タスク数も取得
   const projectsRaw = await prisma.project.findMany({
     where: { workspaceId: activeWorkspaceId, archived: false },
     include: { _count: { select: { tasks: true } } },
     orderBy: { name: "asc" },
   })
+
+  // 各プロジェクトの完了タスク数を並列取得
+  const completedCounts = await Promise.all(
+    projectsRaw.map((p) =>
+      prisma.task.count({ where: { projectId: p.id, status: "done" } })
+    )
+  )
+
+  const projectsWithCompletion = projectsRaw.map((p, i) => ({
+    ...JSON.parse(JSON.stringify(p)),
+    _completedCount: completedCounts[i],
+  }))
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -114,7 +128,7 @@ export default async function ChatLayout({
         channels={channels}
         workspaceId={activeWorkspaceId}
         currentUserId={auth.userId}
-        projects={JSON.parse(JSON.stringify(projectsRaw))}
+        projects={projectsWithCompletion}
       />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -126,11 +140,15 @@ export default async function ChatLayout({
             workspaceId={activeWorkspaceId}
             currentUserId={auth.userId}
           />
-          <span className="font-semibold text-sm truncate">chatta-chat</span>
+          <MobilePageTitle />
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-14 md:pb-0">
           {children}
         </div>
+        <MobileBottomNav
+          workspaceId={activeWorkspaceId}
+          unreadNotificationCount={unreadNotificationCount}
+        />
       </main>
     </div>
   )

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { TaskItem } from "@/components/task/TaskItem"
 import { TaskDetailPanel } from "@/components/task/TaskDetailPanel"
 import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
+import { EmptyState } from "@/components/ui/empty-state"
 import type { TaskInfo } from "@/types/chat"
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
   viewMode: "my-tasks" | "project"
   projectId?: string
   projectName?: string
+  initialSelectedTaskId?: string
 }
 
 export function TaskListView({
@@ -27,9 +29,10 @@ export function TaskListView({
   viewMode,
   projectId,
   projectName,
+  initialSelectedTaskId,
 }: Props) {
   const [tasks, setTasks] = useState(initialTasks)
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId || null)
   const [createOpen, setCreateOpen] = useState(false)
 
   const todoTasks = tasks.filter((t) => t.status === "todo")
@@ -81,7 +84,7 @@ export function TaskListView({
   const title = viewMode === "my-tasks" ? "マイタスク" : projectName || "プロジェクト"
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full page-enter">
       {/* タスクリスト */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
@@ -132,16 +135,17 @@ export function TaskListView({
           />
 
           {tasks.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-4 opacity-50">
-                <path d="M9 11l3 3L22 4" />
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-              </svg>
-              <p>タスクはまだありません</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => setCreateOpen(true)}>
-                最初のタスクを作成
-              </Button>
-            </div>
+            <EmptyState
+              icon={
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+              }
+              title="タスクはまだありません"
+              description="タスクを作成して、チームの作業を管理しましょう"
+              action={{ label: "最初のタスクを作成", onClick: () => setCreateOpen(true) }}
+            />
           )}
         </div>
       </div>
@@ -217,14 +221,15 @@ function TaskSection({
       </button>
       {!collapsed && (
         <div className="space-y-1">
-          {tasks.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              isSelected={selectedId === task.id}
-              onSelect={() => onSelect(task.id)}
-              onStatusChange={onStatusChange}
-            />
+          {tasks.map((task, i) => (
+            <div key={task.id} className="stagger-item" style={{ animationDelay: `${i * 30}ms` }}>
+              <TaskItem
+                task={task}
+                isSelected={selectedId === task.id}
+                onSelect={() => onSelect(task.id)}
+                onStatusChange={onStatusChange}
+              />
+            </div>
           ))}
         </div>
       )}
