@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -30,7 +29,6 @@ export function TaskDetailPanel({
   onClose,
   onUpdate,
 }: Props) {
-  const router = useRouter()
   const [description, setDescription] = useState(task.description || "")
   const [descriptionDirty, setDescriptionDirty] = useState(false)
   const [subTasks, setSubTasks] = useState<TaskInfo[]>([])
@@ -68,7 +66,6 @@ export function TaskDetailPanel({
     })
     await onUpdate()
     setSaving(false)
-    router.refresh()
   }
 
   const handleSaveDescription = async () => {
@@ -100,7 +97,6 @@ export function TaskDetailPanel({
       body: JSON.stringify({ taskId: subTaskId, status }),
     })
     await fetchDetails()
-    router.refresh()
   }
 
   const handleAddComment = async () => {
@@ -119,7 +115,6 @@ export function TaskDetailPanel({
     await fetch(`/api/internal/tasks?taskId=${task.id}`, { method: "DELETE" })
     onClose()
     await onUpdate()
-    router.refresh()
   }
 
   return (

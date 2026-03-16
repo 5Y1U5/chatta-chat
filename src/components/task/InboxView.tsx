@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { NotificationInfo } from "@/types/chat"
@@ -28,7 +29,6 @@ export function InboxView({ notifications: initial, workspaceId }: Props) {
       body: JSON.stringify({ markAllRead: true }),
     })
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-    router.refresh()
   }
 
   const handleClick = async (notification: NotificationInfo) => {
@@ -42,7 +42,6 @@ export function InboxView({ notifications: initial, workspaceId }: Props) {
       setNotifications((prev) =>
         prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
       )
-      router.refresh()
     }
 
     // タスクページに遷移

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
 import type { ProjectInfo } from "@/types/chat"
 
 const PROJECT_COLORS = [
@@ -20,13 +21,15 @@ const PROJECT_COLORS = [
 
 type Props = {
   projects: ProjectInfo[]
+  members: { id: string; displayName: string | null; avatarUrl: string | null }[]
   workspaceId: string
 }
 
-export function ProjectListView({ projects: initial, workspaceId }: Props) {
+export function ProjectListView({ projects: initial, members, workspaceId }: Props) {
   const router = useRouter()
   const [projects, setProjects] = useState(initial)
   const [createOpen, setCreateOpen] = useState(false)
+  const [createTaskProjectId, setCreateTaskProjectId] = useState<string | null>(null)
   const [name, setName] = useState("")
   const [color, setColor] = useState(PROJECT_COLORS[0])
   const [submitting, setSubmitting] = useState(false)
@@ -49,7 +52,6 @@ export function ProjectListView({ projects: initial, workspaceId }: Props) {
       // 一覧を再取得
       const listRes = await fetch("/api/internal/projects")
       if (listRes.ok) setProjects(await listRes.json())
-      router.refresh()
     }
     setSubmitting(false)
   }
@@ -77,9 +79,9 @@ export function ProjectListView({ projects: initial, workspaceId }: Props) {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((p) => (
-              <button
+              <div
                 key={p.id}
-                className="flex flex-col rounded-lg border p-4 text-left hover:bg-muted/50 transition-colors"
+                className="flex flex-col rounded-lg border p-4 hover:bg-muted/50 transition-colors cursor-pointer"
                 onClick={() => router.push(`/${workspaceId}/tasks?projectId=${p.id}`)}
               >
                 <div className="flex items-center gap-2 mb-2">
@@ -92,14 +94,46 @@ export function ProjectListView({ projects: initial, workspaceId }: Props) {
                 {p.description && (
                   <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{p.description}</p>
                 )}
-                <span className="text-xs text-muted-foreground">
-                  {p._count?.tasks || 0} タスク
-                </span>
-              </button>
+                <div className="flex items-center justify-between mt-auto">
+                  <span className="text-xs text-muted-foreground">
+                    {p._count?.tasks || 0} タスク
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCreateTaskProjectId(p.id)
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    タスク追加
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* タスク作成ダイアログ（プロジェクトから） */}
+      <CreateTaskDialog
+        open={!!createTaskProjectId}
+        onClose={() => setCreateTaskProjectId(null)}
+        onCreated={async () => {
+          setCreateTaskProjectId(null)
+          const listRes = await fetch("/api/internal/projects")
+          if (listRes.ok) setProjects(await listRes.json())
+        }}
+        projects={projects.map((p) => ({ id: p.id, name: p.name, color: p.color }))}
+        members={members}
+        defaultProjectId={createTaskProjectId || undefined}
+        workspaceId={workspaceId}
+      />
 
       {/* プロジェクト作成ダイアログ */}
       <Dialog open={createOpen} onOpenChange={(v) => !v && setCreateOpen(false)}>
