@@ -27,10 +27,10 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json(members.map((m) => ({
+      ...m.user,
       id: m.id,
       userId: m.userId,
       role: m.role,
-      ...m.user,
     })))
   } catch (error) {
     console.error("プロジェクトメンバー取得エラー:", error)

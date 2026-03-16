@@ -27,9 +27,9 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json(members.map((m) => ({
+      ...m.user,
       id: m.id,
       userId: m.userId,
-      ...m.user,
     })))
   } catch (error) {
     console.error("タスクメンバー取得エラー:", error)
