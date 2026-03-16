@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ProfileDialog } from "@/components/chat/ProfileDialog"
 import { InviteDialog } from "@/components/chat/InviteDialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
 type Props = {
@@ -94,16 +95,44 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
         expanded ? "w-44 items-stretch px-2" : "w-14 items-center"
       )}
     >
-      {/* ワークスペースアイコン + トグルボタン */}
+      {/* ワークスペースアイコン + メニュー */}
       <div className={cn("flex items-center gap-2", expanded ? "px-1" : "flex-col")}>
-        <Avatar className="h-9 w-9 shrink-0">
-          <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
-            {workspace?.name?.charAt(0)?.toUpperCase() || "W"}
-          </AvatarFallback>
-        </Avatar>
-        {expanded && (
-          <span className="text-sm font-semibold truncate">{workspace?.name || "Workspace"}</span>
-        )}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="flex items-center gap-2 rounded-md hover:bg-muted p-1 transition-colors min-w-0">
+              <Avatar className="h-8 w-8 shrink-0">
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+                  {workspace?.name?.charAt(0)?.toUpperCase() || "W"}
+                </AvatarFallback>
+              </Avatar>
+              {expanded && (
+                <span className="text-sm font-semibold truncate">{workspace?.name || "Workspace"}</span>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="right" align="start" className="w-48 p-1">
+            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground truncate">
+              {workspace?.name || "Workspace"}
+            </div>
+            <Separator className="my-1" />
+            <div className="space-y-0.5">
+              <InviteDialog />
+              <ProfileDialog />
+              <Separator className="my-1" />
+              <button
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                onClick={handleLogout}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                ログアウト
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
         <div className={expanded ? "ml-auto" : ""}>
           <Button
             variant="ghost"
@@ -161,48 +190,8 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
         </Link>
       ))}
 
-      <Separator className={expanded ? "" : "w-8 mx-auto"} />
-
-      {/* メンバー招待 */}
-      <InviteDialog />
-
       {/* スペーサー */}
       <div className="flex-1" />
-
-      {/* プロフィール */}
-      <ProfileDialog />
-
-      {/* ログアウト */}
-      <Button
-        variant="ghost"
-        className={cn(
-          "text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95",
-          expanded
-            ? "h-9 justify-start gap-2 px-2 text-sm"
-            : "h-9 w-9 hover:scale-110"
-        )}
-        size={expanded ? "sm" : "icon"}
-        onClick={handleLogout}
-        title={expanded ? undefined : "ログアウト"}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="shrink-0"
-        >
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-          <polyline points="16 17 21 12 16 7" />
-          <line x1="21" y1="12" x2="9" y2="12" />
-        </svg>
-        {expanded && <span>ログアウト</span>}
-      </Button>
     </div>
   )
 }

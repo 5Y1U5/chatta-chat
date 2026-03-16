@@ -150,3 +150,28 @@
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* iOS Safe Area 対応 */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* スタッガードアニメーション */
+@keyframes stagger-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stagger-item {
+  animation: stagger-fade-in 0.3s ease-out both;
+}
+
+/* ページトランジション */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: page-enter 0.2s ease-out;
+}

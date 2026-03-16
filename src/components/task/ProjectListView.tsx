@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
 import { cn } from "@/lib/utils"
+import { EmptyState } from "@/components/ui/empty-state"
 import type { ProjectInfo } from "@/types/chat"
 
 const PROJECT_COLORS = [
@@ -92,7 +93,7 @@ export function ProjectListView({ projects: initial, members, workspaceId }: Pro
   const availableMembers = members.filter((m) => !memberIds.has(m.id))
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full page-enter">
       <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
         <h1 className="text-lg font-semibold">プロジェクト</h1>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
@@ -102,21 +103,23 @@ export function ProjectListView({ projects: initial, members, workspaceId }: Pro
 
       <div className="flex-1 overflow-y-auto p-4">
         {projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-4 opacity-50">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
-            <p>プロジェクトはまだありません</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => setCreateOpen(true)}>
-              最初のプロジェクトを作成
-            </Button>
-          </div>
+          <EmptyState
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              </svg>
+            }
+            title="プロジェクトはまだありません"
+            description="プロジェクトを作成してタスクを整理しましょう"
+            action={{ label: "最初のプロジェクトを作成", onClick: () => setCreateOpen(true) }}
+          />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((p) => (
+            {projects.map((p, i) => (
               <div
                 key={p.id}
-                className="group flex flex-col rounded-lg border p-4 hover:bg-muted/50 hover:shadow-sm hover:-translate-y-[1px] transition-all duration-200 cursor-pointer"
+                className="group flex flex-col rounded-xl border p-4 hover:bg-muted/50 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer stagger-item"
+                style={{ animationDelay: `${i * 60}ms` }}
                 onClick={() => router.push(`/${workspaceId}/tasks?projectId=${p.id}`)}
               >
                 <div className="flex items-center gap-2 mb-2">

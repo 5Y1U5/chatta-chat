@@ -27,6 +27,7 @@ type ProjectItem = {
   name: string
   color: string | null
   _count: { tasks: number }
+  _completedCount?: number
 }
 
 type Props = {
@@ -80,14 +81,14 @@ export function ChannelList({ channels, workspaceId, currentUserId, projects = [
   return (
     <div className="hidden w-60 flex-col border-r bg-muted/30 md:flex">
       {/* ヘッダー */}
-      <div className="flex h-12 items-center justify-between px-4 font-semibold border-b">
-        <span>グループチャット</span>
+      <div className="flex h-12 items-center justify-between px-4 border-b">
+        <span className="text-sm font-semibold text-muted-foreground">チャンネル</span>
         <button
           title="検索"
           onClick={() => setSearchOpen(true)}
-          className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+          className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -139,7 +140,7 @@ export function ChannelList({ channels, workspaceId, currentUserId, projects = [
               </span>
               <Link
                 href={`/${workspaceId}/projects`}
-                className="flex h-5 w-5 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                className="flex h-5 w-5 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 title="プロジェクト管理"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -152,14 +153,31 @@ export function ChannelList({ channels, workspaceId, currentUserId, projects = [
               <Link
                 key={project.id}
                 href={`/${workspaceId}/tasks?projectId=${project.id}`}
-                className="mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted"
+                className="mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors group"
               >
                 <span
-                  className="h-2 w-2 rounded-full shrink-0"
+                  className="h-2.5 w-2.5 rounded-full shrink-0 ring-2 ring-background"
                   style={{ backgroundColor: project.color || "#6B7280" }}
                 />
-                <span className="flex-1 truncate">{project.name}</span>
-                <span className="text-[10px] text-muted-foreground">{project._count.tasks}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="truncate block text-sm">{project.name}</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: project._count.tasks > 0 && project._completedCount !== undefined
+                            ? `${Math.round((project._completedCount / project._count.tasks) * 100)}%`
+                            : "0%",
+                          backgroundColor: project.color || "#6B7280",
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {project._count.tasks}
+                    </span>
+                  </div>
+                </div>
               </Link>
             ))}
           </div>
@@ -202,8 +220,9 @@ function ChannelSection({
           <Link
             href={`/${workspaceId}/channel/${channel.id}`}
             className={cn(
-              "flex flex-1 items-center gap-2 rounded-md px-2 py-1 text-sm min-w-0",
+              "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm min-w-0 transition-colors",
               activeChannelId === channel.id && "bg-muted font-medium",
+              activeChannelId !== channel.id && "hover:bg-muted/50",
               channel.unreadCount > 0 && activeChannelId !== channel.id && "font-semibold"
             )}
           >
