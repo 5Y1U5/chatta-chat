@@ -176,8 +176,8 @@ export function TaskDetailPanel({
         {/* 期日 */}
         <Field label="期日">
           <DatePicker
-            value={task.dueDate ? new Date(task.dueDate) : undefined}
-            onChange={(date) => handleUpdate("dueDate", date ? date.toISOString().split("T")[0] : null)}
+            value={task.dueDate ? (() => { const p = task.dueDate!.slice(0, 10).split("-"); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); })() : undefined}
+            onChange={(date) => handleUpdate("dueDate", date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}` : null)}
             className="w-full"
           />
         </Field>
@@ -228,7 +228,7 @@ export function TaskDetailPanel({
             onValueChange={(v) => {
               if (v === "_current") return
               const preset = v as RecurrencePreset
-              const rule = presetToRRule(preset, task.dueDate ? new Date(task.dueDate) : undefined)
+              const rule = presetToRRule(preset, task.dueDate ? (() => { const p = task.dueDate!.slice(0, 10).split("-"); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); })() : undefined)
               handleUpdate("recurrenceRule", rule)
             }}
           >

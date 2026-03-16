@@ -19,10 +19,11 @@ const priorityColors: Record<string, string> = {
 
 function formatDueDate(dueDate: string | null): { text: string; className: string } | null {
   if (!dueDate) return null
-  const due = new Date(dueDate)
+  // DB の DateTime を "日付のみ" として扱うためローカル日付にパース
+  const dueParts = dueDate.slice(0, 10).split("-")
+  const dueDay = new Date(Number(dueParts[0]), Number(dueParts[1]) - 1, Number(dueParts[2]))
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate())
   const diffDays = Math.floor((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
   if (diffDays < 0) return { text: "期限切れ", className: "text-red-500 font-medium" }
@@ -31,7 +32,7 @@ function formatDueDate(dueDate: string | null): { text: string; className: strin
   if (diffDays <= 7) return { text: `${diffDays}日後`, className: "text-muted-foreground" }
 
   return {
-    text: `${due.getMonth() + 1}/${due.getDate()}`,
+    text: `${dueDay.getMonth() + 1}/${dueDay.getDate()}`,
     className: "text-muted-foreground",
   }
 }
