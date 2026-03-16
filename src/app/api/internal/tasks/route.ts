@@ -73,6 +73,9 @@ export async function POST(request: Request) {
       priority,
       dueDate,
       recurrenceRule,
+      fileUrl,
+      fileName,
+      fileType,
     } = await request.json()
 
     if (!title?.trim()) {
@@ -159,6 +162,9 @@ export async function POST(request: Request) {
         priority: priority || "medium",
         dueDate: dueDate ? new Date(dueDate) : null,
         recurrenceRule: recurrenceRule || null,
+        fileUrl: fileUrl || null,
+        fileName: fileName || null,
+        fileType: fileType || null,
       },
       include: taskInclude,
     })
@@ -230,6 +236,9 @@ export async function PATCH(request: Request) {
     if (updates.recurrenceRule !== undefined)
       data.recurrenceRule = updates.recurrenceRule || null
     if (updates.sortOrder !== undefined) data.sortOrder = updates.sortOrder
+    if (updates.fileUrl !== undefined) data.fileUrl = updates.fileUrl || null
+    if (updates.fileName !== undefined) data.fileName = updates.fileName || null
+    if (updates.fileType !== undefined) data.fileType = updates.fileType || null
 
     // ステータス変更のハンドリング
     if (updates.status !== undefined) {
