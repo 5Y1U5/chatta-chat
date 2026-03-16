@@ -25,6 +25,8 @@ model User {
   assignedTasks    Task[]          @relation("TaskAssignee")
   createdTasks     Task[]          @relation("TaskCreator")
   taskComments     TaskComment[]
+  projectMembers   ProjectMember[]
+  taskMembers      TaskMember[]
   notifications    Notification[]  @relation("NotificationRecipient")
   actedNotifications Notification[] @relation("NotificationActor")
 }
@@ -152,10 +154,26 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks     Task[]
+  members   ProjectMember[]
 
   @@index([workspaceId])
+}
+
+// === プロジェクトメンバー ===
+model ProjectMember {
+  id        String   @id @default(uuid())
+  projectId String
+  userId    String
+  role      String   @default("member") // owner | member
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
 }
 
 // === タスク ===
@@ -184,10 +202,25 @@ model Task {
   parentTask Task?         @relation("SubTasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
   subTasks   Task[]        @relation("SubTasks")
   comments   TaskComment[]
+  members    TaskMember[]
 
   @@index([workspaceId, assigneeId, status])
   @@index([projectId, status])
   @@index([parentTaskId])
+}
+
+// === タスクメンバー（招待されたコラボレーター）===
+model TaskMember {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([userId])
 }
 
 // === タスク内チャット ===

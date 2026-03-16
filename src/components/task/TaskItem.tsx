@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { rruleToText } from "@/lib/recurrence"
 import type { TaskInfo } from "@/types/chat"
@@ -40,21 +41,29 @@ function formatDueDate(dueDate: string | null): { text: string; className: strin
 export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) {
   const dueInfo = formatDueDate(task.dueDate)
   const isDone = task.status === "done"
+  const [celebrating, setCelebrating] = useState(false)
 
   const handleCheck = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (isDone) {
       onStatusChange(task.id, "todo")
     } else {
-      onStatusChange(task.id, "done")
+      // 完了時のお祝いアニメーション
+      setCelebrating(true)
+      setTimeout(() => {
+        onStatusChange(task.id, "done")
+        setCelebrating(false)
+      }, 400)
     }
   }
 
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors",
-        isSelected && "bg-muted border-primary/30"
+        "group flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-all duration-200",
+        "hover:bg-muted/50 hover:shadow-sm hover:-translate-y-[1px]",
+        isSelected && "bg-muted border-primary/30 shadow-sm",
+        celebrating && "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
       )}
       onClick={onSelect}
     >
@@ -62,13 +71,14 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
       <button
         onClick={handleCheck}
         className={cn(
-          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
           isDone
-            ? "border-green-500 bg-green-500 text-white"
-            : "border-muted-foreground/40 hover:border-green-500"
+            ? "border-green-500 bg-green-500 text-white scale-110"
+            : "border-muted-foreground/40 hover:border-green-500 hover:scale-110 active:scale-90",
+          celebrating && "animate-bounce border-green-500 bg-green-500 text-white"
         )}
       >
-        {isDone && (
+        {(isDone || celebrating) && (
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
@@ -77,7 +87,11 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
 
       {/* タスク情報 */}
       <div className="flex-1 min-w-0">
-        <div className={cn("text-sm truncate", isDone && "line-through text-muted-foreground")}>
+        <div className={cn(
+          "text-sm truncate transition-all duration-300",
+          isDone && "line-through text-muted-foreground",
+          celebrating && "line-through text-green-600 dark:text-green-400"
+        )}>
           {task.title}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
@@ -94,7 +108,10 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
           )}
           {task._count && task._count.subTasks > 0 && (
             <span className="text-[11px] text-muted-foreground">
-              サブタスク {task._count.subTasks}
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-0.5">
+                <path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" />
+              </svg>
+              {task._count.subTasks}
             </span>
           )}
           {task._count && task._count.comments > 0 && (
@@ -103,6 +120,14 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
               {task._count.comments}
+            </span>
+          )}
+          {task._count && (task._count as Record<string, number>).members > 0 && (
+            <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              {(task._count as Record<string, number>).members}
             </span>
           )}
         </div>
@@ -137,7 +162,7 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
       {/* 担当者アバター */}
       {task.assignee && (
         <div
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium transition-transform group-hover:scale-110"
           title={task.assignee.displayName || ""}
         >
           {task.assignee.displayName?.charAt(0) || "?"}

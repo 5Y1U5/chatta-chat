@@ -13,7 +13,7 @@ const taskInclude = {
   assignee: { select: userSelect },
   creator: { select: userSelect },
   project: { select: { id: true, name: true, color: true } },
-  _count: { select: { subTasks: true, comments: true } },
+  _count: { select: { subTasks: true, comments: true, members: true } },
 } as const
 
 // タスク一覧取得
@@ -112,6 +112,38 @@ export async function POST(request: Request) {
           { error: "担当者がワークスペースに所属していません" },
           { status: 400 }
         )
+      }
+    }
+
+    // サブタスクの場合、上限チェック（各階層最大15個）
+    if (parentTaskId) {
+      const siblingCount = await prisma.task.count({
+        where: { parentTaskId },
+      })
+      if (siblingCount >= 15) {
+        return NextResponse.json(
+          { error: "サブタスクは最大15個までです" },
+          { status: 400 }
+        )
+      }
+
+      // ネスト深度チェック（最大2階層まで: タスク → サブタスク → サブサブタスク）
+      const parentTask = await prisma.task.findUnique({
+        where: { id: parentTaskId },
+        select: { parentTaskId: true },
+      })
+      if (parentTask?.parentTaskId) {
+        // 親がサブタスク → 祖父母を確認
+        const grandparent = await prisma.task.findUnique({
+          where: { id: parentTask.parentTaskId },
+          select: { parentTaskId: true },
+        })
+        if (grandparent?.parentTaskId) {
+          return NextResponse.json(
+            { error: "サブタスクは2階層までです" },
+            { status: 400 }
+          )
+        }
       }
     }
 
