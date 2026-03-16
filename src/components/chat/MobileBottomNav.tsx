@@ -81,7 +81,7 @@ export function MobileBottomNav({ workspaceId, unreadNotificationCount = 0 }: Pr
           >
             <span className="relative">
               {item.icon}
-              {item.badge && item.badge > 0 && (
+              {item.badge != null && item.badge > 0 && (
                 <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
                   {item.badge > 9 ? "9+" : item.badge}
                 </span>
