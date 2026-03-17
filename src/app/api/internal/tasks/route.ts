@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
       }
       where.projectId = projectId
     } else if (assigneeId) {
-      // マイタスク: assignee OR TaskMember に含まれるタスク
+      // マイタスク: assignee OR TaskMember に含まれるタスク（プロジェクト所属タスクを除外）
+      where.projectId = null
       where.OR = [
         { assigneeId },
         { members: { some: { userId: assigneeId } } },

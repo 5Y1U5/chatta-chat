@@ -109,11 +109,12 @@ async function renderMyTasks({
   userSelect: { id: true; displayName: true; avatarUrl: true }
   initialTaskId?: string
 }) {
-  // 自分に割り当てられた or TaskMember として追加されたルートタスク
+  // 自分に割り当てられた or TaskMember として追加されたルートタスク（プロジェクト所属タスクを除外）
   const tasks = await prisma.task.findMany({
     where: {
       workspaceId,
       parentTaskId: null,
+      projectId: null,
       OR: [
         { assigneeId: auth.userId },
         { members: { some: { userId: auth.userId } } },
