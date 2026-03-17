@@ -463,7 +463,7 @@ function InlineAddTask({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") handleSubmit()
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleSubmit() }
           if (e.key === "Escape") { setEditing(false); setTitle("") }
         }}
       />

@@ -51,7 +51,6 @@ export function TaskDetailPanel({
   const [newComment, setNewComment] = useState("")
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
   const [loading, setLoading] = useState(true)
-  const [addingMember, setAddingMember] = useState(false)
   // ネストサブタスク展開状態
   const [expandedSubTasks, setExpandedSubTasks] = useState<Set<string>>(new Set())
   const [nestedSubTasks, setNestedSubTasks] = useState<Record<string, TaskInfo[]>>({})
@@ -65,7 +64,7 @@ export function TaskDetailPanel({
     setNestedSubTasks({})
   }, [task.id, task.description])
 
-  // サブタスク、コメント、メンバーを取得
+  // サブタスク、コメント、メンバーをバックグラウンドで取得（UIをブロックしない）
   const fetchDetails = useCallback(async () => {
     setLoading(true)
     const [subRes, commentRes, memberRes] = await Promise.all([
@@ -77,6 +76,15 @@ export function TaskDetailPanel({
     if (commentRes.ok) setComments(await commentRes.json())
     if (memberRes.ok) setTaskMembers(await memberRes.json())
     setLoading(false)
+  }, [task.id])
+
+  // タスク切り替え時にサブタスク等もリセット
+  useEffect(() => {
+    setSubTasks([])
+    setComments([])
+    setTaskMembers([])
+    setNewComment("")
+    setNewSubTaskTitle("")
   }, [task.id])
 
   useEffect(() => {
@@ -310,12 +318,12 @@ export function TaskDetailPanel({
         { id: crypto.randomUUID(), userId, displayName: member.displayName, avatarUrl: member.avatarUrl },
       ])
     }
-    setAddingMember(true)
+    // API をバックグラウンドで呼ぶ（disabled にしない）
     fetch("/api/internal/tasks/members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: task.id, userId }),
-    }).then(() => setAddingMember(false))
+    })
   }
 
   const handleRemoveMember = (userId: string) => {
@@ -367,7 +375,7 @@ export function TaskDetailPanel({
 
   // メンバー追加候補（既に追加済みを除外）
   const memberIds = new Set(taskMembers.map((m) => m.userId))
-  const availableMembers = members.filter((m) => !memberIds.has(m.id) && m.id !== task.assigneeId)
+  const availableMembers = members.filter((m) => !memberIds.has(m.id))
 
   const completedSubTasks = subTasks.filter((t) => t.status === "done").length
   const subTaskProgress = subTasks.length > 0 ? (completedSubTasks / subTasks.length) * 100 : 0
@@ -444,15 +452,7 @@ export function TaskDetailPanel({
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-            <span className="text-xs">読み込み中...</span>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
           {/* ステータス */}
           <Field label="ステータス">
             <Select value={task.status} onValueChange={(v) => handleUpdate("status", v)}>
@@ -488,7 +488,7 @@ export function TaskDetailPanel({
           </Field>
 
           {/* メンバー（コラボレーター） */}
-          <Field label={`メンバー (${taskMembers.length})`}>
+          <Field label={`メンバー${loading ? "" : ` (${taskMembers.length})`}`}>
             <div className="space-y-2">
               {taskMembers.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
@@ -517,10 +517,9 @@ export function TaskDetailPanel({
                 <Select
                   value=""
                   onValueChange={(v) => v && handleAddMember(v)}
-                  disabled={addingMember}
                 >
                   <SelectTrigger className="h-7 text-xs">
-                    <SelectValue placeholder="メンバーを招待..." />
+                    <SelectValue placeholder="メンバーを追加..." />
                   </SelectTrigger>
                   <SelectContent>
                     {availableMembers.map((m) => (
@@ -628,10 +627,16 @@ export function TaskDetailPanel({
           </Field>
 
           {/* サブタスク（ネスト対応） */}
-          <Field label={`サブタスク (${completedSubTasks}/${subTasks.length})`}>
+          <Field label={`サブタスク${loading ? "" : ` (${completedSubTasks}/${subTasks.length})`}`}>
             <div className="space-y-1">
+              {loading && (
+                <div className="flex items-center gap-2 py-2 text-muted-foreground">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                  <span className="text-xs">読み込み中...</span>
+                </div>
+              )}
               {/* プログレスバー */}
-              {subTasks.length > 0 && (
+              {!loading && subTasks.length > 0 && (
                 <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden mb-2">
                   <div
                     className="h-full rounded-full bg-green-500 transition-all duration-500 ease-out"
@@ -719,7 +724,7 @@ export function TaskDetailPanel({
                             placeholder="サブタスクを追加..."
                             value={newNestedTitle[st.id] || ""}
                             onChange={(e) => setNewNestedTitle((prev) => ({ ...prev, [st.id]: e.target.value }))}
-                            onKeyDown={(e) => e.key === "Enter" && handleAddNestedSubTask(st.id)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddNestedSubTask(st.id) } }}
                           />
                           <Button size="xs" variant="outline" className="h-6 shrink-0 text-[10px]" onClick={() => handleAddNestedSubTask(st.id)}>
                             追加
@@ -738,7 +743,7 @@ export function TaskDetailPanel({
                     placeholder="サブタスクを追加..."
                     value={newSubTaskTitle}
                     onChange={(e) => setNewSubTaskTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddSubTask()}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddSubTask() } }}
                   />
                   <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={handleAddSubTask}>
                     追加
@@ -752,8 +757,14 @@ export function TaskDetailPanel({
           </Field>
 
           {/* コメント（タスク内チャット） */}
-          <Field label={`チャット (${comments.length})`}>
+          <Field label={`チャット${loading ? "" : ` (${comments.length})`}`}>
             <div className="space-y-3">
+              {loading && (
+                <div className="flex items-center gap-2 py-2 text-muted-foreground">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                  <span className="text-xs">読み込み中...</span>
+                </div>
+              )}
               {comments.map((c) => (
                 <div key={c.id} className="text-sm animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
                   <div className="flex items-center gap-2 mb-0.5">
@@ -781,7 +792,7 @@ export function TaskDetailPanel({
                   placeholder="メッセージを入力..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddComment()}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment() } }}
                 />
                 <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={handleAddComment}>
                   送信
@@ -815,7 +826,6 @@ export function TaskDetailPanel({
             </Popover>
           </div>
         </div>
-      )}
     </div>
   )
 }
