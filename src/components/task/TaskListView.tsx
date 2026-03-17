@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { TaskItem } from "@/components/task/TaskItem"
 import { TaskDetailPanel } from "@/components/task/TaskDetailPanel"
 import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
+import { ProjectMembersDialog } from "@/components/task/ProjectMembersDialog"
 import { EmptyState } from "@/components/ui/empty-state"
 import { cn } from "@/lib/utils"
 import type { TaskInfo } from "@/types/chat"
@@ -35,6 +36,8 @@ type Props = {
   viewMode: "my-tasks" | "project"
   projectId?: string
   projectName?: string
+  projectColor?: string | null
+  projectMembers?: { id: string; displayName: string | null; avatarUrl: string | null }[]
   initialSelectedTaskId?: string
 }
 
@@ -73,12 +76,15 @@ export function TaskListView({
   viewMode,
   projectId,
   projectName,
+  projectColor,
+  projectMembers = [],
   initialSelectedTaskId,
 }: Props) {
   const isMobile = useIsMobile()
   const [tasks, setTasks] = useState(initialTasks)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId || null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false)
 
   const todoTasks = sortByPriority(tasks.filter((t) => t.status === "todo"))
   const inProgressTasks = sortByPriority(tasks.filter((t) => t.status === "in_progress"))
@@ -228,15 +234,62 @@ export function TaskListView({
         {/* ヘッダー */}
         <div className="shrink-0 border-b py-4 px-5">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold">{title}</h1>
-            {!isMobile && (
-              <Button size="sm" onClick={() => setCreateOpen(true)}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                タスクを追加
-              </Button>
-            )}
+            <div className="flex items-center gap-2 min-w-0">
+              {viewMode === "project" && projectColor && (
+                <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: projectColor }} />
+              )}
+              <h1 className="text-xl font-bold truncate">{title}</h1>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* プロジェクトビュー: メンバーアバタースタック */}
+              {viewMode === "project" && projectMembers.length > 0 && (
+                <button
+                  onClick={() => setMembersDialogOpen(true)}
+                  className="flex items-center -space-x-1.5 hover:opacity-80 transition-opacity"
+                  title="メンバー管理"
+                >
+                  {projectMembers.slice(0, 3).map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[10px] font-medium border-2 border-background"
+                      title={m.displayName || undefined}
+                    >
+                      {m.avatarUrl ? (
+                        <img src={m.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                      ) : (
+                        m.displayName?.charAt(0) || "?"
+                      )}
+                    </div>
+                  ))}
+                  {projectMembers.length > 3 && (
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[10px] font-medium border-2 border-background">
+                      +{projectMembers.length - 3}
+                    </div>
+                  )}
+                </button>
+              )}
+              {viewMode === "project" && projectMembers.length === 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-muted-foreground"
+                  onClick={() => setMembersDialogOpen(true)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" />
+                  </svg>
+                  メンバー管理
+                </Button>
+              )}
+              {!isMobile && (
+                <Button size="sm" onClick={() => setCreateOpen(true)}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  タスクを追加
+                </Button>
+              )}
+            </div>
           </div>
           {incompleteTasks.length > 0 && (
             <p className="text-sm text-muted-foreground mt-1">
@@ -364,6 +417,18 @@ export function TaskListView({
         workspaceId={workspaceId}
         currentUserId={currentUserId}
       />
+
+      {/* プロジェクトメンバー管理ダイアログ */}
+      {viewMode === "project" && projectId && (
+        <ProjectMembersDialog
+          projectId={projectId}
+          projectName={projectName}
+          projectColor={projectColor}
+          workspaceMembers={members}
+          open={membersDialogOpen}
+          onOpenChange={setMembersDialogOpen}
+        />
+      )}
     </div>
   )
 }
