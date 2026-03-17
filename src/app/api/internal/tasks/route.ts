@@ -42,14 +42,16 @@ export async function GET(request: NextRequest) {
 
     if (status) where.status = status
 
-    // プロジェクト指定時: プロジェクトメンバーか確認
+    // プロジェクト指定時: プロジェクトメンバーでなければ自動追加（ワークスペースメンバーなら閲覧可能）
     if (projectId) {
       const isMember = await prisma.projectMember.findUnique({
         where: { projectId_userId: { projectId, userId: auth.userId } },
       })
       if (!isMember) {
-        // プロジェクトメンバーでなければ空配列を返す
-        return NextResponse.json([])
+        // ワークスペースメンバーなら自動でプロジェクトメンバーに追加
+        await prisma.projectMember.create({
+          data: { projectId, userId: auth.userId },
+        }).catch(() => {}) // 既に存在する場合は無視
       }
       where.projectId = projectId
     } else if (assigneeId) {

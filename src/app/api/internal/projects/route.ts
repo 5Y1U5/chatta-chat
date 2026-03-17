@@ -48,6 +48,14 @@ export async function POST(request: Request) {
       },
     })
 
+    // 作成者を自動でプロジェクトメンバーに追加
+    await prisma.projectMember.create({
+      data: {
+        projectId: project.id,
+        userId: auth.userId,
+      },
+    })
+
     return NextResponse.json({ id: project.id })
   } catch (error) {
     console.error("プロジェクト作成エラー:", error)
