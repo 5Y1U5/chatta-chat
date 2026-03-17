@@ -29,58 +29,69 @@ export default async function MyTasksPage({
       return renderMyTasks({ auth, workspaceId, prisma, userSelect, initialTaskId })
     }
 
-    // プロジェクトメンバー確認（アクセス制御）
-    const isMember = await prisma.projectMember.findUnique({
-      where: { projectId_userId: { projectId, userId: auth.userId } },
-    })
+    // 全クエリを並列実行
+    const [tasks, projectMembersRaw, projects, membersRaw] = await Promise.all([
+      // プロジェクトのタスク取得
+      prisma.task.findMany({
+        where: {
+          workspaceId,
+          projectId,
+          parentTaskId: null,
+        },
+        include: {
+          assignee: { select: userSelect },
+          creator: { select: userSelect },
+          project: { select: { id: true, name: true, color: true } },
+          _count: { select: { subTasks: true, comments: true } },
+        },
+        orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+      }),
+      // プロジェクトメンバー一覧
+      prisma.projectMember.findMany({
+        where: { projectId },
+        include: { user: { select: userSelect } },
+        orderBy: { createdAt: "asc" },
+      }),
+      // プロジェクト一覧（タスク作成時の選択肢用）
+      prisma.project.findMany({
+        where: { workspaceId, archived: false },
+        orderBy: { name: "asc" },
+      }),
+      // ワークスペースメンバー一覧
+      prisma.workspaceMember.findMany({
+        where: {
+          workspaceId,
+          user: { email: { not: "ai@chatta-chat.local" } },
+        },
+        include: { user: { select: userSelect } },
+      }),
+    ])
 
-    // プロジェクトメンバーでない場合も表示（ワークスペースメンバーなら閲覧可能）
-    // ただしメンバー制限がある場合は後でAPIレベルで制御
-
-    // プロジェクトのタスク取得
-    const tasks = await prisma.task.findMany({
-      where: {
-        workspaceId,
-        projectId,
-        parentTaskId: null,
-      },
-      include: {
-        assignee: { select: userSelect },
-        creator: { select: userSelect },
-        project: { select: { id: true, name: true, color: true } },
-        _count: { select: { subTasks: true, comments: true } },
-      },
-      orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
-    })
-
-    // プロジェクトメンバー一覧
-    const projectMembers = await prisma.projectMember.findMany({
-      where: { projectId },
-      include: { user: { select: userSelect } },
-      orderBy: { createdAt: "asc" },
-    })
-
-    // プロジェクト一覧（タスク作成時の選択肢用）
-    const projects = await prisma.project.findMany({
-      where: { workspaceId, archived: false },
-      orderBy: { name: "asc" },
-    })
-
-    // ワークスペースメンバー一覧
-    const members = await prisma.workspaceMember.findMany({
-      where: {
-        workspaceId,
-        user: { email: { not: "ai@chatta-chat.local" } },
-      },
-      include: { user: { select: userSelect } },
-    })
+    // プロジェクトメンバーでなければ自動追加（API側と整合性を確保）
+    const isMember = projectMembersRaw.some((pm) => pm.userId === auth.userId)
+    if (!isMember) {
+      await prisma.projectMember.create({
+        data: { projectId, userId: auth.userId },
+      }).catch(() => {}) // 競合時は無視
+      // メンバー一覧に自分を追加
+      const selfUser = membersRaw.find((m) => m.user.id === auth.userId)
+      if (selfUser) {
+        projectMembersRaw.push({
+          projectId,
+          userId: auth.userId,
+          createdAt: new Date(),
+          user: selfUser.user,
+        } as typeof projectMembersRaw[number])
+      }
+    }
+    const projectMembers = projectMembersRaw
 
     return (
       <TaskListView
         key={`project-${projectId}`}
         tasks={JSON.parse(JSON.stringify(tasks))}
         projects={JSON.parse(JSON.stringify(projects))}
-        members={members.map((m) => m.user)}
+        members={membersRaw.map((m) => m.user)}
         workspaceId={workspaceId}
         currentUserId={auth.userId}
         viewMode="project"
@@ -110,40 +121,41 @@ async function renderMyTasks({
   userSelect: { id: true; displayName: true; avatarUrl: true }
   initialTaskId?: string
 }) {
-  // 自分に割り当てられた or TaskMember として追加されたルートタスク（プロジェクト所属タスクを除外）
-  const tasks = await prisma.task.findMany({
-    where: {
-      workspaceId,
-      parentTaskId: null,
-      projectId: null,
-      OR: [
-        { assigneeId: auth.userId },
-        { members: { some: { userId: auth.userId } } },
-      ],
-    },
-    include: {
-      assignee: { select: userSelect },
-      creator: { select: userSelect },
-      project: { select: { id: true, name: true, color: true } },
-      _count: { select: { subTasks: true, comments: true } },
-    },
-    orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
-  })
-
-  // プロジェクト一覧（タスク作成時の選択肢用）
-  const projects = await prisma.project.findMany({
-    where: { workspaceId, archived: false },
-    orderBy: { name: "asc" },
-  })
-
-  // ワークスペースメンバー一覧（担当者選択用、AIユーザーを除外）
-  const members = await prisma.workspaceMember.findMany({
-    where: {
-      workspaceId,
-      user: { email: { not: "ai@chatta-chat.local" } },
-    },
-    include: { user: { select: userSelect } },
-  })
+  // 全クエリを並列実行
+  const [tasks, projects, members] = await Promise.all([
+    // 自分に割り当てられた or TaskMember として追加されたルートタスク（プロジェクト所属タスクを除外）
+    prisma.task.findMany({
+      where: {
+        workspaceId,
+        parentTaskId: null,
+        projectId: null,
+        OR: [
+          { assigneeId: auth.userId },
+          { members: { some: { userId: auth.userId } } },
+        ],
+      },
+      include: {
+        assignee: { select: userSelect },
+        creator: { select: userSelect },
+        project: { select: { id: true, name: true, color: true } },
+        _count: { select: { subTasks: true, comments: true } },
+      },
+      orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+    }),
+    // プロジェクト一覧（タスク作成時の選択肢用）
+    prisma.project.findMany({
+      where: { workspaceId, archived: false },
+      orderBy: { name: "asc" },
+    }),
+    // ワークスペースメンバー一覧（担当者選択用、AIユーザーを除外）
+    prisma.workspaceMember.findMany({
+      where: {
+        workspaceId,
+        user: { email: { not: "ai@chatta-chat.local" } },
+      },
+      include: { user: { select: userSelect } },
+    }),
+  ])
 
   return (
     <TaskListView

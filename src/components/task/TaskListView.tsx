@@ -81,9 +81,18 @@ export function TaskListView({
   initialSelectedTaskId,
 }: Props) {
   const isMobile = useIsMobile()
+  const viewKey = viewMode === "my-tasks" ? "my-tasks" : `project-${projectId}`
+  const [prevViewKey, setPrevViewKey] = useState(viewKey)
   const [tasks, setTasks] = useState(initialTasks)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId || null)
   const [createOpen, setCreateOpen] = useState(false)
+
+  // ビュー切り替え時にrender中で同期的にリセット（古いデータが1フレームも描画されない）
+  if (prevViewKey !== viewKey) {
+    setPrevViewKey(viewKey)
+    setTasks(initialTasks)
+    setSelectedTaskId(null)
+  }
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)
 
   const todoTasks = sortByPriority(tasks.filter((t) => t.status === "todo"))
