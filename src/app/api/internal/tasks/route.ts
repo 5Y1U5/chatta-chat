@@ -40,9 +40,27 @@ export async function GET(request: NextRequest) {
       where.parentTaskId = null
     }
 
-    if (projectId) where.projectId = projectId
-    if (assigneeId) where.assigneeId = assigneeId
     if (status) where.status = status
+
+    // プロジェクト指定時: プロジェクトメンバーか確認
+    if (projectId) {
+      const isMember = await prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId: auth.userId } },
+      })
+      if (!isMember) {
+        // プロジェクトメンバーでなければ空配列を返す
+        return NextResponse.json([])
+      }
+      where.projectId = projectId
+    } else if (assigneeId) {
+      // マイタスク: assignee OR TaskMember に含まれるタスク
+      where.OR = [
+        { assigneeId },
+        { members: { some: { userId: assigneeId } } },
+      ]
+    } else if (!projectId && !assigneeId) {
+      // 何も指定なしの場合は全タスク（従来通り）
+    }
 
     const tasks = await prisma.task.findMany({
       where,

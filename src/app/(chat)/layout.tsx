@@ -97,6 +97,11 @@ export default async function ChatLayout({
     where: { userId: auth.userId, read: false },
   })
 
+  // ワークスペースメンバー数
+  const memberCount = await prisma.workspaceMember.count({
+    where: { workspaceId: activeWorkspaceId },
+  })
+
   // プロジェクト一覧（サイドバー用）- 完了タスク数も取得
   const projectsRaw = await prisma.project.findMany({
     where: { workspaceId: activeWorkspaceId, archived: false },
@@ -122,6 +127,7 @@ export default async function ChatLayout({
         workspace={workspace ? { id: workspace.id, name: workspace.name, iconUrl: workspace.iconUrl } : null}
         workspaceId={activeWorkspaceId}
         unreadNotificationCount={unreadNotificationCount}
+        memberCount={memberCount}
         projects={projectsWithCompletion.map((p: { id: string; name: string; color: string | null; _count: { tasks: number }; _completedCount: number }) => ({
           id: p.id,
           name: p.name,

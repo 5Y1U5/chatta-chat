@@ -1,22 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
-import { cn } from "@/lib/utils"
+import { CreateProjectDialog } from "@/components/task/CreateProjectDialog"
+import { ProjectMembersDialog } from "@/components/task/ProjectMembersDialog"
 import { EmptyState } from "@/components/ui/empty-state"
 import type { ProjectInfo } from "@/types/chat"
-
-const PROJECT_COLORS = [
-  "#3B82F6", "#10B981", "#F59E0B", "#EF4444",
-  "#8B5CF6", "#EC4899", "#06B6D4", "#F97316",
-]
-
-type MemberInfo = { id: string; userId: string; displayName: string | null; avatarUrl: string | null; role: string }
 
 type Props = {
   projects: ProjectInfo[]
@@ -31,67 +22,13 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
   const [createOpen, setCreateOpen] = useState(false)
   const [createTaskProjectId, setCreateTaskProjectId] = useState<string | null>(null)
   const [manageMembersProjectId, setManageMembersProjectId] = useState<string | null>(null)
-  const [projectMembers, setProjectMembers] = useState<MemberInfo[]>([])
-  const [loadingMembers, setLoadingMembers] = useState(false)
-  const [name, setName] = useState("")
-  const [color, setColor] = useState(PROJECT_COLORS[0])
-  const [submitting, setSubmitting] = useState(false)
 
   const refreshProjects = useCallback(async () => {
     const res = await fetch("/api/internal/projects")
     if (res.ok) setProjects(await res.json())
   }, [])
 
-  const fetchProjectMembers = useCallback(async (projectId: string) => {
-    setLoadingMembers(true)
-    const res = await fetch(`/api/internal/projects/members?projectId=${projectId}`)
-    if (res.ok) setProjectMembers(await res.json())
-    setLoadingMembers(false)
-  }, [])
-
-  useEffect(() => {
-    if (manageMembersProjectId) {
-      fetchProjectMembers(manageMembersProjectId)
-    }
-  }, [manageMembersProjectId, fetchProjectMembers])
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    setSubmitting(true)
-    const res = await fetch("/api/internal/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), color }),
-    })
-    if (res.ok) {
-      setName("")
-      setColor(PROJECT_COLORS[0])
-      setCreateOpen(false)
-      await refreshProjects()
-    }
-    setSubmitting(false)
-  }
-
-  const handleAddMember = async (userId: string) => {
-    if (!manageMembersProjectId) return
-    await fetch("/api/internal/projects/members", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId: manageMembersProjectId, userId }),
-    })
-    await fetchProjectMembers(manageMembersProjectId)
-  }
-
-  const handleRemoveMember = async (userId: string) => {
-    if (!manageMembersProjectId) return
-    await fetch(`/api/internal/projects/members?projectId=${manageMembersProjectId}&userId=${userId}`, { method: "DELETE" })
-    setProjectMembers((prev) => prev.filter((m) => m.userId !== userId))
-  }
-
   const managingProject = projects.find((p) => p.id === manageMembersProjectId)
-  const memberIds = new Set(projectMembers.map((m) => m.userId))
-  const availableMembers = members.filter((m) => !memberIds.has(m.id))
 
   return (
     <div className="flex flex-col h-full page-enter">
@@ -141,7 +78,7 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation()
                         setManageMembersProjectId(p.id)
@@ -155,7 +92,7 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation()
                         setCreateTaskProjectId(p.id)
@@ -189,113 +126,22 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
         currentUserId={currentUserId}
       />
 
-      {/* メンバー管理ダイアログ */}
-      <Dialog open={!!manageMembersProjectId} onOpenChange={(v) => !v && setManageMembersProjectId(null)}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {managingProject?.color && (
-                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: managingProject.color }} />
-              )}
-              {managingProject?.name} のメンバー
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {loadingMembers ? (
-              <div className="flex justify-center py-4">
-                <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-              </div>
-            ) : (
-              <>
-                {projectMembers.length > 0 && (
-                  <div className="space-y-2">
-                    {projectMembers.map((m) => (
-                      <div key={m.userId} className="flex items-center gap-2 animate-in fade-in-0 duration-200">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                          {m.displayName?.charAt(0) || "?"}
-                        </div>
-                        <span className="text-sm flex-1 truncate">{m.displayName || "不明"}</span>
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          className="h-6 text-xs text-muted-foreground"
-                          onClick={() => handleRemoveMember(m.userId)}
-                        >
-                          削除
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {projectMembers.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-2">メンバーはまだいません</p>
-                )}
-                {availableMembers.length > 0 && (
-                  <Select value="" onValueChange={(v) => v && handleAddMember(v)}>
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue placeholder="メンバーを招待..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableMembers.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.displayName || m.id.slice(0, 8)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* プロジェクトメンバー管理ダイアログ */}
+      <ProjectMembersDialog
+        projectId={manageMembersProjectId}
+        projectName={managingProject?.name}
+        projectColor={managingProject?.color}
+        workspaceMembers={members}
+        open={!!manageMembersProjectId}
+        onOpenChange={(v) => !v && setManageMembersProjectId(null)}
+      />
 
       {/* プロジェクト作成ダイアログ */}
-      <Dialog open={createOpen} onOpenChange={(v) => !v && setCreateOpen(false)}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>プロジェクトを作成</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <Input
-              placeholder="プロジェクト名"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-            />
-            <div>
-              <label className="text-xs text-muted-foreground mb-2 block">カラー</label>
-              <div className="flex gap-2">
-                {PROJECT_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={cn(
-                      "h-7 w-7 rounded-full border-2 transition-all duration-200",
-                      color === c ? "border-foreground scale-110" : "border-transparent hover:scale-105"
-                    )}
-                    style={{ backgroundColor: c }}
-                    onClick={() => setColor(c)}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                キャンセル
-              </Button>
-              <Button type="submit" disabled={!name.trim() || submitting}>
-                {submitting ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                    作成中
-                  </span>
-                ) : "作成"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreateProjectDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={refreshProjects}
+      />
     </div>
   )
 }

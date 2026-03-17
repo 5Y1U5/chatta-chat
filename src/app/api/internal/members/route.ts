@@ -1,29 +1,34 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 
-// ワークスペースメンバー一覧（自分以外）
-export async function GET() {
+// ワークスペースメンバー一覧
+export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth()
     const prisma = getPrisma()
+    const includeSelf = request.nextUrl.searchParams.get("includeSelf") === "true"
+
+    const where: Record<string, unknown> = {
+      workspaceId: auth.workspaceId,
+    }
+    if (!includeSelf) {
+      where.userId = { not: auth.userId }
+    }
 
     const members = await prisma.workspaceMember.findMany({
-      where: {
-        workspaceId: auth.workspaceId,
-        userId: { not: auth.userId },
-      },
+      where,
       include: { user: true },
+      orderBy: { createdAt: "asc" },
     })
 
-    const result: { id: string; displayName: string | null; email: string }[] = []
-    for (const m of members) {
-      result.push({
-        id: m.user.id,
-        displayName: m.user.displayName,
-        email: m.user.email,
-      })
-    }
+    const result = members.map((m) => ({
+      id: m.user.id,
+      displayName: m.user.displayName,
+      avatarUrl: m.user.avatarUrl,
+      email: m.user.email,
+      role: m.role,
+    }))
 
     return NextResponse.json(result)
   } catch (error) {

@@ -8,7 +8,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ProfileDialog } from "@/components/chat/ProfileDialog"
-import { InviteDialog } from "@/components/chat/InviteDialog"
+import { WorkspaceMembersDialog } from "@/components/chat/WorkspaceMembersDialog"
+import { CreateProjectDialog } from "@/components/task/CreateProjectDialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
@@ -29,10 +30,13 @@ type Props = {
   workspaceId: string
   unreadNotificationCount?: number
   projects?: ProjectInfo[]
+  memberCount?: number
 }
 
-export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCount = 0, projects = [] }: Props) {
+export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCount = 0, projects = [], memberCount = 0 }: Props) {
   const [expanded, setExpanded] = useState(true)
+  const [membersOpen, setMembersOpen] = useState(false)
+  const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -95,116 +99,174 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
         </svg>
       ),
     },
+    {
+      label: "メンバー",
+      active: false,
+      onClick: () => setMembersOpen(true),
+      badge: memberCount,
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      ),
+    },
   ]
 
   return (
-    <div
-      className={cn(
-        "hidden flex-col gap-2 bg-muted/50 py-3 border-r md:flex transition-all duration-200",
-        expanded ? "w-44 items-stretch px-2" : "w-14 items-center"
-      )}
-    >
-      {/* ワークスペースアイコン + メニュー */}
-      <div className={cn("flex items-center gap-2", expanded ? "px-1" : "flex-col")}>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="flex items-center gap-2 rounded-md hover:bg-muted p-1 transition-colors min-w-0">
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
-                  {workspace?.name?.charAt(0)?.toUpperCase() || "W"}
-                </AvatarFallback>
-              </Avatar>
-              {expanded && (
-                <span className="text-sm font-semibold truncate">{workspace?.name || "Workspace"}</span>
-              )}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="right" align="start" className="w-48 p-1">
-            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground truncate">
-              {workspace?.name || "Workspace"}
-            </div>
-            <Separator className="my-1" />
-            <div className="space-y-0.5">
-              <InviteDialog />
-              <ProfileDialog />
-              <Separator className="my-1" />
-              <button
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                onClick={handleLogout}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                ログアウト
+    <>
+      <div
+        className={cn(
+          "hidden flex-col gap-2 bg-muted/50 py-3 border-r md:flex transition-all duration-200",
+          expanded ? "w-44 items-stretch px-2" : "w-14 items-center"
+        )}
+      >
+        {/* ワークスペースアイコン + メニュー */}
+        <div className={cn("flex items-center gap-2", expanded ? "px-1" : "flex-col")}>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-2 rounded-md hover:bg-muted p-1 transition-colors min-w-0">
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+                    {workspace?.name?.charAt(0)?.toUpperCase() || "W"}
+                  </AvatarFallback>
+                </Avatar>
+                {expanded && (
+                  <span className="text-sm font-semibold truncate">{workspace?.name || "Workspace"}</span>
+                )}
               </button>
-            </div>
-          </PopoverContent>
-        </Popover>
-        <div className={expanded ? "ml-auto" : ""}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            onClick={() => setExpanded(!expanded)}
-            title={expanded ? "サイドバーを閉じる" : "サイドバーを開く"}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {expanded ? (
-                <>
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M9 3v18" />
-                  <path d="M14 9l-3 3 3 3" />
-                </>
-              ) : (
-                <>
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M9 3v18" />
-                  <path d="M14 9l3 3-3 3" />
-                </>
-              )}
-            </svg>
-          </Button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" className="w-48 p-1">
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground truncate">
+                {workspace?.name || "Workspace"}
+              </div>
+              <Separator className="my-1" />
+              <div className="space-y-0.5">
+                <ProfileDialog />
+                <Separator className="my-1" />
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  onClick={handleLogout}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  ログアウト
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <div className={expanded ? "ml-auto" : ""}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => setExpanded(!expanded)}
+              title={expanded ? "サイドバーを閉じる" : "サイドバーを開く"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {expanded ? (
+                  <>
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M9 3v18" />
+                    <path d="M14 9l-3 3 3 3" />
+                  </>
+                ) : (
+                  <>
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M9 3v18" />
+                    <path d="M14 9l3 3-3 3" />
+                  </>
+                )}
+              </svg>
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <Separator className={expanded ? "" : "w-8 mx-auto"} />
+        <Separator className={expanded ? "" : "w-8 mx-auto"} />
 
-      {/* ナビゲーション */}
-      {navItems.map((item) => (
-        <Link
-          key={item.label}
-          href={item.href}
-          prefetch={true}
-          className={cn(
+        {/* ナビゲーション */}
+        {navItems.map((item) => {
+          const content = (
+            <>
+              <span className="shrink-0">{item.icon}</span>
+              {expanded && <span className="truncate">{item.label}</span>}
+              {item.badge && item.badge > 0 && (
+                <span className={cn(
+                  "flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[9px] font-medium text-muted-foreground",
+                  expanded ? "ml-auto" : "absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground font-bold"
+                )}>
+                  {item.badge > 99 ? "99+" : item.badge}
+                </span>
+              )}
+            </>
+          )
+
+          const className = cn(
             "relative inline-flex items-center rounded-md text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95",
             expanded
               ? "h-9 justify-start gap-2 px-2 text-sm"
               : "h-9 w-9 justify-center hover:scale-110",
             item.active && "bg-muted text-foreground"
-          )}
-          title={expanded ? undefined : item.label}
-        >
-          <span className="shrink-0">{item.icon}</span>
-          {expanded && <span className="truncate">{item.label}</span>}
-          {item.badge && item.badge > 0 && (
-            <span className={cn(
-              "flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground",
-              expanded ? "ml-auto" : "absolute -top-0.5 -right-0.5"
-            )}>
-              {item.badge > 9 ? "9+" : item.badge}
-            </span>
-          )}
-        </Link>
-      ))}
+          )
 
-      {/* プロジェクト一覧 */}
-      {projects.length > 0 && (
+          if ("onClick" in item && item.onClick) {
+            return (
+              <button
+                key={item.label}
+                className={className}
+                onClick={item.onClick}
+                title={expanded ? undefined : item.label}
+              >
+                {content}
+              </button>
+            )
+          }
+
+          return (
+            <Link
+              key={item.label}
+              href={"href" in item ? item.href! : "#"}
+              prefetch={true}
+              className={className}
+              title={expanded ? undefined : item.label}
+            >
+              {content}
+            </Link>
+          )
+        })}
+
+        {/* プロジェクト一覧 */}
         <>
           <Separator className={expanded ? "mt-1" : "w-8 mx-auto mt-1"} />
           {expanded && (
-            <span className="text-[10px] font-medium text-muted-foreground px-2 mt-1">プロジェクト</span>
+            <div className="flex items-center justify-between px-2 mt-1">
+              <span className="text-[10px] font-medium text-muted-foreground">プロジェクト</span>
+              <button
+                onClick={() => setCreateProjectOpen(true)}
+                className="flex h-5 w-5 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                title="プロジェクトを作成"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {!expanded && (
+            <button
+              onClick={() => setCreateProjectOpen(true)}
+              className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="プロジェクトを作成"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
           )}
           <div className={cn("space-y-0.5 overflow-y-auto max-h-40", expanded ? "" : "flex flex-col items-center")}>
             {projects.map((project) => {
@@ -247,11 +309,38 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
               )
             })}
           </div>
+          {/* すべて表示リンク */}
+          {expanded && (
+            <Link
+              href={`/${workspaceId}/projects`}
+              className="flex items-center gap-1 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+              すべて表示
+            </Link>
+          )}
         </>
-      )}
 
-      {/* スペーサー */}
-      <div className="flex-1" />
-    </div>
+        {/* スペーサー */}
+        <div className="flex-1" />
+      </div>
+
+      {/* ダイアログ群 */}
+      <WorkspaceMembersDialog
+        open={membersOpen}
+        onOpenChange={setMembersOpen}
+        memberCount={memberCount}
+      />
+      <CreateProjectDialog
+        open={createProjectOpen}
+        onOpenChange={setCreateProjectOpen}
+        onCreated={() => {
+          setCreateProjectOpen(false)
+          router.refresh()
+        }}
+      />
+    </>
   )
 }
