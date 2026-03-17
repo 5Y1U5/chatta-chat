@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import {
   DndContext,
@@ -82,11 +82,6 @@ export function TaskListView({
 }: Props) {
   const isMobile = useIsMobile()
   const [tasks, setTasks] = useState(initialTasks)
-
-  // プロジェクト切り替え時に initialTasks をリセット
-  useEffect(() => {
-    setTasks(initialTasks)
-  }, [viewMode, projectId])
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId || null)
   const [createOpen, setCreateOpen] = useState(false)
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)

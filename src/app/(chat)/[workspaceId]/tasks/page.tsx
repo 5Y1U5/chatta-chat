@@ -77,6 +77,7 @@ export default async function MyTasksPage({
 
     return (
       <TaskListView
+        key={`project-${projectId}`}
         tasks={JSON.parse(JSON.stringify(tasks))}
         projects={JSON.parse(JSON.stringify(projects))}
         members={members.map((m) => m.user)}
@@ -146,6 +147,7 @@ async function renderMyTasks({
 
   return (
     <TaskListView
+      key="my-tasks"
       tasks={JSON.parse(JSON.stringify(tasks))}
       projects={JSON.parse(JSON.stringify(projects))}
       members={members.map((m) => m.user)}
