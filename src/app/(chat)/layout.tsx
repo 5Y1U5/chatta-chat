@@ -1,10 +1,11 @@
+import { Suspense } from "react"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 import { WorkspaceSidebar } from "@/components/chat/WorkspaceSidebar"
 import { ChannelList } from "@/components/chat/ChannelList"
-import { MobileSidebar } from "@/components/chat/MobileSidebar"
+import { TaskNav } from "@/components/task/TaskNav"
+import { MobileHeaderSwitch } from "@/components/chat/MobileHeaderSwitch"
 import { MobileBottomNav } from "@/components/chat/MobileBottomNav"
-import { MobilePageTitle } from "@/components/chat/MobilePageTitle"
 import { InstallBanner } from "@/components/pwa/InstallBanner"
 
 type ChannelItem = {
@@ -102,7 +103,7 @@ export default async function ChatLayout({
     where: { workspaceId: activeWorkspaceId },
   })
 
-  // プロジェクト一覧（サイドバー用）- 完了タスク数も取得
+  // プロジェクト一覧（TaskNav / MobileTaskHeader 用）- 完了タスク数も取得
   const projectsRaw = await prisma.project.findMany({
     where: { workspaceId: activeWorkspaceId, archived: false },
     include: { _count: { select: { tasks: true } } },
@@ -116,9 +117,12 @@ export default async function ChatLayout({
     )
   )
 
-  const projectsWithCompletion = projectsRaw.map((p, i) => ({
-    ...JSON.parse(JSON.stringify(p)),
-    _completedCount: completedCounts[i],
+  const projectsForNav = projectsRaw.map((p, i) => ({
+    id: p.id,
+    name: p.name,
+    color: p.color,
+    totalTasks: p._count.tasks,
+    completedTasks: completedCounts[i],
   }))
 
   return (
@@ -128,32 +132,33 @@ export default async function ChatLayout({
         workspaceId={activeWorkspaceId}
         unreadNotificationCount={unreadNotificationCount}
         memberCount={memberCount}
-        projects={projectsWithCompletion.map((p: { id: string; name: string; color: string | null; _count: { tasks: number }; _completedCount: number }) => ({
-          id: p.id,
-          name: p.name,
-          color: p.color,
-          totalTasks: p._count.tasks,
-          completedTasks: p._completedCount,
-        }))}
       />
 
+      {/* PC第2カラム: チャット時は ChannelList、タスク時は TaskNav */}
       <ChannelList
         channels={channels}
         workspaceId={activeWorkspaceId}
         currentUserId={auth.userId}
-        projects={projectsWithCompletion}
       />
+      <Suspense>
+        <TaskNav
+          workspaceId={activeWorkspaceId}
+          projects={projectsForNav}
+        />
+      </Suspense>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <InstallBanner />
-        {/* モバイルヘッダー */}
+        {/* モバイルヘッダー: タスク系ページは MobileTaskHeader、それ以外は MobileSidebar + MobilePageTitle */}
         <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
-          <MobileSidebar
-            channels={channels}
-            workspaceId={activeWorkspaceId}
-            currentUserId={auth.userId}
-          />
-          <MobilePageTitle />
+          <Suspense>
+            <MobileHeaderSwitch
+              channels={channels}
+              workspaceId={activeWorkspaceId}
+              currentUserId={auth.userId}
+              projects={projectsForNav}
+            />
+          </Suspense>
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-14 md:pb-0">
           {children}

@@ -22,19 +22,10 @@ type ChannelItem = {
   }[]
 }
 
-type ProjectItem = {
-  id: string
-  name: string
-  color: string | null
-  _count: { tasks: number }
-  _completedCount?: number
-}
-
 type Props = {
   channels: ChannelItem[]
   workspaceId: string
   currentUserId: string
-  projects?: ProjectItem[]
 }
 
 // DM の場合は相手の名前を表示
@@ -49,7 +40,7 @@ function getChannelDisplayName(
   return channel.name || "名前なし"
 }
 
-export function ChannelList({ channels, workspaceId, currentUserId, projects = [] }: Props) {
+export function ChannelList({ channels, workspaceId, currentUserId }: Props) {
   const params = useParams()
   const pathname = usePathname()
   const activeChannelId = params.channelId as string | undefined
@@ -131,57 +122,6 @@ export function ChannelList({ channels, workspaceId, currentUserId, projects = [
           action={<NewDmDialog workspaceId={workspaceId} />}
         />
 
-        {/* プロジェクト */}
-        {projects.length > 0 && (
-          <div className="mb-2">
-            <div className="flex items-center justify-between px-4 py-1">
-              <span className="text-xs font-medium text-muted-foreground uppercase">
-                プロジェクト
-              </span>
-              <Link
-                href={`/${workspaceId}/projects`}
-                className="flex h-5 w-5 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                title="プロジェクト管理"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </Link>
-            </div>
-            {projects.map((project) => (
-              <Link
-                key={project.id}
-                href={`/${workspaceId}/tasks?projectId=${project.id}`}
-                className="mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors group"
-              >
-                <span
-                  className="h-2.5 w-2.5 rounded-full shrink-0 ring-2 ring-background"
-                  style={{ backgroundColor: project.color || "#6B7280" }}
-                />
-                <div className="flex-1 min-w-0">
-                  <span className="truncate block text-sm">{project.name}</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: project._count.tasks > 0 && project._completedCount !== undefined
-                            ? `${Math.round((project._completedCount / project._count.tasks) * 100)}%`
-                            : "0%",
-                          backgroundColor: project.color || "#6B7280",
-                        }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0">
-                      {project._count.tasks}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   )

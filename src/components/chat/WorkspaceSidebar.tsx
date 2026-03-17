@@ -9,17 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ProfileDialog } from "@/components/chat/ProfileDialog"
 import { WorkspaceMembersDialog } from "@/components/chat/WorkspaceMembersDialog"
-import { CreateProjectDialog } from "@/components/task/CreateProjectDialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-
-type ProjectInfo = {
-  id: string
-  name: string
-  color: string | null
-  totalTasks: number
-  completedTasks: number
-}
 
 type Props = {
   workspace: {
@@ -29,14 +20,12 @@ type Props = {
   } | null
   workspaceId: string
   unreadNotificationCount?: number
-  projects?: ProjectInfo[]
   memberCount?: number
 }
 
-export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCount = 0, projects = [], memberCount = 0 }: Props) {
+export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCount = 0, memberCount = 0 }: Props) {
   const [expanded, setExpanded] = useState(true)
   const [membersOpen, setMembersOpen] = useState(false)
-  const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -240,89 +229,6 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
           )
         })}
 
-        {/* プロジェクト一覧 */}
-        <>
-          <Separator className={expanded ? "mt-1" : "w-8 mx-auto mt-1"} />
-          {expanded && (
-            <div className="flex items-center justify-between px-2 mt-1">
-              <span className="text-[10px] font-medium text-muted-foreground">プロジェクト</span>
-              <button
-                onClick={() => setCreateProjectOpen(true)}
-                className="flex h-5 w-5 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                title="プロジェクトを作成"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </button>
-            </div>
-          )}
-          {!expanded && (
-            <button
-              onClick={() => setCreateProjectOpen(true)}
-              className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="プロジェクトを作成"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </button>
-          )}
-          <div className={cn("space-y-0.5 overflow-y-auto max-h-40", expanded ? "" : "flex flex-col items-center")}>
-            {projects.map((project) => {
-              const progress = project.totalTasks > 0 ? (project.completedTasks / project.totalTasks) * 100 : 0
-              return (
-                <Link
-                  key={project.id}
-                  href={`/${workspaceId}/tasks?projectId=${project.id}`}
-                  className={cn(
-                    "flex items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                    expanded
-                      ? "gap-2 px-2 py-1.5 text-xs"
-                      : "h-7 w-7 justify-center"
-                  )}
-                  title={expanded ? undefined : project.name}
-                >
-                  <span
-                    className="h-2.5 w-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: project.color || "#94a3b8" }}
-                  />
-                  {expanded && (
-                    <div className="flex-1 min-w-0">
-                      <span className="truncate block">{project.name}</span>
-                      {project.totalTasks > 0 && (
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-green-500 transition-all"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                          <span className="text-[9px] text-muted-foreground shrink-0">
-                            {project.completedTasks}/{project.totalTasks}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Link>
-              )
-            })}
-          </div>
-          {/* すべて表示リンク */}
-          {expanded && (
-            <Link
-              href={`/${workspaceId}/projects`}
-              className="flex items-center gap-1 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-              すべて表示
-            </Link>
-          )}
-        </>
-
         {/* スペーサー */}
         <div className="flex-1" />
       </div>
@@ -332,14 +238,6 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
         open={membersOpen}
         onOpenChange={setMembersOpen}
         memberCount={memberCount}
-      />
-      <CreateProjectDialog
-        open={createProjectOpen}
-        onOpenChange={setCreateProjectOpen}
-        onCreated={() => {
-          setCreateProjectOpen(false)
-          router.refresh()
-        }}
       />
     </>
   )
