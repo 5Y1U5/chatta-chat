@@ -10,11 +10,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { DatePicker } from "@/components/ui/date-picker"
 import { RECURRENCE_PRESETS, presetToRRule, type RecurrencePreset } from "@/lib/recurrence"
 import { useIsMobile } from "@/hooks/useIsMobile"
+import type { TaskInfo } from "@/types/chat"
 
 type Props = {
   open: boolean
   onClose: () => void
-  onCreated: () => void
+  onCreated: (task?: TaskInfo) => void
   projects: { id: string; name: string; color: string | null }[]
   members: { id: string; displayName: string | null; avatarUrl: string | null }[]
   defaultProjectId?: string
@@ -99,10 +100,10 @@ export function CreateTaskDialog({
     })
 
     if (res.ok) {
-      // コラボレーターを追加
+      const task = await res.json()
+      // コラボレーターを追加（バックグラウンド）
       if (collaboratorIds.length > 0) {
-        const task = await res.json()
-        await Promise.all(
+        Promise.all(
           collaboratorIds.map((userId) =>
             fetch("/api/internal/tasks/members", {
               method: "POST",
@@ -113,7 +114,7 @@ export function CreateTaskDialog({
         )
       }
       resetForm()
-      onCreated()
+      onCreated(task)
     }
     setSubmitting(false)
   }

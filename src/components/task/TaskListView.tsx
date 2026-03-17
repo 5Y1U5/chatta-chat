@@ -104,7 +104,8 @@ export function TaskListView({
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null
 
-  const refreshTasks = useCallback(async () => {
+  // バックグラウンド同期（UIをブロックしない）
+  const syncInBackground = useCallback(() => {
     const params = new URLSearchParams()
     if (viewMode === "my-tasks") {
       params.set("assigneeId", currentUserId)
@@ -112,42 +113,91 @@ export function TaskListView({
     if (projectId) {
       params.set("projectId", projectId)
     }
-
-    const res = await fetch(`/api/internal/tasks?${params}`)
-    if (res.ok) {
-      const data = await res.json()
-      setTasks(data)
-    }
+    fetch(`/api/internal/tasks?${params}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (data) setTasks(data) })
+      .catch(() => {})
   }, [viewMode, currentUserId, projectId])
 
-  const handleStatusChange = async (taskId: string, status: string) => {
-    const res = await fetch("/api/internal/tasks", {
+  // 楽観的ステータス変更
+  const handleStatusChange = useCallback((taskId: string, status: string) => {
+    const targetTask = tasks.find((t) => t.id === taskId)
+    // 即座にローカル state を更新
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null }
+          : t
+      )
+    )
+    // API をバックグラウンドで呼ぶ
+    fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId, status }),
+    }).then(() => {
+      // 繰り返しタスクの場合、サーバーが次回タスクを生成するのでバックグラウンド同期
+      if (targetTask?.recurrenceRule && status === "done") {
+        syncInBackground()
+      }
     })
-    if (res.ok) {
-      await refreshTasks()
-    }
-  }
+  }, [tasks, syncInBackground])
 
-  const handleReorder = useCallback(async (reorderedTasks: TaskInfo[]) => {
+  const handleReorder = useCallback((reorderedTasks: TaskInfo[]) => {
     const taskIds = reorderedTasks.map((t) => t.id)
-    await fetch("/api/internal/tasks/reorder", {
+    fetch("/api/internal/tasks/reorder", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskIds }),
     })
   }, [])
 
-  const handleTaskCreated = async () => {
-    await refreshTasks()
+  // ダイアログからのタスク作成（APIレスポンスを受け取って即座に追加）
+  const handleTaskCreated = useCallback((task?: TaskInfo) => {
+    if (task) {
+      setTasks((prev) => [task, ...prev])
+    } else {
+      syncInBackground()
+    }
     setCreateOpen(false)
-  }
+  }, [syncInBackground])
 
-  // インラインタスク追加
-  const handleInlineCreate = async (title: string, status: string) => {
-    await fetch("/api/internal/tasks", {
+  // インラインタスク追加（楽観的）
+  const handleInlineCreate = useCallback(async (title: string, status: string) => {
+    const tempId = crypto.randomUUID()
+    const tempTask: TaskInfo = {
+      id: tempId,
+      workspaceId,
+      projectId: projectId || null,
+      parentTaskId: null,
+      title: title.trim(),
+      description: null,
+      status,
+      priority: "medium",
+      assigneeId: viewMode === "my-tasks" ? currentUserId : null,
+      creatorId: currentUserId,
+      dueDate: null,
+      completedAt: null,
+      recurrenceRule: null,
+      sortOrder: 9999,
+      fileUrl: null,
+      fileName: null,
+      fileType: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      assignee: viewMode === "my-tasks"
+        ? (members.find((m) => m.id === currentUserId) || { id: currentUserId, displayName: null, avatarUrl: null })
+        : null,
+      creator: members.find((m) => m.id === currentUserId) || { id: currentUserId, displayName: null, avatarUrl: null },
+      project: projectId ? (projects.find((p) => p.id === projectId) || null) : null,
+      _count: { subTasks: 0, comments: 0 },
+    }
+
+    // 即座にローカルに追加
+    setTasks((prev) => [tempTask, ...prev])
+
+    // API呼び出し → 成功したらサーバーのデータで置換
+    const res = await fetch("/api/internal/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -158,8 +208,16 @@ export function TaskListView({
         projectId: projectId || undefined,
       }),
     })
-    await refreshTasks()
-  }
+    if (res.ok) {
+      const realTask = await res.json()
+      setTasks((prev) => prev.map((t) => (t.id === tempId ? realTask : t)))
+    }
+  }, [workspaceId, projectId, viewMode, currentUserId, members, projects])
+
+  // 詳細パネルからの楽観的タスク更新
+  const handleOptimisticTaskUpdate = useCallback((taskId: string, updates: Partial<TaskInfo>) => {
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t)))
+  }, [])
 
   const title = viewMode === "my-tasks" ? "マイタスク" : projectName || "プロジェクト"
 
@@ -275,7 +333,11 @@ export function TaskListView({
           workspaceId={workspaceId}
           currentUserId={currentUserId}
           onClose={() => setSelectedTaskId(null)}
-          onUpdate={refreshTasks}
+          onOptimisticUpdate={handleOptimisticTaskUpdate}
+          onTaskDeleted={(taskId) => {
+            setTasks((prev) => prev.filter((t) => t.id !== taskId))
+            setSelectedTaskId(null)
+          }}
         />
       )}
 
@@ -368,15 +430,14 @@ function InlineAddTask({
 }) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState("")
-  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = async () => {
-    if (!title.trim() || submitting) return
-    setSubmitting(true)
-    await onSubmit(title, sectionStatus)
+  const handleSubmit = () => {
+    if (!title.trim()) return
+    const t = title
     setTitle("")
     setEditing(false)
-    setSubmitting(false)
+    // 非同期だがUIは既にリセット済み
+    onSubmit(t, sectionStatus)
   }
 
   if (!editing) {
@@ -405,9 +466,8 @@ function InlineAddTask({
           if (e.key === "Enter") handleSubmit()
           if (e.key === "Escape") { setEditing(false); setTitle("") }
         }}
-        disabled={submitting}
       />
-      <Button size="sm" className="h-8 shrink-0" onClick={handleSubmit} disabled={!title.trim() || submitting}>
+      <Button size="sm" className="h-8 shrink-0" onClick={handleSubmit} disabled={!title.trim()}>
         追加
       </Button>
       <Button

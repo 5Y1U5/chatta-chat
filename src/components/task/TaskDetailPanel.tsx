@@ -20,7 +20,8 @@ type Props = {
   workspaceId: string
   currentUserId: string
   onClose: () => void
-  onUpdate: () => Promise<void>
+  onOptimisticUpdate: (taskId: string, updates: Partial<TaskInfo>) => void
+  onTaskDeleted: (taskId: string) => void
 }
 
 function parseDateStr(dateStr: string): Date {
@@ -39,7 +40,8 @@ export function TaskDetailPanel({
   workspaceId,
   currentUserId,
   onClose,
-  onUpdate,
+  onOptimisticUpdate,
+  onTaskDeleted,
 }: Props) {
   const [description, setDescription] = useState(task.description || "")
   const [descriptionDirty, setDescriptionDirty] = useState(false)
@@ -48,7 +50,6 @@ export function TaskDetailPanel({
   const [taskMembers, setTaskMembers] = useState<MemberInfo[]>([])
   const [newComment, setNewComment] = useState("")
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
-  const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [addingMember, setAddingMember] = useState(false)
   // ネストサブタスク展開状態
@@ -106,46 +107,145 @@ export function TaskDetailPanel({
     })
   }
 
-  const handleUpdate = async (field: string, value: unknown) => {
-    setSaving(true)
-    await fetch("/api/internal/tasks", {
+  // 楽観的フィールド更新
+  const handleUpdate = (field: string, value: unknown) => {
+    // 親リストを楽観的に更新
+    const optimistic: Partial<TaskInfo> = { [field]: value }
+
+    // 関連フィールドも一緒に更新
+    if (field === "status") {
+      optimistic.completedAt = value === "done" ? new Date().toISOString() : null
+    }
+    if (field === "assigneeId") {
+      const member = members.find((m) => m.id === value)
+      optimistic.assignee = member
+        ? { id: member.id, displayName: member.displayName, avatarUrl: member.avatarUrl }
+        : null
+    }
+    if (field === "projectId") {
+      const project = projects.find((p) => p.id === value)
+      optimistic.project = project
+        ? { id: project.id, name: project.name, color: project.color }
+        : null
+    }
+
+    onOptimisticUpdate(task.id, optimistic)
+
+    // API をバックグラウンドで呼ぶ
+    fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: task.id, [field]: value }),
     })
-    await onUpdate()
-    setSaving(false)
   }
 
-  const handleSaveDescription = async () => {
-    await handleUpdate("description", description)
+  const handleSaveDescription = () => {
+    handleUpdate("description", description)
     setDescriptionDirty(false)
   }
 
-  const handleAddSubTask = async () => {
+  // 楽観的サブタスク追加
+  const handleAddSubTask = () => {
     if (!newSubTaskTitle.trim()) return
     if (subTasks.length >= 15) return
-    await fetch("/api/internal/tasks", {
+
+    const tempId = crypto.randomUUID()
+    const tempSubTask: TaskInfo = {
+      id: tempId,
+      workspaceId,
+      projectId: task.projectId,
+      parentTaskId: task.id,
+      title: newSubTaskTitle.trim(),
+      description: null,
+      status: "todo",
+      priority: "medium",
+      assigneeId: task.assigneeId,
+      creatorId: currentUserId,
+      dueDate: null,
+      completedAt: null,
+      recurrenceRule: null,
+      sortOrder: subTasks.length,
+      fileUrl: null,
+      fileName: null,
+      fileType: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      assignee: task.assignee,
+      creator: members.find((m) => m.id === currentUserId) || { id: currentUserId, displayName: null, avatarUrl: null },
+      project: task.project,
+      _count: { subTasks: 0, comments: 0 },
+    }
+
+    // 即座にローカルに追加
+    setSubTasks((prev) => [...prev, tempSubTask])
+    // 親タスクの _count も更新
+    onOptimisticUpdate(task.id, {
+      _count: { subTasks: subTasks.length + 1, comments: task._count?.comments || 0 },
+    })
+    const title = newSubTaskTitle.trim()
+    setNewSubTaskTitle("")
+
+    // API をバックグラウンドで呼ぶ → 成功したら置換
+    fetch("/api/internal/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        title: newSubTaskTitle.trim(),
+        title,
         parentTaskId: task.id,
         projectId: task.projectId,
         assigneeId: task.assigneeId,
       }),
+    }).then(async (res) => {
+      if (res.ok) {
+        const realTask = await res.json()
+        setSubTasks((prev) => prev.map((t) => (t.id === tempId ? realTask : t)))
+      }
     })
-    setNewSubTaskTitle("")
-    await fetchDetails()
-    await onUpdate()
   }
 
-  const handleAddNestedSubTask = async (parentSubTaskId: string) => {
+  // 楽観的ネストサブタスク追加
+  const handleAddNestedSubTask = (parentSubTaskId: string) => {
     const title = newNestedTitle[parentSubTaskId]?.trim()
     if (!title) return
     const current = nestedSubTasks[parentSubTaskId] || []
     if (current.length >= 15) return
-    await fetch("/api/internal/tasks", {
+
+    const tempId = crypto.randomUUID()
+    const tempTask: TaskInfo = {
+      id: tempId,
+      workspaceId,
+      projectId: task.projectId,
+      parentTaskId: parentSubTaskId,
+      title,
+      description: null,
+      status: "todo",
+      priority: "medium",
+      assigneeId: task.assigneeId,
+      creatorId: currentUserId,
+      dueDate: null,
+      completedAt: null,
+      recurrenceRule: null,
+      sortOrder: current.length,
+      fileUrl: null,
+      fileName: null,
+      fileType: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      assignee: task.assignee,
+      creator: members.find((m) => m.id === currentUserId) || { id: currentUserId, displayName: null, avatarUrl: null },
+      project: task.project,
+      _count: { subTasks: 0, comments: 0 },
+    }
+
+    // 即座にローカルに追加
+    setNestedSubTasks((prev) => ({
+      ...prev,
+      [parentSubTaskId]: [...(prev[parentSubTaskId] || []), tempTask],
+    }))
+    setNewNestedTitle((prev) => ({ ...prev, [parentSubTaskId]: "" }))
+
+    // API をバックグラウンドで呼ぶ
+    fetch("/api/internal/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -154,63 +254,115 @@ export function TaskDetailPanel({
         projectId: task.projectId,
         assigneeId: task.assigneeId,
       }),
+    }).then(async (res) => {
+      if (res.ok) {
+        const realTask = await res.json()
+        setNestedSubTasks((prev) => ({
+          ...prev,
+          [parentSubTaskId]: (prev[parentSubTaskId] || []).map((t) =>
+            t.id === tempId ? realTask : t
+          ),
+        }))
+      }
     })
-    setNewNestedTitle((prev) => ({ ...prev, [parentSubTaskId]: "" }))
-    await fetchNestedSubTasks(parentSubTaskId)
-    await fetchDetails()
   }
 
-  const handleSubTaskStatusChange = async (subTaskId: string, status: string) => {
-    await fetch("/api/internal/tasks", {
+  // 楽観的サブタスクステータス変更
+  const handleSubTaskStatusChange = (subTaskId: string, status: string) => {
+    setSubTasks((prev) =>
+      prev.map((t) =>
+        t.id === subTaskId
+          ? { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null }
+          : t
+      )
+    )
+    fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: subTaskId, status }),
     })
-    await fetchDetails()
   }
 
-  const handleNestedSubTaskStatusChange = async (parentId: string, subTaskId: string, status: string) => {
-    await fetch("/api/internal/tasks", {
+  // 楽観的ネストサブタスクステータス変更
+  const handleNestedSubTaskStatusChange = (parentId: string, subTaskId: string, status: string) => {
+    setNestedSubTasks((prev) => ({
+      ...prev,
+      [parentId]: (prev[parentId] || []).map((t) =>
+        t.id === subTaskId
+          ? { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null }
+          : t
+      ),
+    }))
+    fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: subTaskId, status }),
     })
-    await fetchNestedSubTasks(parentId)
   }
 
-  const handleAddMember = async (userId: string) => {
+  // 楽観的メンバー追加
+  const handleAddMember = (userId: string) => {
+    const member = members.find((m) => m.id === userId)
+    if (member) {
+      // 即座にローカルに追加
+      setTaskMembers((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), userId, displayName: member.displayName, avatarUrl: member.avatarUrl },
+      ])
+    }
     setAddingMember(true)
-    await fetch("/api/internal/tasks/members", {
+    fetch("/api/internal/tasks/members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: task.id, userId }),
-    })
-    const res = await fetch(`/api/internal/tasks/members?taskId=${task.id}`)
-    if (res.ok) setTaskMembers(await res.json())
-    setAddingMember(false)
+    }).then(() => setAddingMember(false))
   }
 
-  const handleRemoveMember = async (userId: string) => {
-    await fetch(`/api/internal/tasks/members?taskId=${task.id}&userId=${userId}`, { method: "DELETE" })
+  const handleRemoveMember = (userId: string) => {
     setTaskMembers((prev) => prev.filter((m) => m.userId !== userId))
+    fetch(`/api/internal/tasks/members?taskId=${task.id}&userId=${userId}`, { method: "DELETE" })
   }
 
-  const handleAddComment = async () => {
+  // 楽観的コメント追加
+  const handleAddComment = () => {
     if (!newComment.trim()) return
-    await fetch("/api/internal/tasks/comments", {
+
+    const currentMember = members.find((m) => m.id === currentUserId)
+    const tempComment: TaskCommentInfo = {
+      id: crypto.randomUUID(),
+      taskId: task.id,
+      content: newComment.trim(),
+      createdAt: new Date().toISOString(),
+      user: {
+        id: currentUserId,
+        displayName: currentMember?.displayName || null,
+        avatarUrl: currentMember?.avatarUrl || null,
+      },
+    }
+
+    // 即座にローカルに追加
+    setComments((prev) => [...prev, tempComment])
+    // 親タスクの _count も更新
+    onOptimisticUpdate(task.id, {
+      _count: { subTasks: task._count?.subTasks || 0, comments: (task._count?.comments || 0) + 1 },
+    })
+    const content = newComment.trim()
+    setNewComment("")
+
+    // API をバックグラウンドで呼ぶ
+    fetch("/api/internal/tasks/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: task.id, content: newComment.trim() }),
+      body: JSON.stringify({ taskId: task.id, content }),
     })
-    setNewComment("")
-    await fetchDetails()
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!confirm("このタスクを削除しますか？")) return
-    await fetch(`/api/internal/tasks?taskId=${task.id}`, { method: "DELETE" })
-    onClose()
-    await onUpdate()
+    // 即座にUIから除去
+    onTaskDeleted(task.id)
+    // API をバックグラウンドで呼ぶ
+    fetch(`/api/internal/tasks?taskId=${task.id}`, { method: "DELETE" })
   }
 
   // メンバー追加候補（既に追加済みを除外）
@@ -237,12 +389,6 @@ export function TaskDetailPanel({
             <span className="text-sm font-semibold truncate">{task.title}</span>
           </div>
           <div className="flex items-center gap-1">
-            {saving && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                保存中
-              </span>
-            )}
             {/* リンクコピー */}
             <Button
               variant="ghost"
@@ -374,7 +520,7 @@ export function TaskDetailPanel({
                   disabled={addingMember}
                 >
                   <SelectTrigger className="h-7 text-xs">
-                    <SelectValue placeholder={addingMember ? "追加中..." : "メンバーを招待..."} />
+                    <SelectValue placeholder="メンバーを招待..." />
                   </SelectTrigger>
                   <SelectContent>
                     {availableMembers.map((m) => (
