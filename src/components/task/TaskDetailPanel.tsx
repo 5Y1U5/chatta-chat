@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -43,6 +43,9 @@ export function TaskDetailPanel({
   onOptimisticUpdate,
   onTaskDeleted,
 }: Props) {
+  const [title, setTitle] = useState(task.title)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const titleInputRef = useRef<HTMLTextAreaElement>(null)
   const [description, setDescription] = useState(task.description || "")
   const [descriptionDirty, setDescriptionDirty] = useState(false)
   const [subTasks, setSubTasks] = useState<TaskInfo[]>([])
@@ -50,7 +53,8 @@ export function TaskDetailPanel({
   const [taskMembers, setTaskMembers] = useState<MemberInfo[]>([])
   const [newComment, setNewComment] = useState("")
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
-  const [loading, setLoading] = useState(true)
+  const [detailsLoaded, setDetailsLoaded] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   // ネストサブタスク展開状態
   const [expandedSubTasks, setExpandedSubTasks] = useState<Set<string>>(new Set())
   const [nestedSubTasks, setNestedSubTasks] = useState<Record<string, TaskInfo[]>>({})
@@ -58,15 +62,16 @@ export function TaskDetailPanel({
 
   // タスクが切り替わった時にリセット
   useEffect(() => {
+    setTitle(task.title)
+    setEditingTitle(false)
     setDescription(task.description || "")
     setDescriptionDirty(false)
     setExpandedSubTasks(new Set())
     setNestedSubTasks({})
-  }, [task.id, task.description])
+  }, [task.id, task.title, task.description])
 
-  // サブタスク、コメント、メンバーをバックグラウンドで取得（UIをブロックしない）
+  // サブタスク、コメント、メンバーをバックグラウンドで取得
   const fetchDetails = useCallback(async () => {
-    setLoading(true)
     const [subRes, commentRes, memberRes] = await Promise.all([
       fetch(`/api/internal/tasks?parentTaskId=${task.id}`),
       fetch(`/api/internal/tasks/comments?taskId=${task.id}`),
@@ -75,14 +80,14 @@ export function TaskDetailPanel({
     if (subRes.ok) setSubTasks(await subRes.json())
     if (commentRes.ok) setComments(await commentRes.json())
     if (memberRes.ok) setTaskMembers(await memberRes.json())
-    setLoading(false)
+    setDetailsLoaded(true)
   }, [task.id])
 
-  // タスク切り替え時にサブタスク等もリセット
   useEffect(() => {
     setSubTasks([])
     setComments([])
     setTaskMembers([])
+    setDetailsLoaded(false)
     setNewComment("")
     setNewSubTaskTitle("")
   }, [task.id])
@@ -90,6 +95,14 @@ export function TaskDetailPanel({
   useEffect(() => {
     fetchDetails()
   }, [fetchDetails])
+
+  // タイトル編集開始時にフォーカス
+  useEffect(() => {
+    if (editingTitle && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [editingTitle])
 
   // ネストサブタスクの取得
   const fetchNestedSubTasks = async (parentId: string) => {
@@ -117,10 +130,8 @@ export function TaskDetailPanel({
 
   // 楽観的フィールド更新
   const handleUpdate = (field: string, value: unknown) => {
-    // 親リストを楽観的に更新
     const optimistic: Partial<TaskInfo> = { [field]: value }
 
-    // 関連フィールドも一緒に更新
     if (field === "status") {
       optimistic.completedAt = value === "done" ? new Date().toISOString() : null
     }
@@ -139,12 +150,21 @@ export function TaskDetailPanel({
 
     onOptimisticUpdate(task.id, optimistic)
 
-    // API をバックグラウンドで呼ぶ
     fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: task.id, [field]: value }),
     })
+  }
+
+  const handleSaveTitle = () => {
+    const trimmed = title.trim()
+    if (trimmed && trimmed !== task.title) {
+      handleUpdate("title", trimmed)
+    } else {
+      setTitle(task.title)
+    }
+    setEditingTitle(false)
   }
 
   const handleSaveDescription = () => {
@@ -184,21 +204,18 @@ export function TaskDetailPanel({
       _count: { subTasks: 0, comments: 0 },
     }
 
-    // 即座にローカルに追加
     setSubTasks((prev) => [...prev, tempSubTask])
-    // 親タスクの _count も更新
     onOptimisticUpdate(task.id, {
       _count: { subTasks: subTasks.length + 1, comments: task._count?.comments || 0 },
     })
-    const title = newSubTaskTitle.trim()
+    const t = newSubTaskTitle.trim()
     setNewSubTaskTitle("")
 
-    // API をバックグラウンドで呼ぶ → 成功したら置換
     fetch("/api/internal/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        title,
+        title: t,
         parentTaskId: task.id,
         projectId: task.projectId,
         assigneeId: task.assigneeId,
@@ -206,15 +223,15 @@ export function TaskDetailPanel({
     }).then(async (res) => {
       if (res.ok) {
         const realTask = await res.json()
-        setSubTasks((prev) => prev.map((t) => (t.id === tempId ? realTask : t)))
+        setSubTasks((prev) => prev.map((st) => (st.id === tempId ? realTask : st)))
       }
     })
   }
 
   // 楽観的ネストサブタスク追加
   const handleAddNestedSubTask = (parentSubTaskId: string) => {
-    const title = newNestedTitle[parentSubTaskId]?.trim()
-    if (!title) return
+    const ntitle = newNestedTitle[parentSubTaskId]?.trim()
+    if (!ntitle) return
     const current = nestedSubTasks[parentSubTaskId] || []
     if (current.length >= 15) return
 
@@ -224,7 +241,7 @@ export function TaskDetailPanel({
       workspaceId,
       projectId: task.projectId,
       parentTaskId: parentSubTaskId,
-      title,
+      title: ntitle,
       description: null,
       status: "todo",
       priority: "medium",
@@ -245,19 +262,17 @@ export function TaskDetailPanel({
       _count: { subTasks: 0, comments: 0 },
     }
 
-    // 即座にローカルに追加
     setNestedSubTasks((prev) => ({
       ...prev,
       [parentSubTaskId]: [...(prev[parentSubTaskId] || []), tempTask],
     }))
     setNewNestedTitle((prev) => ({ ...prev, [parentSubTaskId]: "" }))
 
-    // API をバックグラウンドで呼ぶ
     fetch("/api/internal/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        title,
+        title: ntitle,
         parentTaskId: parentSubTaskId,
         projectId: task.projectId,
         assigneeId: task.assigneeId,
@@ -312,13 +327,11 @@ export function TaskDetailPanel({
   const handleAddMember = (userId: string) => {
     const member = members.find((m) => m.id === userId)
     if (member) {
-      // 即座にローカルに追加
       setTaskMembers((prev) => [
         ...prev,
         { id: crypto.randomUUID(), userId, displayName: member.displayName, avatarUrl: member.avatarUrl },
       ])
     }
-    // API をバックグラウンドで呼ぶ（disabled にしない）
     fetch("/api/internal/tasks/members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -348,16 +361,13 @@ export function TaskDetailPanel({
       },
     }
 
-    // 即座にローカルに追加
     setComments((prev) => [...prev, tempComment])
-    // 親タスクの _count も更新
     onOptimisticUpdate(task.id, {
       _count: { subTasks: task._count?.subTasks || 0, comments: (task._count?.comments || 0) + 1 },
     })
     const content = newComment.trim()
     setNewComment("")
 
-    // API をバックグラウンドで呼ぶ
     fetch("/api/internal/tasks/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -367,13 +377,11 @@ export function TaskDetailPanel({
 
   const handleDelete = () => {
     if (!confirm("このタスクを削除しますか？")) return
-    // 即座にUIから除去
     onTaskDeleted(task.id)
-    // API をバックグラウンドで呼ぶ
     fetch(`/api/internal/tasks?taskId=${task.id}`, { method: "DELETE" })
   }
 
-  // メンバー追加候補（既に追加済みを除外）
+  // メンバー追加候補
   const memberIds = new Set(taskMembers.map((m) => m.userId))
   const availableMembers = members.filter((m) => !memberIds.has(m.id))
 
@@ -382,10 +390,10 @@ export function TaskDetailPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background md:static md:inset-auto md:z-auto md:w-96 md:shrink-0 md:border-l lg:w-[28rem] animate-in slide-in-from-right-5 duration-200 overflow-hidden">
-      {/* ヘッダー */}
-      <div className="shrink-0 border-b px-4 py-3">
+      {/* ヘッダー: 閉じる・完了ボタン・アクション */}
+      <div className="shrink-0 border-b px-4 py-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1">
             <button
               className="flex md:hidden h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-muted text-muted-foreground touch-manipulation"
               onClick={onClose}
@@ -394,425 +402,76 @@ export function TaskDetailPanel({
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
-            <span className="text-sm font-semibold truncate">{task.title}</span>
+            <Button
+              size="sm"
+              variant={task.status === "done" ? "outline" : "default"}
+              className={cn(
+                "h-7 text-xs",
+                task.status === "done" && "border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20"
+              )}
+              onClick={() => handleUpdate("status", task.status === "done" ? "todo" : "done")}
+            >
+              {task.status === "done" ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  完了済み
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <path d="M9 11l3 3L22 4" />
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                  </svg>
+                  完了にする
+                </>
+              )}
+            </Button>
           </div>
           <div className="flex items-center gap-1">
-            {/* リンクコピー */}
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground"
               title="リンクをコピー"
-              onClick={() => {
+              onClick={async () => {
                 const url = `${window.location.origin}/${workspaceId}/tasks?taskId=${task.id}`
-                navigator.clipboard.writeText(url)
+                try {
+                  await navigator.clipboard.writeText(url)
+                } catch {
+                  // フォールバック
+                  const textarea = document.createElement("textarea")
+                  textarea.value = url
+                  document.body.appendChild(textarea)
+                  textarea.select()
+                  document.execCommand("copy")
+                  document.body.removeChild(textarea)
+                }
+                setLinkCopied(true)
+                setTimeout(() => setLinkCopied(false), 2000)
               }}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-            </Button>
-            <Button variant="ghost" size="icon" className="hidden md:flex h-7 w-7" onClick={onClose}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </Button>
-          </div>
-        </div>
-        {/* 完了トグルボタン */}
-        <div className="mt-2">
-          <Button
-            size="sm"
-            variant={task.status === "done" ? "outline" : "default"}
-            className={cn(
-              "h-8 text-xs",
-              task.status === "done" && "border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20"
-            )}
-            onClick={() => handleUpdate("status", task.status === "done" ? "todo" : "done")}
-          >
-            {task.status === "done" ? (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+              {linkCopied ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
-                未完了に戻す
-              </>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-                  <path d="M9 11l3 3L22 4" />
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                 </svg>
-                完了にする
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
-          {/* ステータス */}
-          <Field label="ステータス">
-            <Select value={task.status} onValueChange={(v) => handleUpdate("status", v)}>
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todo">未着手</SelectItem>
-                <SelectItem value="in_progress">進行中</SelectItem>
-                <SelectItem value="done">完了</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-
-          {/* 担当者 */}
-          <Field label="担当者">
-            <Select
-              value={task.assigneeId || "_none"}
-              onValueChange={(v) => handleUpdate("assigneeId", v === "_none" ? null : v)}
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="未割当" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">未割当</SelectItem>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.displayName || m.id.slice(0, 8)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          {/* メンバー（コラボレーター） */}
-          <Field label={`メンバー${loading ? "" : ` (${taskMembers.length})`}`}>
-            <div className="space-y-2">
-              {taskMembers.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {taskMembers.map((m) => (
-                    <div
-                      key={m.userId}
-                      className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs animate-in fade-in-0 zoom-in-95 duration-200"
-                    >
-                      <div className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-[8px] font-medium">
-                        {m.displayName?.charAt(0) || "?"}
-                      </div>
-                      <span className="max-w-20 truncate">{m.displayName || "不明"}</span>
-                      <button
-                        onClick={() => handleRemoveMember(m.userId)}
-                        className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
               )}
-              {availableMembers.length > 0 && (
-                <Select
-                  value=""
-                  onValueChange={(v) => v && handleAddMember(v)}
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue placeholder="メンバーを追加..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableMembers.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.displayName || m.id.slice(0, 8)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          </Field>
-
-          {/* 期日 */}
-          <Field label="期日">
-            <DatePicker
-              value={task.dueDate ? parseDateStr(task.dueDate) : undefined}
-              onChange={(date) => handleUpdate("dueDate", date ? formatDateLocal(date) : null)}
-              className="w-full"
-            />
-          </Field>
-
-          {/* 優先度 */}
-          <Field label="優先度">
-            <Select value={task.priority} onValueChange={(v) => handleUpdate("priority", v)}>
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="high">高</SelectItem>
-                <SelectItem value="medium">中</SelectItem>
-                <SelectItem value="low">低</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-
-          {/* プロジェクト */}
-          <Field label="プロジェクト">
-            <Select
-              value={task.projectId || "_none"}
-              onValueChange={(v) => handleUpdate("projectId", v === "_none" ? null : v)}
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="なし" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">なし</SelectItem>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    <span className="flex items-center gap-2">
-                      {p.color && (
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
-                      )}
-                      {p.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          {/* 繰り返し */}
-          <Field label={`繰り返し${task.recurrenceRule ? ` (${rruleToText(task.recurrenceRule)})` : ""}`}>
-            <Select
-              value={task.recurrenceRule ? "_current" : "none"}
-              onValueChange={(v) => {
-                if (v === "_current") return
-                const preset = v as RecurrencePreset
-                const rule = presetToRRule(preset, task.dueDate ? parseDateStr(task.dueDate) : undefined)
-                handleUpdate("recurrenceRule", rule)
-              }}
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue>
-                  {task.recurrenceRule ? rruleToText(task.recurrenceRule) : "繰り返しなし"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {RECURRENCE_PRESETS.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          {/* 説明 */}
-          <Field label="説明">
-            <Textarea
-              className="text-sm min-h-20 resize-none break-all"
-              placeholder="タスクの説明を入力..."
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value)
-                setDescriptionDirty(true)
-              }}
-              onBlur={() => descriptionDirty && handleSaveDescription()}
-            />
-            {descriptionDirty && (
-              <Button size="sm" variant="outline" className="mt-1" onClick={handleSaveDescription}>
-                保存
-              </Button>
-            )}
-          </Field>
-
-          {/* サブタスク（ネスト対応） */}
-          <Field label={`サブタスク${loading ? "" : ` (${completedSubTasks}/${subTasks.length})`}`}>
-            <div className="space-y-1">
-              {loading && (
-                <div className="flex items-center gap-2 py-2 text-muted-foreground">
-                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                  <span className="text-xs">読み込み中...</span>
-                </div>
-              )}
-              {/* プログレスバー */}
-              {!loading && subTasks.length > 0 && (
-                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden mb-2">
-                  <div
-                    className="h-full rounded-full bg-green-500 transition-all duration-500 ease-out"
-                    style={{ width: `${subTaskProgress}%` }}
-                  />
-                </div>
-              )}
-
-              {subTasks.map((st) => (
-                <div key={st.id} className="animate-in fade-in-0 slide-in-from-left-2 duration-200">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleSubTaskStatusChange(st.id, st.status === "done" ? "todo" : "done")}
-                      className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
-                        st.status === "done"
-                          ? "border-green-500 bg-green-500 text-white scale-110"
-                          : "border-muted-foreground/40 hover:border-green-500 hover:scale-110"
-                      )}
-                    >
-                      {st.status === "done" && (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </button>
-                    <span className={cn("text-sm truncate flex-1", st.status === "done" && "line-through text-muted-foreground")}>
-                      {st.title}
-                    </span>
-                    {/* サブサブタスク展開ボタン */}
-                    <button
-                      onClick={() => toggleSubTaskExpand(st.id)}
-                      className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                      title="サブタスク"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className={cn("transition-transform duration-200", expandedSubTasks.has(st.id) && "rotate-90")}
-                      >
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </button>
-                    {st._count && st._count.subTasks > 0 && (
-                      <span className="text-[10px] text-muted-foreground">{st._count.subTasks}</span>
-                    )}
-                  </div>
-
-                  {/* ネストサブタスク */}
-                  {expandedSubTasks.has(st.id) && (
-                    <div className="ml-6 mt-1 space-y-1 border-l pl-2 animate-in fade-in-0 slide-in-from-top-1 duration-200">
-                      {(nestedSubTasks[st.id] || []).map((nst) => (
-                        <div key={nst.id} className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleNestedSubTaskStatusChange(st.id, nst.id, nst.status === "done" ? "todo" : "done")}
-                            className={cn(
-                              "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
-                              nst.status === "done"
-                                ? "border-green-500 bg-green-500 text-white"
-                                : "border-muted-foreground/40 hover:border-green-500"
-                            )}
-                          >
-                            {nst.status === "done" && (
-                              <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            )}
-                          </button>
-                          <span className={cn("text-xs truncate", nst.status === "done" && "line-through text-muted-foreground")}>
-                            {nst.title}
-                          </span>
-                        </div>
-                      ))}
-                      {(nestedSubTasks[st.id] || []).length < 15 && (
-                        <div className="flex gap-1.5 mt-1">
-                          <Input
-                            className="h-6 text-xs"
-                            placeholder="サブタスクを追加..."
-                            value={newNestedTitle[st.id] || ""}
-                            onChange={(e) => setNewNestedTitle((prev) => ({ ...prev, [st.id]: e.target.value }))}
-                            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddNestedSubTask(st.id) } }}
-                          />
-                          <Button size="xs" variant="outline" className="h-6 shrink-0 text-[10px]" onClick={() => handleAddNestedSubTask(st.id)}>
-                            追加
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {subTasks.length < 15 && (
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    className="h-7 text-sm"
-                    placeholder="サブタスクを追加..."
-                    value={newSubTaskTitle}
-                    onChange={(e) => setNewSubTaskTitle(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddSubTask() } }}
-                  />
-                  <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={handleAddSubTask}>
-                    追加
-                  </Button>
-                </div>
-              )}
-              {subTasks.length >= 15 && (
-                <p className="text-[10px] text-muted-foreground mt-1">サブタスクの上限（15個）に達しています</p>
-              )}
-            </div>
-          </Field>
-
-          {/* コメント（タスク内チャット） */}
-          <Field label={`チャット${loading ? "" : ` (${comments.length})`}`}>
-            <div className="space-y-3">
-              {loading && (
-                <div className="flex items-center gap-2 py-2 text-muted-foreground">
-                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                  <span className="text-xs">読み込み中...</span>
-                </div>
-              )}
-              {comments.map((c) => (
-                <div key={c.id} className="text-sm animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-medium shrink-0">
-                      {c.user.displayName?.charAt(0) || "?"}
-                    </div>
-                    <span className="font-medium text-xs">
-                      {c.user.displayName || "不明"}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {new Date(c.createdAt).toLocaleString("ja-JP", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
-                  <p className="text-muted-foreground whitespace-pre-wrap ml-7">{c.content}</p>
-                </div>
-              ))}
-              <div className="flex gap-2">
-                <Input
-                  className="h-8 text-sm"
-                  placeholder="メッセージを入力..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment() } }}
-                />
-                <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={handleAddComment}>
-                  送信
-                </Button>
-              </div>
-            </div>
-          </Field>
-
-          {/* アクション */}
-          <div className="pt-4 border-t">
+            </Button>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-muted-foreground">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
                   </svg>
-                  その他
                 </Button>
               </PopoverTrigger>
-              <PopoverContent side="top" align="start" className="w-40 p-1">
+              <PopoverContent side="bottom" align="end" className="w-40 p-1">
                 <button
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
                   onClick={handleDelete}
@@ -824,19 +483,408 @@ export function TaskDetailPanel({
                 </button>
               </PopoverContent>
             </Popover>
+            <Button variant="ghost" size="icon" className="hidden md:flex h-7 w-7" onClick={onClose}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </Button>
           </div>
         </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {/* タイトル（編集可能） */}
+        <div className="px-4 pt-4 pb-2">
+          {editingTitle ? (
+            <textarea
+              ref={titleInputRef}
+              className="w-full text-lg font-bold resize-none border-0 bg-transparent outline-none focus:ring-1 focus:ring-primary/30 rounded px-1 -mx-1"
+              value={title}
+              rows={Math.min(Math.ceil(title.length / 30) || 1, 3)}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={handleSaveTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleSaveTitle() }
+                if (e.key === "Escape") { setTitle(task.title); setEditingTitle(false) }
+              }}
+            />
+          ) : (
+            <h2
+              className="text-lg font-bold cursor-text hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 transition-colors"
+              onClick={() => setEditingTitle(true)}
+            >
+              {task.title}
+            </h2>
+          )}
+        </div>
+
+        {/* プロパティ: 2列グリッド */}
+        <div className="px-4 pb-3">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+            {/* ステータス */}
+            <PropField label="ステータス">
+              <Select value={task.status} onValueChange={(v) => handleUpdate("status", v)}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todo">未着手</SelectItem>
+                  <SelectItem value="in_progress">進行中</SelectItem>
+                  <SelectItem value="done">完了</SelectItem>
+                </SelectContent>
+              </Select>
+            </PropField>
+
+            {/* 優先度 */}
+            <PropField label="優先度">
+              <Select value={task.priority} onValueChange={(v) => handleUpdate("priority", v)}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="high">高</SelectItem>
+                  <SelectItem value="medium">中</SelectItem>
+                  <SelectItem value="low">低</SelectItem>
+                </SelectContent>
+              </Select>
+            </PropField>
+
+            {/* 担当者 */}
+            <PropField label="担当者">
+              <Select
+                value={task.assigneeId || "_none"}
+                onValueChange={(v) => handleUpdate("assigneeId", v === "_none" ? null : v)}
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="未割当" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">未割当</SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.displayName || m.id.slice(0, 8)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </PropField>
+
+            {/* 期日 */}
+            <PropField label="期日">
+              <DatePicker
+                value={task.dueDate ? parseDateStr(task.dueDate) : undefined}
+                onChange={(date) => handleUpdate("dueDate", date ? formatDateLocal(date) : null)}
+                className="w-full h-7 text-xs"
+              />
+            </PropField>
+
+            {/* プロジェクト */}
+            <PropField label="プロジェクト">
+              <Select
+                value={task.projectId || "_none"}
+                onValueChange={(v) => handleUpdate("projectId", v === "_none" ? null : v)}
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="なし" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">なし</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="flex items-center gap-2">
+                        {p.color && (
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+                        )}
+                        {p.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </PropField>
+
+            {/* 繰り返し */}
+            <PropField label="繰り返し">
+              <Select
+                value={task.recurrenceRule ? "_current" : "none"}
+                onValueChange={(v) => {
+                  if (v === "_current") return
+                  const preset = v as RecurrencePreset
+                  const rule = presetToRRule(preset, task.dueDate ? parseDateStr(task.dueDate) : undefined)
+                  handleUpdate("recurrenceRule", rule)
+                }}
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue>
+                    {task.recurrenceRule ? rruleToText(task.recurrenceRule) : "なし"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {RECURRENCE_PRESETS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </PropField>
+          </div>
+
+          {/* メンバー（2列グリッドの外。幅を使いたい） */}
+          <div className="mt-2">
+            <PropField label={`メンバー${detailsLoaded ? ` (${taskMembers.length})` : ""}`}>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {taskMembers.map((m) => (
+                  <div
+                    key={m.userId}
+                    className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
+                  >
+                    <div className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-[8px] font-medium">
+                      {m.displayName?.charAt(0) || "?"}
+                    </div>
+                    <span className="max-w-20 truncate">{m.displayName || "不明"}</span>
+                    <button
+                      onClick={() => handleRemoveMember(m.userId)}
+                      className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                {availableMembers.length > 0 && (
+                  <Select value="" onValueChange={(v) => v && handleAddMember(v)}>
+                    <SelectTrigger className="h-6 w-auto min-w-0 border-dashed text-xs px-2 gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      追加
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableMembers.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.displayName || m.id.slice(0, 8)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </PropField>
+          </div>
+        </div>
+
+        <div className="border-t mx-4" />
+
+        {/* 説明 */}
+        <div className="px-4 py-3">
+          <SectionLabel>説明</SectionLabel>
+          <Textarea
+            className="text-sm min-h-28 resize-none break-all"
+            placeholder="タスクの説明を入力..."
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value)
+              setDescriptionDirty(true)
+            }}
+            onBlur={() => descriptionDirty && handleSaveDescription()}
+          />
+          {descriptionDirty && (
+            <Button size="sm" variant="outline" className="mt-1 h-7 text-xs" onClick={handleSaveDescription}>
+              保存
+            </Button>
+          )}
+        </div>
+
+        <div className="border-t mx-4" />
+
+        {/* サブタスク */}
+        <div className="px-4 py-3">
+          <SectionLabel>
+            サブタスク{detailsLoaded ? ` (${completedSubTasks}/${subTasks.length})` : ""}
+          </SectionLabel>
+          <div className="space-y-1">
+            {/* プログレスバー */}
+            {subTasks.length > 0 && (
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden mb-2">
+                <div
+                  className="h-full rounded-full bg-green-500 transition-all duration-500 ease-out"
+                  style={{ width: `${subTaskProgress}%` }}
+                />
+              </div>
+            )}
+
+            {subTasks.map((st) => (
+              <div key={st.id}>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSubTaskStatusChange(st.id, st.status === "done" ? "todo" : "done")}
+                    className={cn(
+                      "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
+                      st.status === "done"
+                        ? "border-green-500 bg-green-500 text-white scale-110"
+                        : "border-muted-foreground/40 hover:border-green-500 hover:scale-110"
+                    )}
+                  >
+                    {st.status === "done" && (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                  <span className={cn("text-sm truncate flex-1", st.status === "done" && "line-through text-muted-foreground")}>
+                    {st.title}
+                  </span>
+                  <button
+                    onClick={() => toggleSubTaskExpand(st.id)}
+                    className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    title="サブタスク"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={cn("transition-transform duration-200", expandedSubTasks.has(st.id) && "rotate-90")}
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+                  {st._count && st._count.subTasks > 0 && (
+                    <span className="text-[10px] text-muted-foreground">{st._count.subTasks}</span>
+                  )}
+                </div>
+
+                {/* ネストサブタスク */}
+                {expandedSubTasks.has(st.id) && (
+                  <div className="ml-6 mt-1 space-y-1 border-l pl-2">
+                    {(nestedSubTasks[st.id] || []).map((nst) => (
+                      <div key={nst.id} className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleNestedSubTaskStatusChange(st.id, nst.id, nst.status === "done" ? "todo" : "done")}
+                          className={cn(
+                            "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
+                            nst.status === "done"
+                              ? "border-green-500 bg-green-500 text-white"
+                              : "border-muted-foreground/40 hover:border-green-500"
+                          )}
+                        >
+                          {nst.status === "done" && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+                        <span className={cn("text-xs truncate", nst.status === "done" && "line-through text-muted-foreground")}>
+                          {nst.title}
+                        </span>
+                      </div>
+                    ))}
+                    {(nestedSubTasks[st.id] || []).length < 15 && (
+                      <div className="flex gap-1.5 mt-1">
+                        <Input
+                          className="h-6 text-xs"
+                          placeholder="サブタスクを追加..."
+                          value={newNestedTitle[st.id] || ""}
+                          onChange={(e) => setNewNestedTitle((prev) => ({ ...prev, [st.id]: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddNestedSubTask(st.id) } }}
+                        />
+                        <Button size="xs" variant="outline" className="h-6 shrink-0 text-[10px]" onClick={() => handleAddNestedSubTask(st.id)}>
+                          追加
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {subTasks.length < 15 && (
+              <div className="flex gap-2 mt-2">
+                <Input
+                  className="h-7 text-sm"
+                  placeholder="サブタスクを追加..."
+                  value={newSubTaskTitle}
+                  onChange={(e) => setNewSubTaskTitle(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddSubTask() } }}
+                />
+                <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={handleAddSubTask}>
+                  追加
+                </Button>
+              </div>
+            )}
+            {subTasks.length >= 15 && (
+              <p className="text-[10px] text-muted-foreground mt-1">サブタスクの上限（15個）に達しています</p>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t mx-4" />
+
+        {/* コメント（タスク内チャット） */}
+        <div className="px-4 py-3">
+          <SectionLabel>
+            チャット{detailsLoaded ? ` (${comments.length})` : ""}
+          </SectionLabel>
+          <div className="space-y-3">
+            {comments.map((c) => (
+              <div key={c.id} className="text-sm">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-medium shrink-0">
+                    {c.user.displayName?.charAt(0) || "?"}
+                  </div>
+                  <span className="font-medium text-xs">
+                    {c.user.displayName || "不明"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(c.createdAt).toLocaleString("ja-JP", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                <p className="text-muted-foreground whitespace-pre-wrap ml-7">{c.content}</p>
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Input
+                className="h-8 text-sm"
+                placeholder="メッセージを入力..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment() } }}
+              />
+              <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={handleAddComment}>
+                送信
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function PropField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="text-xs font-medium text-muted-foreground mb-1 block">
-        {label}
-      </label>
+      <span className="text-[10px] font-medium text-muted-foreground block mb-0.5">{label}</span>
       {children}
     </div>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-xs font-semibold text-muted-foreground block mb-1.5">{children}</span>
   )
 }
