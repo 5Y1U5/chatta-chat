@@ -2,8 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname, useSearchParams } from "next/navigation"
-import { useRouter } from "next/navigation"
+import { usePathname, useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { CreateProjectDialog } from "@/components/task/CreateProjectDialog"
 
@@ -43,10 +42,10 @@ export function TaskNav({ workspaceId, projects }: Props) {
 
       <div className="flex-1 overflow-y-auto py-2">
         {/* マイタスク */}
-        <Link
-          href={`/${workspaceId}/tasks`}
+        <button
+          onClick={() => window.history.pushState(null, "", `/${workspaceId}/tasks`)}
           className={cn(
-            "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+            "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-left",
             isMyTasks ? "bg-muted font-medium" : "hover:bg-muted/50"
           )}
         >
@@ -55,7 +54,7 @@ export function TaskNav({ workspaceId, projects }: Props) {
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
           </svg>
           マイタスク
-        </Link>
+        </button>
 
         {/* セパレータ */}
         <div className="mx-4 my-2 border-t" />
@@ -85,11 +84,11 @@ export function TaskNav({ workspaceId, projects }: Props) {
               : 0
 
             return (
-              <Link
+              <button
                 key={project.id}
-                href={`/${workspaceId}/tasks?projectId=${project.id}`}
+                onClick={() => window.history.pushState(null, "", `/${workspaceId}/tasks?projectId=${project.id}`)}
                 className={cn(
-                  "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                  "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-left w-[calc(100%-1rem)]",
                   isActive ? "bg-muted font-medium" : "hover:bg-muted/50"
                 )}
               >
@@ -116,7 +115,7 @@ export function TaskNav({ workspaceId, projects }: Props) {
                     </div>
                   )}
                 </div>
-              </Link>
+              </button>
             )
           })}
 

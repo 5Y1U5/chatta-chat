@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { usePathname, useSearchParams, useRouter } from "next/navigation"
-import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
@@ -38,14 +37,14 @@ export function MobileTaskHeader({ workspaceId, projects }: Props) {
   if (currentProject) {
     return (
       <div className="flex flex-1 items-center gap-2">
-        <Link
-          href={`/${workspaceId}/tasks`}
+        <button
+          onClick={() => window.history.pushState(null, "", `/${workspaceId}/tasks`)}
           className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted active:bg-muted/80 transition-colors touch-manipulation"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
-        </Link>
+        </button>
         <span
           className="h-2.5 w-2.5 rounded-full shrink-0"
           style={{ backgroundColor: currentProject.color || "#6B7280" }}
@@ -90,7 +89,7 @@ export function MobileTaskHeader({ workspaceId, projects }: Props) {
             <button
               onClick={() => {
                 setSheetOpen(false)
-                router.push(`/${workspaceId}/tasks`)
+                window.history.pushState(null, "", `/${workspaceId}/tasks`)
               }}
               className={cn(
                 "flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-sm touch-manipulation active:bg-muted/80 transition-colors",
@@ -123,7 +122,7 @@ export function MobileTaskHeader({ workspaceId, projects }: Props) {
                     key={project.id}
                     onClick={() => {
                       setSheetOpen(false)
-                      router.push(`/${workspaceId}/tasks?projectId=${project.id}`)
+                      window.history.pushState(null, "", `/${workspaceId}/tasks?projectId=${project.id}`)
                     }}
                     className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-sm touch-manipulation active:bg-muted/80 transition-colors"
                   >

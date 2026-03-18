@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import {
@@ -99,20 +99,11 @@ export function TaskListView({
 }: Props) {
   const router = useRouter()
   const isMobile = useIsMobile()
-  const viewKey = viewMode === "my-tasks" ? "my-tasks" : `project-${projectId}`
-  const [prevViewKey, setPrevViewKey] = useState(viewKey)
   const [tasks, setTasks] = useState(initialTasks)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId || null)
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-
-  // ビュー切り替え時にrender中で同期的にリセット（古いデータを即座にクリア）
-  if (prevViewKey !== viewKey) {
-    setPrevViewKey(viewKey)
-    setTasks([])
-    setSelectedTaskId(null)
-  }
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)
 
   const todoTasks = sortByPriority(tasks.filter((t) => t.status === "todo"))
@@ -153,11 +144,6 @@ export function TaskListView({
       .then((data) => { if (data) setTasks(data) })
       .catch(() => {})
   }, [viewMode, currentUserId, projectId])
-
-  // ビュー切り替え時にAPIから最新データを取得
-  useEffect(() => {
-    syncInBackground()
-  }, [syncInBackground])
 
   // 楽観的ステータス変更
   const handleStatusChange = useCallback((taskId: string, status: string) => {
@@ -267,7 +253,7 @@ export function TaskListView({
     setDeleting(false)
     if (res.ok) {
       setDeleteDialogOpen(false)
-      router.push(`/${workspaceId}/tasks`)
+      window.history.pushState(null, "", `/${workspaceId}/tasks`)
       router.refresh()
     }
   }, [projectId, workspaceId, router])
