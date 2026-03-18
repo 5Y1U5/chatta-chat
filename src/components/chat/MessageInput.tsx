@@ -217,7 +217,7 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
   const isImage = pendingFile?.type.startsWith("image/")
 
   return (
-    <div className="relative shrink-0 border-t p-4">
+    <div className="relative shrink-0 px-4 pb-4 pt-2">
       {/* AI 返信候補 */}
       {aiSuggestions.length > 0 && (
         <div className="mb-2 space-y-1">
@@ -299,7 +299,7 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
         </div>
       )}
 
-      <div className="rounded-lg border bg-background focus-within:ring-1 focus-within:ring-ring transition-shadow">
+      <div className="mx-auto max-w-3xl rounded-2xl border bg-background focus-within:ring-1 focus-within:ring-ring/30 transition-shadow">
         <Textarea
           ref={textareaRef}
           value={content}
@@ -406,8 +406,8 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
           <Button
             onClick={handleSend}
             disabled={(!content.trim() && !pendingFile) || disabled || uploading}
-            size="sm"
-            className="h-8 px-3 rounded-full"
+            size="icon"
+            className="h-8 w-8 rounded-full"
           >
             {uploading ? (
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
