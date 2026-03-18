@@ -161,7 +161,7 @@ function ChannelSection({
             href={`/${workspaceId}/channel/${channel.id}`}
             className={cn(
               "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm min-w-0 transition-colors",
-              activeChannelId === channel.id && "bg-muted font-medium",
+              activeChannelId === channel.id && "bg-primary/10 font-medium border-l-2 border-primary",
               activeChannelId !== channel.id && "hover:bg-muted/50",
               channel.unreadCount > 0 && activeChannelId !== channel.id && "font-semibold"
             )}

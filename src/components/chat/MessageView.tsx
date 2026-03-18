@@ -11,6 +11,7 @@ import { TypingIndicator } from "@/components/chat/TypingIndicator"
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import { ChannelMembersDialog } from "@/components/chat/ChannelMembersDialog"
+import { cn } from "@/lib/utils"
 import type { MessageWithUser, ChannelMemberInfo, ChannelInfo, ReactionInfo } from "@/types/chat"
 
 type Props = {
@@ -399,7 +400,10 @@ function MessageBubble({
 
   return (
     <div
-      className="group relative flex gap-3 py-1.5 hover:bg-muted/50 rounded-md px-1 -mx-1"
+      className={cn(
+        "group relative flex gap-3 py-1.5 hover:bg-muted/50 rounded-md px-1 -mx-1 animate-message-in",
+        message.aiGenerated && "bg-ai-bubble border border-ai-bubble-border"
+      )}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => { setShowActions(false); setShowEmojiPicker(false) }}
     >
@@ -414,7 +418,7 @@ function MessageBubble({
             {message.user.displayName || "不明"}
           </span>
           {message.aiGenerated && (
-            <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+            <span className="rounded bg-gradient-to-r from-violet-500 to-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
               AI
             </span>
           )}
@@ -478,7 +482,7 @@ function MessageBubble({
               <button
                 key={r.emoji}
                 onClick={() => onReaction(message.id, r.emoji)}
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs hover:bg-muted ${
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs hover:bg-muted animate-pop-in ${
                   r.userReacted ? "border-primary/50 bg-primary/10" : "border-border"
                 }`}
               >
@@ -505,7 +509,7 @@ function MessageBubble({
 
       {/* アクションメニュー */}
       {showActions && !isDeleted && !editing && (
-        <div className="absolute -top-3 right-1 flex gap-0.5 rounded-md border bg-background shadow-sm">
+        <div className="absolute -top-3 right-1 flex gap-0.5 rounded-md border bg-background shadow-sm animate-fade-in">
           {/* リアクション */}
           <div className="relative">
             <ActionButton title="リアクション" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>

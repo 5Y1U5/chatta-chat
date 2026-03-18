@@ -75,14 +75,14 @@ export function MobileBottomNav({ workspaceId, unreadNotificationCount = 0 }: Pr
             className={cn(
               "relative flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-manipulation transition-colors",
               item.active
-                ? "text-primary"
+                ? "text-primary nav-dot-indicator"
                 : "text-muted-foreground active:text-foreground"
             )}
           >
             <span className="relative">
               {item.icon}
               {item.badge != null && item.badge > 0 && (
-                <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground animate-badge-pulse">
                   {item.badge > 9 ? "9+" : item.badge}
                 </span>
               )}

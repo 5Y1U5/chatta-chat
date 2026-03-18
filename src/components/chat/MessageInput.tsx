@@ -407,7 +407,7 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
             onClick={handleSend}
             disabled={(!content.trim() && !pendingFile) || disabled || uploading}
             size="sm"
-            className="h-8 px-3 rounded-md"
+            className="h-8 px-3 rounded-full"
           >
             {uploading ? (
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">

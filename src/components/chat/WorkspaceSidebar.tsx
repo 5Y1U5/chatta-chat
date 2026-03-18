@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
+import { useTheme } from "next-themes"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -28,6 +29,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
   const [membersOpen, setMembersOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  const { theme, setTheme } = useTheme()
 
   const isDashboardActive = pathname.includes("/dashboard")
   const isChatActive = pathname.includes("/channel/") && !isDashboardActive
@@ -39,6 +41,12 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
     await supabase.auth.signOut()
     router.push("/login")
     router.refresh()
+  }
+
+  function cycleTheme() {
+    if (theme === "light") setTheme("dark")
+    else if (theme === "dark") setTheme("system")
+    else setTheme("light")
   }
 
   const navItems = [
@@ -108,7 +116,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
     <>
       <div
         className={cn(
-          "hidden flex-col gap-2 bg-muted/50 py-3 border-r md:flex transition-all duration-200",
+          "hidden flex-col gap-2 bg-sidebar py-3 border-r border-sidebar-border md:flex transition-all duration-200",
           expanded ? "w-44 items-stretch px-2" : "w-14 items-center"
         )}
       >
@@ -116,14 +124,14 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
         <div className={cn("flex items-center gap-2", expanded ? "px-1" : "flex-col")}>
           <Popover>
             <PopoverTrigger asChild>
-              <button className="flex items-center gap-2 rounded-md hover:bg-muted p-1 transition-colors min-w-0">
+              <button className="flex items-center gap-2 rounded-md hover:bg-sidebar-accent p-1 transition-colors min-w-0">
                 <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+                  <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
                     {workspace?.name?.charAt(0)?.toUpperCase() || "W"}
                   </AvatarFallback>
                 </Avatar>
                 {expanded && (
-                  <span className="text-sm font-semibold truncate">{workspace?.name || "Workspace"}</span>
+                  <span className="text-sm font-semibold truncate text-sidebar-foreground">{workspace?.name || "Workspace"}</span>
                 )}
               </button>
             </PopoverTrigger>
@@ -134,6 +142,31 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
               <Separator className="my-1" />
               <div className="space-y-0.5">
                 <ProfileDialog />
+                <Separator className="my-1" />
+                {/* テーマ切替 */}
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  onClick={cycleTheme}
+                >
+                  {theme === "dark" ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                    </svg>
+                  ) : theme === "light" ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="5" />
+                      <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                      <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+                    </svg>
+                  )}
+                  {theme === "dark" ? "ダーク" : theme === "light" ? "ライト" : "システム"}
+                </button>
                 <Separator className="my-1" />
                 <button
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -153,7 +186,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
               onClick={() => setExpanded(!expanded)}
               title={expanded ? "サイドバーを閉じる" : "サイドバーを開く"}
             >
@@ -176,7 +209,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
           </div>
         </div>
 
-        <Separator className={expanded ? "" : "w-8 mx-auto"} />
+        <Separator className={cn("bg-sidebar-border", expanded ? "" : "w-8 mx-auto")} />
 
         {/* ナビゲーション */}
         {navItems.map((item) => {
@@ -186,8 +219,10 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
               {expanded && <span className="truncate">{item.label}</span>}
               {item.badge && item.badge > 0 && (
                 <span className={cn(
-                  "flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[9px] font-medium text-muted-foreground",
-                  expanded ? "ml-auto" : "absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground font-bold"
+                  "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-medium",
+                  expanded
+                    ? "ml-auto bg-sidebar-accent text-sidebar-foreground/70"
+                    : "absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground font-bold animate-badge-pulse"
                 )}>
                   {item.badge > 99 ? "99+" : item.badge}
                 </span>
@@ -196,11 +231,11 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
           )
 
           const className = cn(
-            "relative inline-flex items-center rounded-md text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95",
+            "relative inline-flex items-center rounded-md text-sidebar-foreground/70 transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-foreground active:scale-95",
             expanded
               ? "h-9 justify-start gap-2 px-2 text-sm"
               : "h-9 w-9 justify-center hover:scale-110",
-            item.active && "bg-muted text-foreground"
+            item.active && "bg-sidebar-accent text-sidebar-foreground nav-active-indicator"
           )
 
           if ("onClick" in item && item.onClick) {

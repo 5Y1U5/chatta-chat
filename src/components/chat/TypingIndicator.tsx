@@ -26,9 +26,9 @@ export function TypingIndicator({ typingUsers }: Props) {
   return (
     <div className="flex items-center gap-1.5 px-4 py-1 text-xs text-muted-foreground">
       <span className="flex gap-0.5">
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
       </span>
       <span>{text}...</span>
     </div>
