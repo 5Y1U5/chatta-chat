@@ -108,26 +108,45 @@ export function TaskListView({
   const [deleting, setDeleting] = useState(false)
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)
 
-  const todoTasks = sortByPriority(tasks.filter((t) => t.status === "todo"))
-  const inProgressTasks = sortByPriority(tasks.filter((t) => t.status === "in_progress"))
+  const now = new Date()
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const tomorrowStart = new Date(todayEnd.getTime() + 86400000)
+  const todayStart = todayEnd.getTime()
+
+  const incompleteTasks = tasks.filter((t) => t.status !== "done")
   const doneTasks = sortByPriority(tasks.filter((t) => t.status === "done"))
 
+  // 期日をパースするヘルパー
+  const parseDueDate = (dueDate: string): Date => {
+    const p = dueDate.slice(0, 10).split("-")
+    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
+  }
+
+  // マイタスク（タスク）: 期日なし or 期日が今日以前
+  const myTasks = sortByPriority(incompleteTasks.filter((t) => {
+    if (!t.dueDate) return true
+    const due = parseDueDate(t.dueDate)
+    return due.getTime() < tomorrowStart.getTime()
+  }))
+
+  // 明日以降のタスク: 期日が明日以降
+  const futureTasks = sortByPriority(incompleteTasks.filter((t) => {
+    if (!t.dueDate) return false
+    const due = parseDueDate(t.dueDate)
+    return due.getTime() >= tomorrowStart.getTime()
+  }))
+
   // 今日完了したタスク
-  const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const completedTodayTasks = doneTasks.filter((t) => {
     if (!t.completedAt) return false
     return new Date(t.completedAt).getTime() >= todayStart
   })
 
-  // 未完了タスク数と本日期限タスク数
-  const incompleteTasks = tasks.filter((t) => t.status !== "done")
+  // 本日期限タスク数
   const todayDueTasks = incompleteTasks.filter((t) => {
     if (!t.dueDate) return false
-    const dueParts = t.dueDate.slice(0, 10).split("-")
-    const dueDay = new Date(Number(dueParts[0]), Number(dueParts[1]) - 1, Number(dueParts[2]))
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    return dueDay.getTime() === today.getTime()
+    const due = parseDueDate(t.dueDate)
+    return due.getTime() === todayStart
   })
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null
@@ -183,7 +202,7 @@ export function TaskListView({
   // ダイアログからのタスク作成（APIレスポンスを受け取って即座に追加）
   const handleTaskCreated = useCallback((task?: TaskInfo) => {
     if (task) {
-      setTasks((prev) => [task, ...prev])
+      setTasks((prev) => [...prev, task])
     } else {
       syncInBackground()
     }
@@ -222,7 +241,7 @@ export function TaskListView({
     }
 
     // 即座にローカルに追加
-    setTasks((prev) => [tempTask, ...prev])
+    setTasks((prev) => [...prev, tempTask])
 
     // API呼び出し → 成功したらサーバーのデータで置換
     const res = await fetch("/api/internal/tasks", {
@@ -361,11 +380,11 @@ export function TaskListView({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4">
-          {/* 未着手 */}
+          {/* マイタスク / タスク */}
           <TaskSection
-            label="未着手"
+            label={viewMode === "my-tasks" ? "マイタスク" : "タスク"}
             sectionStatus="todo"
-            tasks={todoTasks}
+            tasks={myTasks}
             allTasks={tasks}
             setTasks={setTasks}
             onSelect={setSelectedTaskId}
@@ -375,18 +394,17 @@ export function TaskListView({
             onInlineCreate={!isMobile ? handleInlineCreate : undefined}
           />
 
-          {/* 進行中 */}
+          {/* 明日以降のタスク */}
           <TaskSection
-            label="進行中"
+            label="明日以降のタスク"
             sectionStatus="in_progress"
-            tasks={inProgressTasks}
+            tasks={futureTasks}
             allTasks={tasks}
             setTasks={setTasks}
             onSelect={setSelectedTaskId}
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
-            onInlineCreate={!isMobile ? handleInlineCreate : undefined}
           />
 
           {/* 今日完了 */}

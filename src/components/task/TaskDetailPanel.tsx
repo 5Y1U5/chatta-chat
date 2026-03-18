@@ -1,11 +1,26 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DatePicker } from "@/components/ui/date-picker"
 import { RECURRENCE_PRESETS, presetToRRule, rruleToText, type RecurrencePreset } from "@/lib/recurrence"
@@ -388,6 +403,35 @@ export function TaskDetailPanel({
   const completedSubTasks = subTasks.filter((t) => t.status === "done").length
   const subTaskProgress = subTasks.length > 0 ? (completedSubTasks / subTasks.length) * 100 : 0
 
+  // サブタスク並び替え用
+  const subTaskSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  )
+  const subTaskIds = useMemo(() => subTasks.map((t) => t.id), [subTasks])
+
+  const handleSubTaskDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = subTasks.findIndex((t) => t.id === active.id)
+    const newIndex = subTasks.findIndex((t) => t.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const reordered = [...subTasks]
+    const [moved] = reordered.splice(oldIndex, 1)
+    reordered.splice(newIndex, 0, moved)
+
+    const updated = reordered.map((t, i) => ({ ...t, sortOrder: i }))
+    setSubTasks(updated)
+
+    fetch("/api/internal/tasks/reorder", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskIds: updated.map((t) => t.id) }),
+    })
+  }, [subTasks])
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background md:static md:inset-auto md:z-auto md:w-96 md:shrink-0 md:border-l lg:w-[28rem] animate-in slide-in-from-right-5 duration-200 overflow-hidden">
       {/* ヘッダー: 閉じる・完了ボタン・アクション */}
@@ -522,20 +566,6 @@ export function TaskDetailPanel({
         {/* プロパティ: 2列グリッド */}
         <div className="px-4 pb-3">
           <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-            {/* ステータス */}
-            <PropField label="ステータス">
-              <Select value={task.status} onValueChange={(v) => handleUpdate("status", v)}>
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todo">未着手</SelectItem>
-                  <SelectItem value="in_progress">進行中</SelectItem>
-                  <SelectItem value="done">完了</SelectItem>
-                </SelectContent>
-              </Select>
-            </PropField>
-
             {/* 優先度 */}
             <PropField label="優先度">
               <Select value={task.priority} onValueChange={(v) => handleUpdate("priority", v)}>
@@ -656,7 +686,7 @@ export function TaskDetailPanel({
                   </div>
                 ))}
                 {availableMembers.length > 0 && (
-                  <Select value="" onValueChange={(v) => v && handleAddMember(v)}>
+                  <Select key={taskMembers.length} onValueChange={(v) => v && handleAddMember(v)}>
                     <SelectTrigger className="h-6 w-auto min-w-0 border-dashed text-xs px-2 gap-1">
                       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -717,95 +747,28 @@ export function TaskDetailPanel({
               </div>
             )}
 
-            {subTasks.map((st) => (
-              <div key={st.id}>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleSubTaskStatusChange(st.id, st.status === "done" ? "todo" : "done")}
-                    className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
-                      st.status === "done"
-                        ? "border-primary bg-primary text-white scale-110"
-                        : "border-muted-foreground/40 hover:border-primary hover:scale-110"
-                    )}
-                  >
-                    {st.status === "done" && (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-                  <span className={cn("text-sm truncate flex-1", st.status === "done" && "line-through text-muted-foreground")}>
-                    {st.title}
-                  </span>
-                  <button
-                    onClick={() => toggleSubTaskExpand(st.id)}
-                    className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                    title="サブタスク"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className={cn("transition-transform duration-200", expandedSubTasks.has(st.id) && "rotate-90")}
-                    >
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                  </button>
-                  {st._count && st._count.subTasks > 0 && (
-                    <span className="text-[10px] text-muted-foreground">{st._count.subTasks}</span>
-                  )}
-                </div>
-
-                {/* ネストサブタスク */}
-                {expandedSubTasks.has(st.id) && (
-                  <div className="ml-6 mt-1 space-y-1 border-l pl-2">
-                    {(nestedSubTasks[st.id] || []).map((nst) => (
-                      <div key={nst.id} className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleNestedSubTaskStatusChange(st.id, nst.id, nst.status === "done" ? "todo" : "done")}
-                          className={cn(
-                            "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
-                            nst.status === "done"
-                              ? "border-primary bg-primary text-white"
-                              : "border-muted-foreground/40 hover:border-primary"
-                          )}
-                        >
-                          {nst.status === "done" && (
-                            <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          )}
-                        </button>
-                        <span className={cn("text-xs truncate", nst.status === "done" && "line-through text-muted-foreground")}>
-                          {nst.title}
-                        </span>
-                      </div>
-                    ))}
-                    {(nestedSubTasks[st.id] || []).length < 15 && (
-                      <div className="flex gap-1.5 mt-1">
-                        <Input
-                          className="h-6 text-xs"
-                          placeholder="サブタスクを追加..."
-                          value={newNestedTitle[st.id] || ""}
-                          onChange={(e) => setNewNestedTitle((prev) => ({ ...prev, [st.id]: e.target.value }))}
-                          onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddNestedSubTask(st.id) } }}
-                        />
-                        <Button size="xs" variant="outline" className="h-6 shrink-0 text-[10px]" onClick={() => handleAddNestedSubTask(st.id)}>
-                          追加
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+            <DndContext
+              sensors={subTaskSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleSubTaskDragEnd}
+            >
+              <SortableContext items={subTaskIds} strategy={verticalListSortingStrategy}>
+                {subTasks.map((st) => (
+                  <SortableSubTaskItem
+                    key={st.id}
+                    subTask={st}
+                    onStatusChange={handleSubTaskStatusChange}
+                    onToggleExpand={toggleSubTaskExpand}
+                    isExpanded={expandedSubTasks.has(st.id)}
+                    nestedSubTasks={nestedSubTasks[st.id] || []}
+                    onNestedStatusChange={(nstId, status) => handleNestedSubTaskStatusChange(st.id, nstId, status)}
+                    newNestedTitle={newNestedTitle[st.id] || ""}
+                    onNestedTitleChange={(v) => setNewNestedTitle((prev) => ({ ...prev, [st.id]: v }))}
+                    onAddNested={() => handleAddNestedSubTask(st.id)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
 
             {subTasks.length < 15 && (
               <div className="flex gap-2 mt-2">
@@ -871,6 +834,145 @@ export function TaskDetailPanel({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ドラッグ可能なサブタスクアイテム
+function SortableSubTaskItem({
+  subTask,
+  onStatusChange,
+  onToggleExpand,
+  isExpanded,
+  nestedSubTasks,
+  onNestedStatusChange,
+  newNestedTitle,
+  onNestedTitleChange,
+  onAddNested,
+}: {
+  subTask: TaskInfo
+  onStatusChange: (id: string, status: string) => void
+  onToggleExpand: (id: string) => void
+  isExpanded: boolean
+  nestedSubTasks: TaskInfo[]
+  onNestedStatusChange: (nstId: string, status: string) => void
+  newNestedTitle: string
+  onNestedTitleChange: (v: string) => void
+  onAddNested: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: subTask.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="group/subtask">
+      <div className="flex items-center gap-2">
+        {/* ドラッグハンドル */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex shrink-0 items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover/subtask:opacity-100 transition-opacity touch-none"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+            <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
+            <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
+          </svg>
+        </div>
+        <button
+          onClick={() => onStatusChange(subTask.id, subTask.status === "done" ? "todo" : "done")}
+          className={cn(
+            "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
+            subTask.status === "done"
+              ? "border-primary bg-primary text-white scale-110"
+              : "border-muted-foreground/40 hover:border-primary hover:scale-110"
+          )}
+        >
+          {subTask.status === "done" && (
+            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
+        </button>
+        <span className={cn("text-sm truncate flex-1", subTask.status === "done" && "line-through text-muted-foreground")}>
+          {subTask.title}
+        </span>
+        <button
+          onClick={() => onToggleExpand(subTask.id)}
+          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          title="サブタスク"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={cn("transition-transform duration-200", isExpanded && "rotate-90")}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+        {subTask._count && subTask._count.subTasks > 0 && (
+          <span className="text-[10px] text-muted-foreground">{subTask._count.subTasks}</span>
+        )}
+      </div>
+
+      {/* ネストサブタスク */}
+      {isExpanded && (
+        <div className="ml-6 mt-1 space-y-1 border-l pl-2">
+          {nestedSubTasks.map((nst) => (
+            <div key={nst.id} className="flex items-center gap-2">
+              <button
+                onClick={() => onNestedStatusChange(nst.id, nst.status === "done" ? "todo" : "done")}
+                className={cn(
+                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
+                  nst.status === "done"
+                    ? "border-primary bg-primary text-white"
+                    : "border-muted-foreground/40 hover:border-primary"
+                )}
+              >
+                {nst.status === "done" && (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+              <span className={cn("text-xs truncate", nst.status === "done" && "line-through text-muted-foreground")}>
+                {nst.title}
+              </span>
+            </div>
+          ))}
+          {nestedSubTasks.length < 15 && (
+            <div className="flex gap-1.5 mt-1">
+              <Input
+                className="h-6 text-xs"
+                placeholder="サブタスクを追加..."
+                value={newNestedTitle}
+                onChange={(e) => onNestedTitleChange(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); onAddNested() } }}
+              />
+              <Button size="xs" variant="outline" className="h-6 shrink-0 text-[10px]" onClick={onAddNested}>
+                追加
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
