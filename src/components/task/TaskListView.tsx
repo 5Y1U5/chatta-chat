@@ -73,7 +73,7 @@ function sortByPriority(tasks: TaskInfo[]): TaskInfo[] {
     const pb = PRIORITY_WEIGHT[b.priority] ?? 1
     if (pa !== pb) return pa - pb
     if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   })
 }
 
