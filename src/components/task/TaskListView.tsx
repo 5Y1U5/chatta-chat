@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import {
   DndContext,
@@ -24,6 +25,22 @@ import { TaskDetailPanel } from "@/components/task/TaskDetailPanel"
 import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
 import { ProjectMembersDialog } from "@/components/task/ProjectMembersDialog"
 import { EmptyState } from "@/components/ui/empty-state"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import type { TaskInfo } from "@/types/chat"
 
@@ -80,17 +97,20 @@ export function TaskListView({
   projectMembers = [],
   initialSelectedTaskId,
 }: Props) {
+  const router = useRouter()
   const isMobile = useIsMobile()
   const viewKey = viewMode === "my-tasks" ? "my-tasks" : `project-${projectId}`
   const [prevViewKey, setPrevViewKey] = useState(viewKey)
   const [tasks, setTasks] = useState(initialTasks)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId || null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
-  // ビュー切り替え時にrender中で同期的にリセット（古いデータが1フレームも描画されない）
+  // ビュー切り替え時にrender中で同期的にリセット（古いデータを即座にクリア）
   if (prevViewKey !== viewKey) {
     setPrevViewKey(viewKey)
-    setTasks(initialTasks)
+    setTasks([])
     setSelectedTaskId(null)
   }
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)
@@ -133,6 +153,11 @@ export function TaskListView({
       .then((data) => { if (data) setTasks(data) })
       .catch(() => {})
   }, [viewMode, currentUserId, projectId])
+
+  // ビュー切り替え時にAPIから最新データを取得
+  useEffect(() => {
+    syncInBackground()
+  }, [syncInBackground])
 
   // 楽観的ステータス変更
   const handleStatusChange = useCallback((taskId: string, status: string) => {
@@ -234,6 +259,19 @@ export function TaskListView({
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t)))
   }, [])
 
+  // プロジェクト削除
+  const handleDeleteProject = useCallback(async () => {
+    if (!projectId) return
+    setDeleting(true)
+    const res = await fetch(`/api/internal/projects?projectId=${projectId}`, { method: "DELETE" })
+    setDeleting(false)
+    if (res.ok) {
+      setDeleteDialogOpen(false)
+      router.push(`/${workspaceId}/tasks`)
+      router.refresh()
+    }
+  }, [projectId, workspaceId, router])
+
   const title = viewMode === "my-tasks" ? "マイタスク" : projectName || "プロジェクト"
 
   return (
@@ -248,6 +286,28 @@ export function TaskListView({
                 <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: projectColor }} />
               )}
               <h1 className="text-xl font-bold truncate">{title}</h1>
+              {viewMode === "project" && projectId && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" />
+                      </svg>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                        <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                      プロジェクトを削除
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {/* プロジェクトビュー: メンバーアバタースタック */}
@@ -438,6 +498,28 @@ export function TaskListView({
           onOpenChange={setMembersDialogOpen}
         />
       )}
+
+      {/* プロジェクト削除確認ダイアログ */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>プロジェクトを削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              「{projectName}」を削除します。プロジェクト内のタスクは削除されず、未分類になります。この操作は取り消せません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProject}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "削除中..." : "削除する"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

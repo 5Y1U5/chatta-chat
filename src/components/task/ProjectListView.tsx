@@ -3,6 +3,16 @@
 import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
 import { CreateProjectDialog } from "@/components/task/CreateProjectDialog"
 import { ProjectMembersDialog } from "@/components/task/ProjectMembersDialog"
@@ -22,13 +32,27 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
   const [createOpen, setCreateOpen] = useState(false)
   const [createTaskProjectId, setCreateTaskProjectId] = useState<string | null>(null)
   const [manageMembersProjectId, setManageMembersProjectId] = useState<string | null>(null)
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const refreshProjects = useCallback(async () => {
     const res = await fetch("/api/internal/projects")
     if (res.ok) setProjects(await res.json())
   }, [])
 
+  const handleDeleteProject = useCallback(async () => {
+    if (!deleteProjectId) return
+    setDeleting(true)
+    const res = await fetch(`/api/internal/projects?projectId=${deleteProjectId}`, { method: "DELETE" })
+    setDeleting(false)
+    if (res.ok) {
+      setProjects((prev) => prev.filter((p) => p.id !== deleteProjectId))
+      setDeleteProjectId(null)
+    }
+  }, [deleteProjectId])
+
   const managingProject = projects.find((p) => p.id === manageMembersProjectId)
+  const deletingProject = projects.find((p) => p.id === deleteProjectId)
 
   return (
     <div className="flex flex-col h-full page-enter">
@@ -103,6 +127,20 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
                       </svg>
                       タスク
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteProjectId(p.id)
+                      }}
+                      title="プロジェクトを削除"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -142,6 +180,28 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
         onOpenChange={setCreateOpen}
         onCreated={refreshProjects}
       />
+
+      {/* プロジェクト削除確認ダイアログ */}
+      <AlertDialog open={!!deleteProjectId} onOpenChange={(v) => !v && setDeleteProjectId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>プロジェクトを削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              「{deletingProject?.name}」を削除します。プロジェクト内のタスクは削除されず、未分類になります。この操作は取り消せません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProject}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "削除中..." : "削除する"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
