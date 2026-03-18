@@ -11,13 +11,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { InviteShareButtons } from "./InviteShareButtons"
 
 export function InviteDialog() {
   const [open, setOpen] = useState(false)
   const [inviteUrl, setInviteUrl] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [copied, setCopied] = useState(false)
+
   async function handleOpen(isOpen: boolean) {
     setOpen(isOpen)
     if (isOpen) {
@@ -45,6 +46,16 @@ export function InviteDialog() {
       setError("招待リンクの生成に失敗しました")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // フォールバック
     }
   }
 
@@ -92,8 +103,12 @@ export function InviteDialog() {
             <p className="text-sm text-muted-foreground">生成中...</p>
           ) : inviteUrl ? (
             <div className="space-y-3">
-              <Input value={inviteUrl} readOnly className="text-sm" />
-              <InviteShareButtons url={inviteUrl} />
+              <div className="flex gap-2">
+                <Input value={inviteUrl} readOnly className="text-sm" />
+                <Button onClick={handleCopy} variant="outline" className="shrink-0">
+                  {copied ? "コピー済み" : "コピー"}
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
                 このリンクを共有すると、誰でもワークスペースに参加できます
               </p>
