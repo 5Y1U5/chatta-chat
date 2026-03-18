@@ -3,6 +3,11 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { SummarizeDialog } from "@/components/chat/SummarizeDialog"
+import { MinutesDialog } from "@/components/chat/MinutesDialog"
+import { MemoryPanel } from "@/components/chat/MemoryPanel"
+import { VoiceRecorder } from "@/components/chat/VoiceRecorder"
 import type { ChannelMemberInfo } from "@/types/chat"
 
 export type FileAttachment = {
@@ -29,6 +34,7 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
   const [uploading, setUploading] = useState(false)
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -306,6 +312,26 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
         />
         <div className="flex items-center justify-between px-2 pb-2">
           <div className="flex items-center gap-0.5">
+            {/* ＋ AIツールメニュー */}
+            <Popover open={toolsOpen} onOpenChange={setToolsOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  title="ツール"
+                  className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="start" className="w-52 p-1">
+                <SummarizeDialog channelId={channelId} asMenuItem onOpenDialog={() => setToolsOpen(false)} />
+                <MinutesDialog channelId={channelId} asMenuItem onOpenDialog={() => setToolsOpen(false)} />
+                <MemoryPanel channelId={channelId} asMenuItem onOpenDialog={() => setToolsOpen(false)} />
+              </PopoverContent>
+            </Popover>
+
             {/* ファイル添付ボタン */}
             <button
               title="ファイルを添付"
@@ -324,6 +350,9 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
               className="hidden"
               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
             />
+
+            {/* 音声録音 */}
+            <VoiceRecorder channelId={channelId} />
 
             {/* AI 返信提案ボタン */}
             <button
