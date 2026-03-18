@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
+import { InviteShareButtons } from "./InviteShareButtons"
 
 type Member = {
   id: string
@@ -25,7 +25,6 @@ export function WorkspaceMembersDialog({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [inviteUrl, setInviteUrl] = useState("")
   const [inviteLoading, setInviteLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -54,16 +53,6 @@ export function WorkspaceMembersDialog({ open, onOpenChange }: Props) {
       // エラー無視
     } finally {
       setInviteLoading(false)
-    }
-  }
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(inviteUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // フォールバック
     }
   }
 
@@ -109,12 +98,7 @@ export function WorkspaceMembersDialog({ open, onOpenChange }: Props) {
           <div className="space-y-2">
             <p className="text-sm font-medium">メンバーを招待</p>
             {inviteUrl ? (
-              <div className="flex gap-2">
-                <Input value={inviteUrl} readOnly className="text-xs" />
-                <Button onClick={handleCopy} variant="outline" size="sm" className="shrink-0">
-                  {copied ? "コピー済み" : "コピー"}
-                </Button>
-              </div>
+              <InviteShareButtons url={inviteUrl} />
             ) : (
               <Button
                 onClick={handleGenerateInvite}
