@@ -116,15 +116,15 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
     <>
       <div
         className={cn(
-          "hidden flex-col gap-1 bg-sidebar py-3 md:flex transition-all duration-200",
+          "hidden flex-col gap-2 bg-sidebar py-3 border-r border-sidebar-border md:flex transition-all duration-200",
           expanded ? "w-44 items-stretch px-2" : "w-14 items-center"
         )}
       >
         {/* ワークスペースアイコン + メニュー */}
-        <div className={cn("flex items-center gap-2 mb-1", expanded ? "px-1" : "flex-col")}>
+        <div className={cn("flex items-center gap-2", expanded ? "px-1" : "flex-col")}>
           <Popover>
             <PopoverTrigger asChild>
-              <button className="flex items-center gap-2 rounded-lg hover:bg-sidebar-accent p-1 transition-colors min-w-0">
+              <button className="flex items-center gap-2 rounded-md hover:bg-sidebar-accent p-1 transition-colors min-w-0">
                 <Avatar className="h-8 w-8 shrink-0">
                   <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
                     {workspace?.name?.charAt(0)?.toUpperCase() || "W"}
@@ -186,7 +186,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent"
+              className="h-7 w-7 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
               onClick={() => setExpanded(!expanded)}
               title={expanded ? "サイドバーを閉じる" : "サイドバーを開く"}
             >
@@ -209,6 +209,8 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
           </div>
         </div>
 
+        <Separator className={cn("bg-sidebar-border", expanded ? "" : "w-8 mx-auto")} />
+
         {/* ナビゲーション */}
         {navItems.map((item) => {
           const content = (
@@ -219,24 +221,21 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
                 <span className={cn(
                   "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-medium",
                   expanded
-                    ? "ml-auto text-muted-foreground"
-                    : "absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground font-bold"
+                    ? "ml-auto bg-sidebar-accent text-sidebar-foreground/70"
+                    : "absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground font-bold animate-badge-pulse"
                 )}>
-                  {expanded ? item.badge > 99 ? "99+" : item.badge : ""}
-                  {!expanded && (
-                    <span className="h-2 w-2 rounded-full bg-primary" />
-                  )}
+                  {item.badge > 99 ? "99+" : item.badge}
                 </span>
               )}
             </>
           )
 
           const className = cn(
-            "relative inline-flex items-center rounded-lg text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+            "relative inline-flex items-center rounded-md text-sidebar-foreground/70 transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-foreground active:scale-95",
             expanded
               ? "h-9 justify-start gap-2 px-2 text-sm"
-              : "h-9 w-9 justify-center",
-            item.active && "bg-sidebar-accent text-sidebar-foreground font-medium"
+              : "h-9 w-9 justify-center hover:scale-110",
+            item.active && "bg-sidebar-accent text-sidebar-foreground nav-active-indicator"
           )
 
           if ("onClick" in item && item.onClick) {

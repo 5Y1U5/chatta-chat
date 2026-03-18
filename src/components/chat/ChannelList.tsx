@@ -70,7 +70,7 @@ export function ChannelList({ channels, workspaceId, currentUserId }: Props) {
   const dmChannels = channelsWithLiveCounts.filter((ch) => ch.type === "dm")
 
   return (
-    <div className="hidden w-60 flex-col border-r border-border/50 bg-sidebar md:flex">
+    <div className="hidden w-60 flex-col border-r bg-muted/30 md:flex">
       {/* ヘッダー */}
       <div className="flex h-12 items-center justify-between px-4 border-b">
         <span className="text-sm font-semibold text-muted-foreground">チャンネル</span>
@@ -161,7 +161,7 @@ function ChannelSection({
             href={`/${workspaceId}/channel/${channel.id}`}
             className={cn(
               "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm min-w-0 transition-colors",
-              activeChannelId === channel.id && "bg-muted font-medium",
+              activeChannelId === channel.id && "bg-primary/10 font-medium border-l-2 border-primary",
               activeChannelId !== channel.id && "hover:bg-muted/50",
               channel.unreadCount > 0 && activeChannelId !== channel.id && "font-semibold"
             )}
@@ -173,7 +173,9 @@ function ChannelSection({
               {getChannelDisplayName(channel, currentUserId)}
             </span>
             {channel.unreadCount > 0 && activeChannelId !== channel.id && (
-              <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                {channel.unreadCount > 99 ? "99+" : channel.unreadCount}
+              </span>
             )}
           </Link>
           <div className="hidden shrink-0 group-hover/item:block">

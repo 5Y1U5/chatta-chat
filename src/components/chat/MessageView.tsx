@@ -292,8 +292,7 @@ export function MessageView({
         </div>
 
         {/* メッセージ一覧 */}
-        <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto py-2">
-          <div className="mx-auto max-w-3xl px-4">
+        <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
           {loadingMore && (
             <div className="py-2 text-center text-xs text-muted-foreground">
               読み込み中...
@@ -317,7 +316,6 @@ export function MessageView({
             ))
           )}
           <div ref={messagesEndRef} />
-          </div>
         </div>
 
         {/* タイピングインジケータ */}
@@ -402,7 +400,10 @@ function MessageBubble({
 
   return (
     <div
-      className="group relative flex gap-3 py-2 hover:bg-muted/30 rounded-lg px-2 -mx-2 animate-message-in"
+      className={cn(
+        "group relative flex gap-3 py-1.5 hover:bg-muted/50 rounded-md px-1 -mx-1 animate-message-in",
+        message.aiGenerated && "bg-ai-bubble border border-ai-bubble-border"
+      )}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => { setShowActions(false); setShowEmojiPicker(false) }}
     >
@@ -417,7 +418,7 @@ function MessageBubble({
             {message.user.displayName || "不明"}
           </span>
           {message.aiGenerated && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span className="rounded bg-gradient-to-r from-violet-500 to-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
               AI
             </span>
           )}
@@ -453,12 +454,12 @@ function MessageBubble({
         ) : (
           <>
             {message.content && !message.fileUrl && (
-              <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+              <p className="text-sm whitespace-pre-wrap break-words">
                 {message.content}
               </p>
             )}
             {message.content && message.fileUrl && !message.content.startsWith("[ファイル]") && (
-              <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+              <p className="text-sm whitespace-pre-wrap break-words">
                 {message.content}
               </p>
             )}
