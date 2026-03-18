@@ -70,7 +70,7 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
         "group relative flex items-center gap-3 border-b border-border/50 px-3 py-2.5 cursor-pointer transition-colors duration-150",
         "hover:bg-muted/30",
         isSelected && "bg-muted/50",
-        celebrating && "bg-green-50 dark:bg-green-950/20"
+        celebrating && "bg-blue-50 dark:bg-blue-950/20"
       )}
       onClick={onSelect}
     >
@@ -89,9 +89,9 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
         className={cn(
           "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
           isDone
-            ? "border-green-500 bg-green-500 text-white scale-110"
-            : "border-muted-foreground/40 hover:border-green-500 hover:scale-110 active:scale-90",
-          celebrating && "animate-bounce border-green-500 bg-green-500 text-white"
+            ? "border-primary bg-primary text-primary-foreground scale-110"
+            : "border-muted-foreground/40 hover:border-primary hover:scale-110 active:scale-90",
+          celebrating && "animate-bounce border-primary bg-primary text-primary-foreground"
         )}
       >
         {(isDone || celebrating) && (
@@ -106,7 +106,7 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
         <div className={cn(
           "text-sm truncate transition-all duration-300",
           isDone && "line-through text-muted-foreground",
-          celebrating && "line-through text-green-600 dark:text-green-400"
+          celebrating && "line-through text-primary dark:text-primary"
         )}>
           {task.title}
         </div>

@@ -80,8 +80,8 @@ function sortByPriority(tasks: TaskInfo[]): TaskInfo[] {
 const statusDotColors: Record<string, string> = {
   todo: "bg-gray-400",
   in_progress: "bg-blue-500",
-  done: "bg-green-500",
-  completed_today: "bg-green-500",
+  done: "bg-primary",
+  completed_today: "bg-primary",
 }
 
 export function TaskListView({

@@ -407,7 +407,7 @@ export function TaskDetailPanel({
               variant={task.status === "done" ? "outline" : "default"}
               className={cn(
                 "h-7 text-xs",
-                task.status === "done" && "border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20"
+                task.status === "done" && "border-primary text-primary hover:bg-blue-50 dark:hover:bg-blue-950/20"
               )}
               onClick={() => handleUpdate("status", task.status === "done" ? "todo" : "done")}
             >
@@ -453,7 +453,7 @@ export function TaskDetailPanel({
               }}
             >
               {linkCopied ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               ) : (
@@ -710,7 +710,7 @@ export function TaskDetailPanel({
             {subTasks.length > 0 && (
               <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden mb-2">
                 <div
-                  className="h-full rounded-full bg-green-500 transition-all duration-500 ease-out"
+                  className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
                   style={{ width: `${subTaskProgress}%` }}
                 />
               </div>
@@ -724,8 +724,8 @@ export function TaskDetailPanel({
                     className={cn(
                       "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
                       st.status === "done"
-                        ? "border-green-500 bg-green-500 text-white scale-110"
-                        : "border-muted-foreground/40 hover:border-green-500 hover:scale-110"
+                        ? "border-primary bg-primary text-white scale-110"
+                        : "border-muted-foreground/40 hover:border-primary hover:scale-110"
                     )}
                   >
                     {st.status === "done" && (
@@ -772,8 +772,8 @@ export function TaskDetailPanel({
                           className={cn(
                             "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
                             nst.status === "done"
-                              ? "border-green-500 bg-green-500 text-white"
-                              : "border-muted-foreground/40 hover:border-green-500"
+                              ? "border-primary bg-primary text-white"
+                              : "border-muted-foreground/40 hover:border-primary"
                           )}
                         >
                           {nst.status === "done" && (
