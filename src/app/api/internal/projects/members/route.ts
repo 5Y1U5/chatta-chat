@@ -55,6 +55,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "プロジェクトが見つかりません" }, { status: 404 })
     }
 
+    // 操作者がプロジェクトメンバーであることを確認
+    const operatorMember = await prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId: auth.userId } },
+    })
+    if (!operatorMember) {
+      return NextResponse.json({ error: "プロジェクトメンバーのみがメンバーを追加できます" }, { status: 403 })
+    }
+
     // ワークスペースメンバーか確認
     const wsMember = await prisma.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId: auth.workspaceId, userId } },
@@ -115,6 +123,27 @@ export async function DELETE(request: NextRequest) {
     const project = await prisma.project.findUnique({ where: { id: projectId } })
     if (!project || project.workspaceId !== auth.workspaceId) {
       return NextResponse.json({ error: "プロジェクトが見つかりません" }, { status: 404 })
+    }
+
+    // 操作者が owner であることを確認
+    const operatorMember = await prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId: auth.userId } },
+    })
+    if (!operatorMember || operatorMember.role !== "owner") {
+      return NextResponse.json({ error: "プロジェクトオーナーのみがメンバーを削除できます" }, { status: 403 })
+    }
+
+    // 削除対象が owner の場合、最後の owner 削除を防止
+    const targetMember = await prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    })
+    if (targetMember?.role === "owner") {
+      const ownerCount = await prisma.projectMember.count({
+        where: { projectId, role: "owner" },
+      })
+      if (ownerCount <= 1) {
+        return NextResponse.json({ error: "最後のオーナーは削除できません" }, { status: 400 })
+      }
     }
 
     await prisma.projectMember.deleteMany({

@@ -15,8 +15,19 @@ export default async function ProjectsPage({
 
   const [projects, membersRaw] = await Promise.all([
     prisma.project.findMany({
-      where: { workspaceId, archived: false },
-      include: { _count: { select: { tasks: true } } },
+      where: {
+        workspaceId,
+        archived: false,
+        members: { some: { userId: auth.userId } },
+      },
+      include: {
+        _count: { select: { tasks: true } },
+        members: {
+          where: { userId: auth.userId },
+          select: { role: true },
+          take: 1,
+        },
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.workspaceMember.findMany({
@@ -28,9 +39,14 @@ export default async function ProjectsPage({
     }),
   ])
 
+  const projectsWithRole = projects.map(({ members: memberRows, ...p }) => ({
+    ...p,
+    myRole: memberRows[0]?.role || "member",
+  }))
+
   return (
     <ProjectListView
-      projects={JSON.parse(JSON.stringify(projects))}
+      projects={JSON.parse(JSON.stringify(projectsWithRole))}
       members={membersRaw.map((m) => m.user)}
       workspaceId={workspaceId}
       currentUserId={auth.userId}

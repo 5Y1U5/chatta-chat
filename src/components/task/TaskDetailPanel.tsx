@@ -631,9 +631,10 @@ export function TaskDetailPanel({
             </PropField>
           </div>
 
-          {/* メンバー（2列グリッドの外。幅を使いたい） */}
+          {/* 共有（2列グリッドの外。幅を使いたい） */}
           <div className="mt-2">
-            <PropField label={`メンバー${detailsLoaded ? ` (${taskMembers.length})` : ""}`}>
+            <PropField label={`共有${detailsLoaded ? ` (${taskMembers.length})` : ""}`}>
+              <p className="text-[10px] text-muted-foreground mb-1">共有すると相手のマイタスクにも表示されます</p>
               <div className="flex flex-wrap items-center gap-1.5">
                 {taskMembers.map((m) => (
                   <div

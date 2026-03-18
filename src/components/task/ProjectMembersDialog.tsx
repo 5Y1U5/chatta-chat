@@ -20,9 +20,10 @@ type Props = {
   workspaceMembers: { id: string; displayName: string | null; avatarUrl: string | null }[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  myRole?: string
 }
 
-export function ProjectMembersDialog({ projectId, projectName, projectColor, workspaceMembers, open, onOpenChange }: Props) {
+export function ProjectMembersDialog({ projectId, projectName, projectColor, workspaceMembers, open, onOpenChange, myRole }: Props) {
   const [members, setMembers] = useState<MemberInfo[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -68,6 +69,7 @@ export function ProjectMembersDialog({ projectId, projectName, projectColor, wor
             {projectName || "プロジェクト"} のメンバー
           </DialogTitle>
         </DialogHeader>
+        <p className="text-xs text-muted-foreground">メンバーのみがこのプロジェクトのタスクを閲覧できます</p>
         <div className="space-y-4">
           {loading ? (
             <div className="flex justify-center py-4">
@@ -83,14 +85,19 @@ export function ProjectMembersDialog({ projectId, projectName, projectColor, wor
                         {m.displayName?.charAt(0) || "?"}
                       </div>
                       <span className="text-sm flex-1 truncate">{m.displayName || "不明"}</span>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        className="h-6 text-xs text-muted-foreground"
-                        onClick={() => handleRemove(m.userId)}
-                      >
-                        削除
-                      </Button>
+                      {m.role === "owner" && (
+                        <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">オーナー</span>
+                      )}
+                      {myRole === "owner" && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="h-6 text-xs text-muted-foreground"
+                          onClick={() => handleRemove(m.userId)}
+                        >
+                          削除
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>

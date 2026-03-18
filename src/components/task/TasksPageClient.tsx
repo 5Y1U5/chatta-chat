@@ -9,7 +9,7 @@ import type { TaskInfo } from "@/types/chat"
 type Props = {
   workspaceId: string
   currentUserId: string
-  projects: { id: string; name: string; color: string | null }[]
+  projects: { id: string; name: string; color: string | null; myRole?: string }[]
   members: { id: string; displayName: string | null; avatarUrl: string | null }[]
   initialTasks: TaskInfo[]
   initialProjectId?: string
@@ -25,6 +25,7 @@ type ViewState = {
   projectName?: string
   projectColor?: string | null
   projectMembers: { id: string; displayName: string | null; avatarUrl: string | null }[]
+  projectMyRole?: string
 }
 
 function TasksPageClientInner(props: Props) {
@@ -44,6 +45,7 @@ function TasksPageClientInner(props: Props) {
     projectName: initialProject?.name,
     projectColor: initialProject?.color,
     projectMembers: props.initialProjectMembers,
+    projectMyRole: initialProject?.myRole,
   })
   const [transitioning, setTransitioning] = useState(false)
 
@@ -76,6 +78,7 @@ function TasksPageClientInner(props: Props) {
         projectId,
         projectName: project?.name,
         projectColor: project?.color,
+        projectMyRole: project?.myRole,
         projectMembers: members
           ? (members as { userId: string; displayName: string | null; avatarUrl: string | null }[]).map(
               (m) => ({ id: m.userId, displayName: m.displayName, avatarUrl: m.avatarUrl })
@@ -103,6 +106,7 @@ function TasksPageClientInner(props: Props) {
         projectColor={view.projectColor}
         projectMembers={view.projectMembers}
         initialSelectedTaskId={props.initialSelectedTaskId}
+        projectMyRole={view.projectMyRole}
       />
     </div>
   )

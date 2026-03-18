@@ -117,6 +117,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "タスクが見つかりません" }, { status: 404 })
     }
 
+    // 自分を削除: 常にOK。他者を削除: creator / assignee のみ
+    if (userId !== auth.userId) {
+      if (task.creatorId !== auth.userId && task.assigneeId !== auth.userId) {
+        return NextResponse.json({ error: "タスクの作成者または担当者のみがメンバーを削除できます" }, { status: 403 })
+      }
+    }
+
     await prisma.taskMember.deleteMany({
       where: { taskId, userId },
     })

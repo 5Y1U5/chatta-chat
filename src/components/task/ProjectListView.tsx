@@ -127,20 +127,22 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
                       </svg>
                       タスク
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setDeleteProjectId(p.id)
-                      }}
-                      title="プロジェクトを削除"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </Button>
+                    {p.myRole === "owner" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setDeleteProjectId(p.id)
+                        }}
+                        title="プロジェクトを削除"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -172,6 +174,7 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
         workspaceMembers={members}
         open={!!manageMembersProjectId}
         onOpenChange={(v) => !v && setManageMembersProjectId(null)}
+        myRole={managingProject?.myRole}
       />
 
       {/* プロジェクト作成ダイアログ */}

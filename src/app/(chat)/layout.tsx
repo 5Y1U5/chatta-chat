@@ -103,9 +103,13 @@ export default async function ChatLayout({
     where: { workspaceId: activeWorkspaceId },
   })
 
-  // プロジェクト一覧（TaskNav / MobileTaskHeader 用）- 完了タスク数も取得
+  // プロジェクト一覧（TaskNav / MobileTaskHeader 用）- メンバーのみ表示
   const projectsRaw = await prisma.project.findMany({
-    where: { workspaceId: activeWorkspaceId, archived: false },
+    where: {
+      workspaceId: activeWorkspaceId,
+      archived: false,
+      members: { some: { userId: auth.userId } },
+    },
     include: { _count: { select: { tasks: true } } },
     orderBy: { name: "asc" },
   })

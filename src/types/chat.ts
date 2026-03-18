@@ -55,6 +55,7 @@ export type ProjectInfo = {
   createdAt: string
   updatedAt: string
   _count?: { tasks: number }
+  myRole?: string
 }
 
 // タスク情報

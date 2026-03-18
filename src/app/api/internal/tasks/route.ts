@@ -42,23 +42,24 @@ export async function GET(request: NextRequest) {
 
     if (status) where.status = status
 
-    // プロジェクト指定時: プロジェクトメンバーでなければ自動追加（ワークスペースメンバーなら閲覧可能）
+    // プロジェクト指定時: プロジェクトメンバーのみ閲覧可能
     if (projectId) {
       const isMember = await prisma.projectMember.findUnique({
         where: { projectId_userId: { projectId, userId: auth.userId } },
       })
       if (!isMember) {
-        // ワークスペースメンバーなら自動でプロジェクトメンバーに追加
-        await prisma.projectMember.create({
-          data: { projectId, userId: auth.userId },
-        }).catch(() => {}) // 既に存在する場合は無視
+        return NextResponse.json(
+          { error: "このプロジェクトへのアクセス権がありません" },
+          { status: 403 }
+        )
       }
       where.projectId = projectId
     } else if (assigneeId) {
-      // マイタスク: assignee OR TaskMember に含まれるタスク（プロジェクト所属タスクを除外）
+      // マイタスク: assignee / creator / TaskMember に含まれるタスク（プロジェクト所属タスクを除外）
       where.projectId = null
       where.OR = [
         { assigneeId },
+        { creatorId: assigneeId },
         { members: { some: { userId: assigneeId } } },
       ]
     } else if (!projectId && !assigneeId) {
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
 
     const prisma = getPrisma()
 
-    // プロジェクトの所属確認
+    // プロジェクトの所属確認 + メンバーチェック
     if (projectId) {
       const project = await prisma.project.findUnique({
         where: { id: projectId },
@@ -117,6 +118,15 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { error: "プロジェクトが見つかりません" },
           { status: 404 }
+        )
+      }
+      const isMember = await prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId: auth.userId } },
+      })
+      if (!isMember) {
+        return NextResponse.json(
+          { error: "このプロジェクトへのアクセス権がありません" },
+          { status: 403 }
         )
       }
     }
@@ -240,6 +250,29 @@ export async function PATCH(request: Request) {
         { error: "タスクが見つかりません" },
         { status: 404 }
       )
+    }
+
+    // 権限チェック
+    if (task.projectId) {
+      // プロジェクト所属タスク → ProjectMember か確認
+      const isMember = await prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId: task.projectId, userId: auth.userId } },
+      })
+      if (!isMember) {
+        return NextResponse.json({ error: "このタスクへのアクセス権がありません" }, { status: 403 })
+      }
+    } else {
+      // プロジェクト未所属タスク → creator / assignee / TaskMember か確認
+      const isCreator = task.creatorId === auth.userId
+      const isAssignee = task.assigneeId === auth.userId
+      if (!isCreator && !isAssignee) {
+        const isTaskMember = await prisma.taskMember.findUnique({
+          where: { taskId_userId: { taskId, userId: auth.userId } },
+        })
+        if (!isTaskMember) {
+          return NextResponse.json({ error: "このタスクへのアクセス権がありません" }, { status: 403 })
+        }
+      }
     }
 
     const data: Record<string, unknown> = {}
@@ -370,6 +403,27 @@ export async function DELETE(request: NextRequest) {
         { error: "タスクが見つかりません" },
         { status: 404 }
       )
+    }
+
+    // 権限チェック
+    if (task.projectId) {
+      const isMember = await prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId: task.projectId, userId: auth.userId } },
+      })
+      if (!isMember) {
+        return NextResponse.json({ error: "このタスクへのアクセス権がありません" }, { status: 403 })
+      }
+    } else {
+      const isCreator = task.creatorId === auth.userId
+      const isAssignee = task.assigneeId === auth.userId
+      if (!isCreator && !isAssignee) {
+        const isTaskMember = await prisma.taskMember.findUnique({
+          where: { taskId_userId: { taskId, userId: auth.userId } },
+        })
+        if (!isTaskMember) {
+          return NextResponse.json({ error: "このタスクへのアクセス権がありません" }, { status: 403 })
+        }
+      }
     }
 
     // Cascade でサブタスク・コメントも削除される

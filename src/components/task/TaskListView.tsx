@@ -56,6 +56,7 @@ type Props = {
   projectColor?: string | null
   projectMembers?: { id: string; displayName: string | null; avatarUrl: string | null }[]
   initialSelectedTaskId?: string
+  projectMyRole?: string
 }
 
 // 優先度の重み（小さいほど上）
@@ -96,6 +97,7 @@ export function TaskListView({
   projectColor,
   projectMembers = [],
   initialSelectedTaskId,
+  projectMyRole,
 }: Props) {
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -482,6 +484,7 @@ export function TaskListView({
           workspaceMembers={members}
           open={membersDialogOpen}
           onOpenChange={setMembersDialogOpen}
+          myRole={projectMyRole}
         />
       )}
 

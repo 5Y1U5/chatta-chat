@@ -19,7 +19,18 @@ export default async function MyTasksPage({
   // 共通データを並列で取得
   const [projects, membersRaw] = await Promise.all([
     prisma.project.findMany({
-      where: { workspaceId, archived: false },
+      where: {
+        workspaceId,
+        archived: false,
+        members: { some: { userId: auth.userId } },
+      },
+      include: {
+        members: {
+          where: { userId: auth.userId },
+          select: { role: true },
+          take: 1,
+        },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.workspaceMember.findMany({
@@ -32,7 +43,7 @@ export default async function MyTasksPage({
   ])
 
   // 初期ビューのデータを取得
-  const validProjectId = initialProjectId && projects.some((p) => p.id === initialProjectId)
+  let validProjectId: string | undefined = initialProjectId && projects.some((p) => p.id === initialProjectId)
     ? initialProjectId
     : undefined
 
@@ -40,44 +51,39 @@ export default async function MyTasksPage({
   let initialProjectMembers: { id: string; displayName: string | null; avatarUrl: string | null }[] = []
 
   if (validProjectId) {
-    const [tasks, pmRaw] = await Promise.all([
-      prisma.task.findMany({
-        where: { workspaceId, projectId: validProjectId, parentTaskId: null },
-        include: {
-          assignee: { select: userSelect },
-          creator: { select: userSelect },
-          project: { select: { id: true, name: true, color: true } },
-          _count: { select: { subTasks: true, comments: true } },
-        },
-        orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
-      }),
-      prisma.projectMember.findMany({
-        where: { projectId: validProjectId },
-        include: { user: { select: userSelect } },
-        orderBy: { createdAt: "asc" },
-      }),
-    ])
+    // プロジェクトメンバーか確認
+    const isMember = await prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId: validProjectId, userId: auth.userId } },
+    })
 
-    // プロジェクトメンバーでなければ自動追加
-    const isMember = pmRaw.some((pm) => pm.userId === auth.userId)
-    if (!isMember) {
-      await prisma.projectMember.create({
-        data: { projectId: validProjectId, userId: auth.userId },
-      }).catch(() => {})
-      const selfUser = membersRaw.find((m) => m.user.id === auth.userId)
-      if (selfUser) {
-        pmRaw.push({
-          projectId: validProjectId,
-          userId: auth.userId,
-          createdAt: new Date(),
-          user: selfUser.user,
-        } as typeof pmRaw[number])
-      }
+    if (isMember) {
+      const [tasks, pmRaw] = await Promise.all([
+        prisma.task.findMany({
+          where: { workspaceId, projectId: validProjectId, parentTaskId: null },
+          include: {
+            assignee: { select: userSelect },
+            creator: { select: userSelect },
+            project: { select: { id: true, name: true, color: true } },
+            _count: { select: { subTasks: true, comments: true } },
+          },
+          orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+        }),
+        prisma.projectMember.findMany({
+          where: { projectId: validProjectId },
+          include: { user: { select: userSelect } },
+          orderBy: { createdAt: "asc" },
+        }),
+      ])
+
+      initialTasks = tasks
+      initialProjectMembers = pmRaw.map((pm) => pm.user)
+    } else {
+      // メンバーでなければマイタスクにフォールバック
+      validProjectId = undefined
     }
+  }
 
-    initialTasks = tasks
-    initialProjectMembers = pmRaw.map((pm) => pm.user)
-  } else {
+  if (!validProjectId) {
     initialTasks = await prisma.task.findMany({
       where: {
         workspaceId,
@@ -85,6 +91,7 @@ export default async function MyTasksPage({
         projectId: null,
         OR: [
           { assigneeId: auth.userId },
+          { creatorId: auth.userId },
           { members: { some: { userId: auth.userId } } },
         ],
       },
@@ -102,7 +109,10 @@ export default async function MyTasksPage({
     <TasksPageClient
       workspaceId={workspaceId}
       currentUserId={auth.userId}
-      projects={JSON.parse(JSON.stringify(projects))}
+      projects={JSON.parse(JSON.stringify(projects.map(({ members: memberRows, ...p }) => ({
+        ...p,
+        myRole: memberRows[0]?.role || "member",
+      }))))}
       members={membersRaw.map((m) => m.user)}
       initialTasks={JSON.parse(JSON.stringify(initialTasks))}
       initialProjectId={validProjectId}

@@ -9,12 +9,29 @@ export async function GET() {
     const prisma = getPrisma()
 
     const projects = await prisma.project.findMany({
-      where: { workspaceId: auth.workspaceId, archived: false },
-      include: { _count: { select: { tasks: true } } },
+      where: {
+        workspaceId: auth.workspaceId,
+        archived: false,
+        members: { some: { userId: auth.userId } },
+      },
+      include: {
+        _count: { select: { tasks: true } },
+        members: {
+          where: { userId: auth.userId },
+          select: { role: true },
+          take: 1,
+        },
+      },
       orderBy: { createdAt: "desc" },
     })
 
-    return NextResponse.json(projects)
+    // myRole を付与してレスポンス
+    const result = projects.map(({ members: memberRows, ...p }) => ({
+      ...p,
+      myRole: memberRows[0]?.role || "member",
+    }))
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error("プロジェクト一覧取得エラー:", error)
     return NextResponse.json(
@@ -48,11 +65,12 @@ export async function POST(request: Request) {
       },
     })
 
-    // 作成者を自動でプロジェクトメンバーに追加
+    // 作成者を自動でプロジェクトメンバーに追加（owner ロール）
     await prisma.projectMember.create({
       data: {
         projectId: project.id,
         userId: auth.userId,
+        role: "owner",
       },
     })
 
@@ -90,6 +108,17 @@ export async function PATCH(request: Request) {
       return NextResponse.json(
         { error: "プロジェクトが見つかりません" },
         { status: 404 }
+      )
+    }
+
+    // プロジェクトメンバーであることを確認
+    const isMember = await prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId: auth.userId } },
+    })
+    if (!isMember) {
+      return NextResponse.json(
+        { error: "このプロジェクトへのアクセス権がありません" },
+        { status: 403 }
       )
     }
 
@@ -138,6 +167,17 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json(
         { error: "プロジェクトが見つかりません" },
         { status: 404 }
+      )
+    }
+
+    // owner であることを確認
+    const operatorMember = await prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId: auth.userId } },
+    })
+    if (!operatorMember || operatorMember.role !== "owner") {
+      return NextResponse.json(
+        { error: "プロジェクトオーナーのみが削除できます" },
+        { status: 403 }
       )
     }
 
