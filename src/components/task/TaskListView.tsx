@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import {
@@ -108,7 +108,15 @@ export function TaskListView({
   const [deleting, setDeleting] = useState(false)
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)
 
-  const now = new Date()
+  // 日付変更時にセクション分類を再計算するためのstate
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    const msUntilMidnight = tomorrow.getTime() - Date.now()
+    const timer = setTimeout(() => setNow(new Date()), msUntilMidnight + 500)
+    return () => clearTimeout(timer)
+  }, [now])
+
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const tomorrowStart = new Date(todayEnd.getTime() + 86400000)
   const todayStart = todayEnd.getTime()
