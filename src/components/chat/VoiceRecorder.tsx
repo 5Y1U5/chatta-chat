@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
-
+import { useState, useRef, useCallback, useEffect } from "react"
 type Props = {
   onTranscript?: (text: string) => void
 }
@@ -16,16 +15,47 @@ interface SpeechRecognitionErrorEvent extends Event {
   error: string
 }
 
-// 音声入力コンポーネント（Web Speech API ベース）
+type SpeechRecognitionInstance = {
+  lang: string
+  interimResults: boolean
+  continuous: boolean
+  start: () => void
+  stop: () => void
+  onresult: ((e: SpeechRecognitionEvent) => void) | null
+  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null
+  onend: (() => void) | null
+}
+
 export function VoiceRecorder({ onTranscript }: Props) {
   const [listening, setListening] = useState(false)
+  const [interimText, setInterimText] = useState("")
+  const [duration, setDuration] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const recognitionRef = useRef<unknown>(null)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // 録音時間のタイマー
+  useEffect(() => {
+    if (listening) {
+      setDuration(0)
+      timerRef.current = setInterval(() => {
+        setDuration((d) => d + 1)
+      }, 1000)
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [listening])
 
   const startListening = useCallback(() => {
     setError(null)
+    setInterimText("")
 
-    // Web Speech API のサポートチェック
     const SpeechRecognition =
       (window as unknown as Record<string, unknown>).SpeechRecognition ||
       (window as unknown as Record<string, unknown>).webkitSpeechRecognition
@@ -35,30 +65,27 @@ export function VoiceRecorder({ onTranscript }: Props) {
       return
     }
 
-    const recognition = new (SpeechRecognition as new () => {
-      lang: string
-      interimResults: boolean
-      continuous: boolean
-      start: () => void
-      stop: () => void
-      onresult: ((e: SpeechRecognitionEvent) => void) | null
-      onerror: ((e: SpeechRecognitionErrorEvent) => void) | null
-      onend: (() => void) | null
-    })()
+    const recognition = new (SpeechRecognition as new () => SpeechRecognitionInstance)()
     recognition.lang = "ja-JP"
-    recognition.interimResults = false
+    recognition.interimResults = true
     recognition.continuous = true
 
     recognition.onresult = (e: SpeechRecognitionEvent) => {
-      const results = e.results
-      let transcript = ""
-      for (let i = e.resultIndex; i < results.length; i++) {
-        if (results[i].isFinal) {
-          transcript += results[i][0].transcript
+      let interim = ""
+      let final = ""
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i][0].transcript
+        if (e.results[i].isFinal) {
+          final += transcript
+        } else {
+          interim += transcript
         }
       }
-      if (transcript && onTranscript) {
-        onTranscript(transcript)
+      if (final && onTranscript) {
+        onTranscript(final)
+        setInterimText("")
+      } else {
+        setInterimText(interim)
       }
     }
 
@@ -66,7 +93,7 @@ export function VoiceRecorder({ onTranscript }: Props) {
       if (e.error === "not-allowed") {
         setError("マイクへのアクセスが許可されていません")
       } else if (e.error === "no-speech") {
-        // 無視（音声が検出されなかった）
+        // 無視
       } else {
         setError("音声認識エラーが発生しました")
       }
@@ -75,6 +102,7 @@ export function VoiceRecorder({ onTranscript }: Props) {
 
     recognition.onend = () => {
       setListening(false)
+      setInterimText("")
       recognitionRef.current = null
     }
 
@@ -84,15 +112,22 @@ export function VoiceRecorder({ onTranscript }: Props) {
   }, [onTranscript])
 
   const stopListening = useCallback(() => {
-    const recognition = recognitionRef.current as { stop: () => void } | null
-    if (recognition) {
-      recognition.stop()
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
     }
     setListening(false)
+    setInterimText("")
   }, [])
 
+  const formatDuration = (s: number) => {
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return `${m}:${String(sec).padStart(2, "0")}`
+  }
+
   return (
-    <div className="flex items-center">
+    <>
+      {/* マイクボタン */}
       {!listening ? (
         <button
           title="音声入力"
@@ -110,16 +145,79 @@ export function VoiceRecorder({ onTranscript }: Props) {
         <button
           title="音声入力を停止"
           onClick={stopListening}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 animate-pulse transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-sm shadow-red-500/30 transition-all"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
             <rect x="6" y="6" width="12" height="12" rx="2" />
           </svg>
         </button>
       )}
-      {error && (
+
+      {/* 録音中バー（入力欄の上に表示） */}
+      {listening && (
+        <div className="absolute bottom-full left-0 right-0 mb-0 px-4 pb-2">
+          <div className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2 shadow-lg animate-in slide-in-from-bottom-2 duration-200">
+            {/* パルスドット */}
+            <span className="relative flex h-3 w-3 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+            </span>
+
+            {/* 波形アニメーション */}
+            <div className="flex items-center gap-[3px] h-5">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span
+                  key={i}
+                  className="w-[3px] rounded-full bg-red-500"
+                  style={{
+                    animation: `voice-wave 1s ease-in-out ${i * 0.15}s infinite`,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* 認識中テキスト or ステータス */}
+            <div className="flex-1 min-w-0">
+              {interimText ? (
+                <p className="text-sm truncate text-foreground">{interimText}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">音声を聞いています...</p>
+              )}
+            </div>
+
+            {/* 録音時間 */}
+            <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+              {formatDuration(duration)}
+            </span>
+
+            {/* 停止ボタン */}
+            <button
+              onClick={stopListening}
+              className="flex h-7 items-center gap-1 rounded-md bg-red-500 px-2.5 text-xs font-medium text-white hover:bg-red-600 transition-colors shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+              停止
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* エラー表示 */}
+      {error && !listening && (
         <span className="text-xs text-destructive ml-1">{error}</span>
       )}
-    </div>
+
+      {/* 波形アニメーション用CSS */}
+      {listening && (
+        <style>{`
+          @keyframes voice-wave {
+            0%, 100% { height: 4px; }
+            50% { height: 16px; }
+          }
+        `}</style>
+      )}
+    </>
   )
 }
