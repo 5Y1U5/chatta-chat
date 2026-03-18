@@ -1,91 +1,103 @@
 "use client"
 
-import { useState, useRef } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useRef, useCallback } from "react"
 
 type Props = {
-  channelId: string
+  onTranscript?: (text: string) => void
 }
 
-// 音声録音 → 議事録生成の基盤コンポーネント
-// 注意: 文字起こしには外部 API（Whisper 等）が必要。現在は録音とアップロードまで対応
-export function VoiceRecorder({ channelId }: Props) {
-  const [recording, setRecording] = useState(false)
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [processing, setProcessing] = useState(false)
+// Web Speech API の型定義
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList
+  resultIndex: number
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string
+}
+
+// 音声入力コンポーネント（Web Speech API ベース）
+export function VoiceRecorder({ onTranscript }: Props) {
+  const [listening, setListening] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
+  const recognitionRef = useRef<unknown>(null)
 
-  const startRecording = async () => {
+  const startListening = useCallback(() => {
     setError(null)
-    setAudioUrl(null)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4",
-      })
-      mediaRecorderRef.current = mediaRecorder
-      chunksRef.current = []
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
-      }
+    // Web Speech API のサポートチェック
+    const SpeechRecognition =
+      (window as unknown as Record<string, unknown>).SpeechRecognition ||
+      (window as unknown as Record<string, unknown>).webkitSpeechRecognition
 
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
-        const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType })
-        const url = URL.createObjectURL(blob)
-        setAudioUrl(url)
+    if (!SpeechRecognition) {
+      setError("このブラウザは音声入力に対応していません")
+      return
+    }
 
-        // ファイルとしてアップロード
-        setProcessing(true)
-        try {
-          const formData = new FormData()
-          const ext = mediaRecorder.mimeType.includes("webm") ? "webm" : "mp4"
-          formData.append("file", blob, `recording-${Date.now()}.${ext}`)
+    const recognition = new (SpeechRecognition as new () => {
+      lang: string
+      interimResults: boolean
+      continuous: boolean
+      start: () => void
+      stop: () => void
+      onresult: ((e: SpeechRecognitionEvent) => void) | null
+      onerror: ((e: SpeechRecognitionErrorEvent) => void) | null
+      onend: (() => void) | null
+    })()
+    recognition.lang = "ja-JP"
+    recognition.interimResults = false
+    recognition.continuous = true
 
-          const res = await fetch("/api/internal/upload", {
-            method: "POST",
-            body: formData,
-          })
-          const data = await res.json()
-
-          if (data.error) {
-            setError("録音ファイルのアップロードに失敗しました")
-          }
-          // TODO: data.fileUrl を Whisper API に送って文字起こし → 議事録生成
-        } catch {
-          setError("アップロードに失敗しました")
-        } finally {
-          setProcessing(false)
+    recognition.onresult = (e: SpeechRecognitionEvent) => {
+      const results = e.results
+      let transcript = ""
+      for (let i = e.resultIndex; i < results.length; i++) {
+        if (results[i].isFinal) {
+          transcript += results[i][0].transcript
         }
       }
-
-      mediaRecorder.start(1000) // 1秒ごとにチャンク
-      setRecording(true)
-    } catch {
-      setError("マイクへのアクセスが許可されていません")
+      if (transcript && onTranscript) {
+        onTranscript(transcript)
+      }
     }
-  }
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.stop()
-      setRecording(false)
+    recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error === "not-allowed") {
+        setError("マイクへのアクセスが許可されていません")
+      } else if (e.error === "no-speech") {
+        // 無視（音声が検出されなかった）
+      } else {
+        setError("音声認識エラーが発生しました")
+      }
+      setListening(false)
     }
-  }
+
+    recognition.onend = () => {
+      setListening(false)
+      recognitionRef.current = null
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setListening(true)
+  }, [onTranscript])
+
+  const stopListening = useCallback(() => {
+    const recognition = recognitionRef.current as { stop: () => void } | null
+    if (recognition) {
+      recognition.stop()
+    }
+    setListening(false)
+  }, [])
 
   return (
-    <div className="flex items-center gap-2">
-      {!recording ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-          onClick={startRecording}
-          disabled={processing}
-          title="録音開始"
+    <div className="flex items-center">
+      {!listening ? (
+        <button
+          title="音声入力"
+          onClick={startListening}
+          className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -93,22 +105,21 @@ export function VoiceRecorder({ channelId }: Props) {
             <line x1="12" y1="19" x2="12" y2="23" />
             <line x1="8" y1="23" x2="16" y2="23" />
           </svg>
-        </Button>
+        </button>
       ) : (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-red-500 hover:text-red-600 animate-pulse"
-          onClick={stopRecording}
-          title="録音停止"
+        <button
+          title="音声入力を停止"
+          onClick={stopListening}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 animate-pulse transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
             <rect x="6" y="6" width="12" height="12" rx="2" />
           </svg>
-        </Button>
+        </button>
       )}
-      {processing && <span className="text-xs text-muted-foreground">処理中...</span>}
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      {error && (
+        <span className="text-xs text-destructive ml-1">{error}</span>
+      )}
     </div>
   )
 }

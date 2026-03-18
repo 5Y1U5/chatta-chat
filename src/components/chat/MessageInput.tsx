@@ -35,6 +35,10 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
+  // ダイアログの開閉状態（Popover外で管理）
+  const [summarizeOpen, setSummarizeOpen] = useState(false)
+  const [minutesOpen, setMinutesOpen] = useState(false)
+  const [memoryOpen, setMemoryOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -47,7 +51,6 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
 
     let fileAttachment: FileAttachment | undefined
 
-    // ファイルがある場合はアップロード
     if (pendingFile) {
       setUploading(true)
       try {
@@ -91,7 +94,6 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
   }, [content, pendingFile, onSend])
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    // メンション候補表示中のキー操作
     if (showMentions && mentionCandidates.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault()
@@ -114,7 +116,6 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
       }
     }
 
-    // Enter で送信、Shift+Enter で改行
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -125,10 +126,8 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
     const value = e.target.value
     setContent(value)
 
-    // タイピング通知
     if (value.trim() && onTyping) onTyping()
 
-    // @ の後のテキストを検出
     const cursorPos = e.target.selectionStart
     const textBeforeCursor = value.substring(0, cursorPos)
     const atMatch = textBeforeCursor.match(/@(\w*)$/)
@@ -150,7 +149,6 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
     const textBeforeCursor = content.substring(0, cursorPos)
     const textAfterCursor = content.substring(cursorPos)
 
-    // @ の位置を見つけて置換
     const atIndex = textBeforeCursor.lastIndexOf("@")
     if (atIndex >= 0) {
       const newContent = textBeforeCursor.substring(0, atIndex) + candidate.value + " " + textAfterCursor
@@ -158,8 +156,6 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
     }
 
     setShowMentions(false)
-
-    // フォーカスを戻す
     requestAnimationFrame(() => {
       textarea.focus()
     })
@@ -174,11 +170,9 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
       }
       setPendingFile(file)
     }
-    // input をリセット（同じファイルを再選択可能に）
     e.target.value = ""
   }
 
-  // クリック外でメンション候補を閉じる
   useEffect(() => {
     if (!showMentions) return
     function handleClick() {
@@ -213,6 +207,12 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
     setAiSuggestions([])
     textareaRef.current?.focus()
   }
+
+  // 音声入力の結果をテキストエリアに追加
+  const handleVoiceTranscript = useCallback((text: string) => {
+    setContent((prev) => prev + text)
+    textareaRef.current?.focus()
+  }, [])
 
   const isImage = pendingFile?.type.startsWith("image/")
 
@@ -326,9 +326,39 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
                 </button>
               </PopoverTrigger>
               <PopoverContent side="top" align="start" className="w-52 p-1">
-                <SummarizeDialog channelId={channelId} asMenuItem onOpenDialog={() => setToolsOpen(false)} />
-                <MinutesDialog channelId={channelId} asMenuItem onOpenDialog={() => setToolsOpen(false)} />
-                <MemoryPanel channelId={channelId} asMenuItem onOpenDialog={() => setToolsOpen(false)} />
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+                  onClick={() => { setToolsOpen(false); setSummarizeOpen(true) }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                  会話を要約
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+                  onClick={() => { setToolsOpen(false); setMinutesOpen(true) }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                    <path d="M9 14h6" /><path d="M9 18h6" /><path d="M9 10h6" />
+                  </svg>
+                  議事録を作成
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+                  onClick={() => { setToolsOpen(false); setMemoryOpen(true) }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                  </svg>
+                  重要事項メモリ
+                </button>
               </PopoverContent>
             </Popover>
 
@@ -351,8 +381,8 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
             />
 
-            {/* 音声録音 */}
-            <VoiceRecorder channelId={channelId} />
+            {/* 音声入力 */}
+            <VoiceRecorder onTranscript={handleVoiceTranscript} />
 
             {/* AI 返信提案ボタン */}
             <button
@@ -392,6 +422,11 @@ export function MessageInput({ channelId, onSend, disabled, placeholder, members
           </Button>
         </div>
       </div>
+
+      {/* ダイアログ（Popoverの外で管理） */}
+      <SummarizeDialog channelId={channelId} open={summarizeOpen} onOpenChange={setSummarizeOpen} />
+      <MinutesDialog channelId={channelId} open={minutesOpen} onOpenChange={setMinutesOpen} />
+      <MemoryPanel channelId={channelId} open={memoryOpen} onOpenChange={setMemoryOpen} />
     </div>
   )
 }
@@ -409,12 +444,10 @@ function getMentionCandidates(
   const q = query.toLowerCase()
   const candidates: MentionCandidate[] = []
 
-  // @AI は常に候補に含める
   if ("ai".startsWith(q) || q === "") {
     candidates.push({ label: "AI アシスタント", value: "@AI", isAi: true })
   }
 
-  // メンバー候補
   for (const m of members) {
     const name = m.displayName || ""
     if (name.toLowerCase().includes(q) || q === "") {
@@ -422,5 +455,5 @@ function getMentionCandidates(
     }
   }
 
-  return candidates.slice(0, 8) // 最大8件
+  return candidates.slice(0, 8)
 }
