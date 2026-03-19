@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import {
@@ -566,12 +566,29 @@ function SortableTaskItem({
     isDragging,
   } = useSortable({ id: task.id })
 
+  // ドラッグ中はクリックイベントを無効化（ドラッグ終了後の誤タップ防止）
+  const isDraggingRef = useRef(false)
+  useEffect(() => {
+    if (isDragging) {
+      isDraggingRef.current = true
+    } else {
+      // ドラッグ終了後に少し待ってからフラグを戻す（タッチエンド → クリックの順序対策）
+      const timer = setTimeout(() => { isDraggingRef.current = false }, 200)
+      return () => clearTimeout(timer)
+    }
+  }, [isDragging])
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 50 : undefined,
+    ...(isMobile ? { touchAction: "none" as const } : {}),
   }
+
+  const handleSelect = useCallback(() => {
+    if (!isDraggingRef.current) onSelect()
+  }, [onSelect])
 
   return (
     <div
@@ -597,7 +614,7 @@ function SortableTaskItem({
       <TaskItem
         task={task}
         isSelected={isSelected}
-        onSelect={onSelect}
+        onSelect={handleSelect}
         onStatusChange={onStatusChange}
       />
     </div>
