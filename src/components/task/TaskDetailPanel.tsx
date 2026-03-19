@@ -28,6 +28,13 @@ import type { TaskInfo, TaskCommentInfo } from "@/types/chat"
 
 type MemberInfo = { id: string; userId: string; displayName: string | null; avatarUrl: string | null }
 
+type TaskDetailsCache = {
+  subTasks: TaskInfo[]
+  comments: TaskCommentInfo[]
+  members: MemberInfo[]
+  fetchedAt: number
+}
+
 type Props = {
   task: TaskInfo
   projects: { id: string; name: string; color: string | null }[]
@@ -58,10 +65,18 @@ export function TaskDetailPanel({
   onOptimisticUpdate,
   onTaskDeleted,
 }: Props) {
-  const [title, setTitle] = useState(task.title)
+  // ナビゲーションスタック: サブタスクに潜る時にプッシュ
+  const [viewStack, setViewStack] = useState<TaskInfo[]>([])
+  // 現在表示中のタスク（スタックの先頭 or ルートタスク）
+  const currentTask = viewStack.length > 0 ? viewStack[viewStack.length - 1] : task
+
+  // キャッシュ: タスクID → 詳細データ
+  const detailsCacheRef = useRef<Record<string, TaskDetailsCache>>({})
+
+  const [title, setTitle] = useState(currentTask.title)
   const [editingTitle, setEditingTitle] = useState(false)
   const titleInputRef = useRef<HTMLTextAreaElement>(null)
-  const [description, setDescription] = useState(task.description || "")
+  const [description, setDescription] = useState(currentTask.description || "")
   const [descriptionDirty, setDescriptionDirty] = useState(false)
   const [subTasks, setSubTasks] = useState<TaskInfo[]>([])
   const [comments, setComments] = useState<TaskCommentInfo[]>([])
@@ -70,46 +85,73 @@ export function TaskDetailPanel({
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
   const [detailsLoaded, setDetailsLoaded] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
-  // ネストサブタスク展開状態
-  const [expandedSubTasks, setExpandedSubTasks] = useState<Set<string>>(new Set())
-  const [nestedSubTasks, setNestedSubTasks] = useState<Record<string, TaskInfo[]>>({})
-  const [newNestedTitle, setNewNestedTitle] = useState<Record<string, string>>({})
 
-  // タスクが切り替わった時にリセット
+  // ルートタスクが切り替わったらスタックとキャッシュをリセット
   useEffect(() => {
-    setTitle(task.title)
-    setEditingTitle(false)
-    setDescription(task.description || "")
-    setDescriptionDirty(false)
-    setExpandedSubTasks(new Set())
-    setNestedSubTasks({})
-  }, [task.id, task.title, task.description])
-
-  // サブタスク、コメント、メンバーをバックグラウンドで取得
-  const fetchDetails = useCallback(async () => {
-    const [subRes, commentRes, memberRes] = await Promise.all([
-      fetch(`/api/internal/tasks?parentTaskId=${task.id}`),
-      fetch(`/api/internal/tasks/comments?taskId=${task.id}`),
-      fetch(`/api/internal/tasks/members?taskId=${task.id}`),
-    ])
-    if (subRes.ok) setSubTasks(await subRes.json())
-    if (commentRes.ok) setComments(await commentRes.json())
-    if (memberRes.ok) setTaskMembers(await memberRes.json())
-    setDetailsLoaded(true)
+    setViewStack([])
+    detailsCacheRef.current = {}
   }, [task.id])
 
+  // currentTask が変わったときに state を同期
   useEffect(() => {
-    setSubTasks([])
-    setComments([])
-    setTaskMembers([])
-    setDetailsLoaded(false)
+    setTitle(currentTask.title)
+    setEditingTitle(false)
+    setDescription(currentTask.description || "")
+    setDescriptionDirty(false)
     setNewComment("")
     setNewSubTaskTitle("")
-  }, [task.id])
+
+    // キャッシュがあれば即座に表示
+    const cached = detailsCacheRef.current[currentTask.id]
+    if (cached) {
+      setSubTasks(cached.subTasks)
+      setComments(cached.comments)
+      setTaskMembers(cached.members)
+      setDetailsLoaded(true)
+    } else {
+      setSubTasks([])
+      setComments([])
+      setTaskMembers([])
+      setDetailsLoaded(false)
+    }
+  }, [currentTask.id, currentTask.title, currentTask.description])
+
+  // 詳細データの取得（キャッシュ有 → バックグラウンド再検証、キャッシュ無 → フル取得）
+  const fetchDetails = useCallback(async (taskId: string) => {
+    const [subRes, commentRes, memberRes] = await Promise.all([
+      fetch(`/api/internal/tasks?parentTaskId=${taskId}`),
+      fetch(`/api/internal/tasks/comments?taskId=${taskId}`),
+      fetch(`/api/internal/tasks/members?taskId=${taskId}`),
+    ])
+    const newSubTasks = subRes.ok ? await subRes.json() : []
+    const newComments = commentRes.ok ? await commentRes.json() : []
+    const newMembers = memberRes.ok ? await memberRes.json() : []
+
+    // キャッシュに保存
+    detailsCacheRef.current[taskId] = {
+      subTasks: newSubTasks,
+      comments: newComments,
+      members: newMembers,
+      fetchedAt: Date.now(),
+    }
+
+    return { subTasks: newSubTasks, comments: newComments, members: newMembers }
+  }, [])
 
   useEffect(() => {
-    fetchDetails()
-  }, [fetchDetails])
+    let cancelled = false
+    const taskId = currentTask.id
+
+    fetchDetails(taskId).then((data) => {
+      if (cancelled) return
+      setSubTasks(data.subTasks)
+      setComments(data.comments)
+      setTaskMembers(data.members)
+      setDetailsLoaded(true)
+    })
+
+    return () => { cancelled = true }
+  }, [currentTask.id, fetchDetails])
 
   // タイトル編集開始時にフォーカス
   useEffect(() => {
@@ -119,29 +161,20 @@ export function TaskDetailPanel({
     }
   }, [editingTitle])
 
-  // ネストサブタスクの取得
-  const fetchNestedSubTasks = async (parentId: string) => {
-    const res = await fetch(`/api/internal/tasks?parentTaskId=${parentId}`)
-    if (res.ok) {
-      const data = await res.json()
-      setNestedSubTasks((prev) => ({ ...prev, [parentId]: data }))
-    }
-  }
+  // サブタスクへナビゲート
+  const navigateToSubTask = useCallback((subTask: TaskInfo) => {
+    setViewStack((prev) => [...prev, subTask])
+  }, [])
 
-  const toggleSubTaskExpand = (subTaskId: string) => {
-    setExpandedSubTasks((prev) => {
-      const next = new Set(prev)
-      if (next.has(subTaskId)) {
-        next.delete(subTaskId)
-      } else {
-        next.add(subTaskId)
-        if (!nestedSubTasks[subTaskId]) {
-          fetchNestedSubTasks(subTaskId)
-        }
-      }
-      return next
-    })
-  }
+  // パンくずリストで戻る
+  const navigateBack = useCallback((index: number) => {
+    // index = -1 → ルートタスクに戻る, 0 → スタックの1つ目まで, etc.
+    if (index < 0) {
+      setViewStack([])
+    } else {
+      setViewStack((prev) => prev.slice(0, index + 1))
+    }
+  }, [])
 
   // 楽観的フィールド更新
   const handleUpdate = (field: string, value: unknown) => {
@@ -163,21 +196,31 @@ export function TaskDetailPanel({
         : null
     }
 
-    onOptimisticUpdate(task.id, optimistic)
+    // スタック内のタスクも更新
+    if (viewStack.length > 0) {
+      setViewStack((prev) =>
+        prev.map((t) => (t.id === currentTask.id ? { ...t, ...optimistic } : t))
+      )
+    }
+
+    // ルートタスクの場合は親コンポーネントに通知
+    if (currentTask.id === task.id) {
+      onOptimisticUpdate(task.id, optimistic)
+    }
 
     fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: task.id, [field]: value }),
+      body: JSON.stringify({ taskId: currentTask.id, [field]: value }),
     })
   }
 
   const handleSaveTitle = () => {
     const trimmed = title.trim()
-    if (trimmed && trimmed !== task.title) {
+    if (trimmed && trimmed !== currentTask.title) {
       handleUpdate("title", trimmed)
     } else {
-      setTitle(task.title)
+      setTitle(currentTask.title)
     }
     setEditingTitle(false)
   }
@@ -196,13 +239,13 @@ export function TaskDetailPanel({
     const tempSubTask: TaskInfo = {
       id: tempId,
       workspaceId,
-      projectId: task.projectId,
-      parentTaskId: task.id,
+      projectId: currentTask.projectId,
+      parentTaskId: currentTask.id,
       title: newSubTaskTitle.trim(),
       description: null,
       status: "todo",
       priority: "medium",
-      assigneeId: task.assigneeId,
+      assigneeId: currentTask.assigneeId,
       creatorId: currentUserId,
       dueDate: null,
       completedAt: null,
@@ -213,16 +256,21 @@ export function TaskDetailPanel({
       fileType: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      assignee: task.assignee,
+      assignee: currentTask.assignee,
       creator: members.find((m) => m.id === currentUserId) || { id: currentUserId, displayName: null, avatarUrl: null },
-      project: task.project,
+      project: currentTask.project,
       _count: { subTasks: 0, comments: 0 },
     }
 
     setSubTasks((prev) => [...prev, tempSubTask])
-    onOptimisticUpdate(task.id, {
-      _count: { subTasks: subTasks.length + 1, comments: task._count?.comments || 0 },
-    })
+
+    // ルートタスクの場合のみ親の _count を更新
+    if (currentTask.id === task.id) {
+      onOptimisticUpdate(task.id, {
+        _count: { subTasks: subTasks.length + 1, comments: task._count?.comments || 0 },
+      })
+    }
+
     const t = newSubTaskTitle.trim()
     setNewSubTaskTitle("")
 
@@ -231,76 +279,20 @@ export function TaskDetailPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: t,
-        parentTaskId: task.id,
-        projectId: task.projectId,
-        assigneeId: task.assigneeId,
+        parentTaskId: currentTask.id,
+        projectId: currentTask.projectId,
+        assigneeId: currentTask.assigneeId,
       }),
     }).then(async (res) => {
       if (res.ok) {
         const realTask = await res.json()
         setSubTasks((prev) => prev.map((st) => (st.id === tempId ? realTask : st)))
-      }
-    })
-  }
-
-  // 楽観的ネストサブタスク追加
-  const handleAddNestedSubTask = (parentSubTaskId: string) => {
-    const ntitle = newNestedTitle[parentSubTaskId]?.trim()
-    if (!ntitle) return
-    const current = nestedSubTasks[parentSubTaskId] || []
-    if (current.length >= 15) return
-
-    const tempId = crypto.randomUUID()
-    const tempTask: TaskInfo = {
-      id: tempId,
-      workspaceId,
-      projectId: task.projectId,
-      parentTaskId: parentSubTaskId,
-      title: ntitle,
-      description: null,
-      status: "todo",
-      priority: "medium",
-      assigneeId: task.assigneeId,
-      creatorId: currentUserId,
-      dueDate: null,
-      completedAt: null,
-      recurrenceRule: null,
-      sortOrder: current.length,
-      fileUrl: null,
-      fileName: null,
-      fileType: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      assignee: task.assignee,
-      creator: members.find((m) => m.id === currentUserId) || { id: currentUserId, displayName: null, avatarUrl: null },
-      project: task.project,
-      _count: { subTasks: 0, comments: 0 },
-    }
-
-    setNestedSubTasks((prev) => ({
-      ...prev,
-      [parentSubTaskId]: [...(prev[parentSubTaskId] || []), tempTask],
-    }))
-    setNewNestedTitle((prev) => ({ ...prev, [parentSubTaskId]: "" }))
-
-    fetch("/api/internal/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: ntitle,
-        parentTaskId: parentSubTaskId,
-        projectId: task.projectId,
-        assigneeId: task.assigneeId,
-      }),
-    }).then(async (res) => {
-      if (res.ok) {
-        const realTask = await res.json()
-        setNestedSubTasks((prev) => ({
-          ...prev,
-          [parentSubTaskId]: (prev[parentSubTaskId] || []).map((t) =>
-            t.id === tempId ? realTask : t
-          ),
-        }))
+        // キャッシュも更新
+        if (detailsCacheRef.current[currentTask.id]) {
+          detailsCacheRef.current[currentTask.id].subTasks = subTasks.map((st) =>
+            st.id === tempId ? realTask : st
+          )
+        }
       }
     })
   }
@@ -321,23 +313,6 @@ export function TaskDetailPanel({
     })
   }
 
-  // 楽観的ネストサブタスクステータス変更
-  const handleNestedSubTaskStatusChange = (parentId: string, subTaskId: string, status: string) => {
-    setNestedSubTasks((prev) => ({
-      ...prev,
-      [parentId]: (prev[parentId] || []).map((t) =>
-        t.id === subTaskId
-          ? { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null }
-          : t
-      ),
-    }))
-    fetch("/api/internal/tasks", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: subTaskId, status }),
-    })
-  }
-
   // 楽観的メンバー追加
   const handleAddMember = (userId: string) => {
     const member = members.find((m) => m.id === userId)
@@ -350,13 +325,13 @@ export function TaskDetailPanel({
     fetch("/api/internal/tasks/members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: task.id, userId }),
+      body: JSON.stringify({ taskId: currentTask.id, userId }),
     })
   }
 
   const handleRemoveMember = (userId: string) => {
     setTaskMembers((prev) => prev.filter((m) => m.userId !== userId))
-    fetch(`/api/internal/tasks/members?taskId=${task.id}&userId=${userId}`, { method: "DELETE" })
+    fetch(`/api/internal/tasks/members?taskId=${currentTask.id}&userId=${userId}`, { method: "DELETE" })
   }
 
   // 楽観的コメント追加
@@ -366,7 +341,7 @@ export function TaskDetailPanel({
     const currentMember = members.find((m) => m.id === currentUserId)
     const tempComment: TaskCommentInfo = {
       id: crypto.randomUUID(),
-      taskId: task.id,
+      taskId: currentTask.id,
       content: newComment.trim(),
       createdAt: new Date().toISOString(),
       user: {
@@ -377,23 +352,39 @@ export function TaskDetailPanel({
     }
 
     setComments((prev) => [...prev, tempComment])
-    onOptimisticUpdate(task.id, {
-      _count: { subTasks: task._count?.subTasks || 0, comments: (task._count?.comments || 0) + 1 },
-    })
+
+    if (currentTask.id === task.id) {
+      onOptimisticUpdate(task.id, {
+        _count: { subTasks: task._count?.subTasks || 0, comments: (task._count?.comments || 0) + 1 },
+      })
+    }
+
     const content = newComment.trim()
     setNewComment("")
 
     fetch("/api/internal/tasks/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: task.id, content }),
+      body: JSON.stringify({ taskId: currentTask.id, content }),
     })
   }
 
   const handleDelete = () => {
     if (!confirm("このタスクを削除しますか？")) return
-    onTaskDeleted(task.id)
-    fetch(`/api/internal/tasks?taskId=${task.id}`, { method: "DELETE" })
+
+    if (viewStack.length > 0) {
+      // サブタスク表示中 → 親に戻って、サブタスク一覧からも削除
+      const deletedId = currentTask.id
+      setViewStack((prev) => prev.slice(0, -1))
+      // 親のサブタスク一覧からも削除（次のレンダリングで反映）
+      setTimeout(() => {
+        setSubTasks((prev) => prev.filter((t) => t.id !== deletedId))
+      }, 0)
+      fetch(`/api/internal/tasks?taskId=${deletedId}`, { method: "DELETE" })
+    } else {
+      onTaskDeleted(task.id)
+      fetch(`/api/internal/tasks?taskId=${task.id}`, { method: "DELETE" })
+    }
   }
 
   // メンバー追加候補
@@ -432,6 +423,17 @@ export function TaskDetailPanel({
     })
   }, [subTasks])
 
+  // パンくずリスト用の階層情報
+  const breadcrumbs = useMemo(() => {
+    const items: { id: string; title: string; index: number }[] = [
+      { id: task.id, title: task.title, index: -1 },
+    ]
+    viewStack.forEach((t, i) => {
+      items.push({ id: t.id, title: t.title, index: i })
+    })
+    return items
+  }, [task.id, task.title, viewStack])
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background md:static md:inset-auto md:z-auto md:w-96 md:shrink-0 md:border-l lg:w-[28rem] animate-in slide-in-from-right-5 duration-200 overflow-hidden">
       {/* ヘッダー: 閉じる・完了ボタン・アクション */}
@@ -440,7 +442,7 @@ export function TaskDetailPanel({
           <div className="flex items-center gap-1">
             <button
               className="flex md:hidden h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-muted text-muted-foreground touch-manipulation"
-              onClick={onClose}
+              onClick={viewStack.length > 0 ? () => navigateBack(viewStack.length - 2) : onClose}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
@@ -448,14 +450,14 @@ export function TaskDetailPanel({
             </button>
             <Button
               size="sm"
-              variant={task.status === "done" ? "outline" : "default"}
+              variant={currentTask.status === "done" ? "outline" : "default"}
               className={cn(
                 "h-7 text-xs",
-                task.status === "done" && "border-primary text-primary hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                currentTask.status === "done" && "border-primary text-primary hover:bg-blue-50 dark:hover:bg-blue-950/20"
               )}
-              onClick={() => handleUpdate("status", task.status === "done" ? "todo" : "done")}
+              onClick={() => handleUpdate("status", currentTask.status === "done" ? "todo" : "done")}
             >
-              {task.status === "done" ? (
+              {currentTask.status === "done" ? (
                 <>
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
                     <polyline points="20 6 9 17 4 12" />
@@ -480,11 +482,10 @@ export function TaskDetailPanel({
               className="h-7 w-7 text-muted-foreground"
               title="リンクをコピー"
               onClick={async () => {
-                const url = `${window.location.origin}/${workspaceId}/tasks?taskId=${task.id}`
+                const url = `${window.location.origin}/${workspaceId}/tasks?taskId=${currentTask.id}`
                 try {
                   await navigator.clipboard.writeText(url)
                 } catch {
-                  // フォールバック
                   const textarea = document.createElement("textarea")
                   textarea.value = url
                   document.body.appendChild(textarea)
@@ -538,6 +539,51 @@ export function TaskDetailPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {/* パンくずリスト（サブタスク表示中のみ） */}
+        {viewStack.length > 0 && (
+          <div className="px-4 pt-2 pb-0 flex items-center gap-1 text-xs text-muted-foreground overflow-x-auto">
+            {breadcrumbs.map((bc, i) => {
+              const isLast = i === breadcrumbs.length - 1
+              return (
+                <span key={bc.id} className="flex items-center gap-1 shrink-0">
+                  {i > 0 && (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  )}
+                  {isLast ? (
+                    <span className="text-foreground font-medium truncate max-w-32">
+                      {bc.title}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => navigateBack(bc.index)}
+                      className="hover:text-foreground transition-colors truncate max-w-24"
+                    >
+                      {bc.title}
+                    </button>
+                  )}
+                </span>
+              )
+            })}
+          </div>
+        )}
+
+        {/* 戻るボタン（デスクトップ、サブタスク表示中のみ） */}
+        {viewStack.length > 0 && (
+          <div className="px-4 pt-2 hidden md:block">
+            <button
+              onClick={() => navigateBack(viewStack.length - 2)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+              親タスクに戻る
+            </button>
+          </div>
+        )}
+
         {/* タイトル（編集可能） */}
         <div className="px-4 pt-4 pb-2">
           {editingTitle ? (
@@ -550,7 +596,7 @@ export function TaskDetailPanel({
               onBlur={handleSaveTitle}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleSaveTitle() }
-                if (e.key === "Escape") { setTitle(task.title); setEditingTitle(false) }
+                if (e.key === "Escape") { setTitle(currentTask.title); setEditingTitle(false) }
               }}
             />
           ) : (
@@ -558,7 +604,7 @@ export function TaskDetailPanel({
               className="text-lg font-bold cursor-text hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 transition-colors"
               onClick={() => setEditingTitle(true)}
             >
-              {task.title}
+              {currentTask.title}
             </h2>
           )}
         </div>
@@ -568,7 +614,7 @@ export function TaskDetailPanel({
           <div className="grid grid-cols-2 gap-x-3 gap-y-2">
             {/* 優先度 */}
             <PropField label="優先度">
-              <Select value={task.priority} onValueChange={(v) => handleUpdate("priority", v)}>
+              <Select value={currentTask.priority} onValueChange={(v) => handleUpdate("priority", v)}>
                 <SelectTrigger className="h-7 text-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -583,7 +629,7 @@ export function TaskDetailPanel({
             {/* 担当者 */}
             <PropField label="担当者">
               <Select
-                value={task.assigneeId || "_none"}
+                value={currentTask.assigneeId || "_none"}
                 onValueChange={(v) => handleUpdate("assigneeId", v === "_none" ? null : v)}
               >
                 <SelectTrigger className="h-7 text-xs">
@@ -603,7 +649,7 @@ export function TaskDetailPanel({
             {/* 期日 */}
             <PropField label="期日">
               <DatePicker
-                value={task.dueDate ? parseDateStr(task.dueDate) : undefined}
+                value={currentTask.dueDate ? parseDateStr(currentTask.dueDate) : undefined}
                 onChange={(date) => handleUpdate("dueDate", date ? formatDateLocal(date) : null)}
                 className="w-full h-7 text-xs"
               />
@@ -612,7 +658,7 @@ export function TaskDetailPanel({
             {/* プロジェクト */}
             <PropField label="プロジェクト">
               <Select
-                value={task.projectId || "_none"}
+                value={currentTask.projectId || "_none"}
                 onValueChange={(v) => handleUpdate("projectId", v === "_none" ? null : v)}
               >
                 <SelectTrigger className="h-7 text-xs">
@@ -637,17 +683,17 @@ export function TaskDetailPanel({
             {/* 繰り返し */}
             <PropField label="繰り返し">
               <Select
-                value={task.recurrenceRule ? "_current" : "none"}
+                value={currentTask.recurrenceRule ? "_current" : "none"}
                 onValueChange={(v) => {
                   if (v === "_current") return
                   const preset = v as RecurrencePreset
-                  const rule = presetToRRule(preset, task.dueDate ? parseDateStr(task.dueDate) : undefined)
+                  const rule = presetToRRule(preset, currentTask.dueDate ? parseDateStr(currentTask.dueDate) : undefined)
                   handleUpdate("recurrenceRule", rule)
                 }}
               >
                 <SelectTrigger className="h-7 text-xs">
                   <SelectValue>
-                    {task.recurrenceRule ? rruleToText(task.recurrenceRule) : "なし"}
+                    {currentTask.recurrenceRule ? rruleToText(currentTask.recurrenceRule) : "なし"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -758,13 +804,7 @@ export function TaskDetailPanel({
                     key={st.id}
                     subTask={st}
                     onStatusChange={handleSubTaskStatusChange}
-                    onToggleExpand={toggleSubTaskExpand}
-                    isExpanded={expandedSubTasks.has(st.id)}
-                    nestedSubTasks={nestedSubTasks[st.id] || []}
-                    onNestedStatusChange={(nstId, status) => handleNestedSubTaskStatusChange(st.id, nstId, status)}
-                    newNestedTitle={newNestedTitle[st.id] || ""}
-                    onNestedTitleChange={(v) => setNewNestedTitle((prev) => ({ ...prev, [st.id]: v }))}
-                    onAddNested={() => handleAddNestedSubTask(st.id)}
+                    onNavigate={navigateToSubTask}
                   />
                 ))}
               </SortableContext>
@@ -838,27 +878,15 @@ export function TaskDetailPanel({
   )
 }
 
-// ドラッグ可能なサブタスクアイテム
+// ドラッグ可能なサブタスクアイテム（クリックで詳細にナビゲート）
 function SortableSubTaskItem({
   subTask,
   onStatusChange,
-  onToggleExpand,
-  isExpanded,
-  nestedSubTasks,
-  onNestedStatusChange,
-  newNestedTitle,
-  onNestedTitleChange,
-  onAddNested,
+  onNavigate,
 }: {
   subTask: TaskInfo
   onStatusChange: (id: string, status: string) => void
-  onToggleExpand: (id: string) => void
-  isExpanded: boolean
-  nestedSubTasks: TaskInfo[]
-  onNestedStatusChange: (nstId: string, status: string) => void
-  newNestedTitle: string
-  onNestedTitleChange: (v: string) => void
-  onAddNested: () => void
+  onNavigate: (task: TaskInfo) => void
 }) {
   const {
     attributes,
@@ -875,6 +903,13 @@ function SortableSubTaskItem({
     opacity: isDragging ? 0.5 : 1,
   }
 
+  // 優先度のインジケーター色
+  const priorityColor = subTask.priority === "high"
+    ? "bg-red-500"
+    : subTask.priority === "low"
+      ? "bg-gray-300 dark:bg-gray-600"
+      : ""
+
   return (
     <div ref={setNodeRef} style={style} className="group/subtask">
       <div className="flex items-center gap-2">
@@ -889,8 +924,12 @@ function SortableSubTaskItem({
             <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
           </svg>
         </div>
+        {/* チェックボタン */}
         <button
-          onClick={() => onStatusChange(subTask.id, subTask.status === "done" ? "todo" : "done")}
+          onClick={(e) => {
+            e.stopPropagation()
+            onStatusChange(subTask.id, subTask.status === "done" ? "todo" : "done")
+          }}
           className={cn(
             "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
             subTask.status === "done"
@@ -904,75 +943,51 @@ function SortableSubTaskItem({
             </svg>
           )}
         </button>
-        <span className={cn("text-sm truncate flex-1", subTask.status === "done" && "line-through text-muted-foreground")}>
-          {subTask.title}
-        </span>
-        <button
-          onClick={() => onToggleExpand(subTask.id)}
-          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-          title="サブタスク"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={cn("transition-transform duration-200", isExpanded && "rotate-90")}
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-        {subTask._count && subTask._count.subTasks > 0 && (
-          <span className="text-[10px] text-muted-foreground">{subTask._count.subTasks}</span>
+        {/* 優先度インジケーター */}
+        {priorityColor && (
+          <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", priorityColor)} />
         )}
-      </div>
-
-      {/* ネストサブタスク */}
-      {isExpanded && (
-        <div className="ml-6 mt-1 space-y-1 border-l pl-2">
-          {nestedSubTasks.map((nst) => (
-            <div key={nst.id} className="flex items-center gap-2">
-              <button
-                onClick={() => onNestedStatusChange(nst.id, nst.status === "done" ? "todo" : "done")}
-                className={cn(
-                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
-                  nst.status === "done"
-                    ? "border-primary bg-primary text-white"
-                    : "border-muted-foreground/40 hover:border-primary"
-                )}
-              >
-                {nst.status === "done" && (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
-              </button>
-              <span className={cn("text-xs truncate", nst.status === "done" && "line-through text-muted-foreground")}>
-                {nst.title}
-              </span>
-            </div>
-          ))}
-          {nestedSubTasks.length < 15 && (
-            <div className="flex gap-1.5 mt-1">
-              <Input
-                className="h-6 text-xs"
-                placeholder="サブタスクを追加..."
-                value={newNestedTitle}
-                onChange={(e) => onNestedTitleChange(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); onAddNested() } }}
-              />
-              <Button size="xs" variant="outline" className="h-6 shrink-0 text-[10px]" onClick={onAddNested}>
-                追加
-              </Button>
-            </div>
+        {/* タイトル（クリックでナビゲート） */}
+        <button
+          onClick={() => onNavigate(subTask)}
+          className={cn(
+            "text-sm text-left truncate flex-1 hover:text-primary transition-colors",
+            subTask.status === "done" && "line-through text-muted-foreground"
           )}
+          title={subTask.title}
+        >
+          {subTask.title}
+        </button>
+        {/* サブタスク数・コメント数バッジ */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {subTask._count && subTask._count.subTasks > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="サブタスク">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" />
+              </svg>
+              {subTask._count.subTasks}
+            </span>
+          )}
+          {subTask._count && subTask._count.comments > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="コメント">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              {subTask._count.comments}
+            </span>
+          )}
+          {/* 開くアイコン */}
+          <button
+            onClick={() => onNavigate(subTask)}
+            className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            title="詳細を開く"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
         </div>
-      )}
+      </div>
     </div>
   )
 }
