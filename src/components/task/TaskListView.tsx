@@ -400,6 +400,7 @@ export function TaskListView({
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
             onInlineCreate={!isMobile ? handleInlineCreate : undefined}
+            isMobile={isMobile}
           />
 
           {/* 明日以降のタスク */}
@@ -413,6 +414,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
+            isMobile={isMobile}
           />
 
           {/* 今日完了 */}
@@ -427,6 +429,7 @@ export function TaskListView({
               selectedId={selectedTaskId}
               onStatusChange={handleStatusChange}
               onReorder={handleReorder}
+              isMobile={isMobile}
             />
           )}
 
@@ -442,6 +445,7 @@ export function TaskListView({
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
             defaultCollapsed
+            isMobile={isMobile}
           />
 
           {tasks.length === 0 && (
@@ -545,11 +549,13 @@ function SortableTaskItem({
   isSelected,
   onSelect,
   onStatusChange,
+  isMobile,
 }: {
   task: TaskInfo
   isSelected: boolean
   onSelect: () => void
   onStatusChange: (taskId: string, status: string) => void
+  isMobile: boolean
 }) {
   const {
     attributes,
@@ -568,19 +574,26 @@ function SortableTaskItem({
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="relative group/sortable">
-      {/* ドラッグハンドル */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute left-0 top-0 bottom-0 w-5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 z-10 touch-none"
-        style={{ left: "-20px" }}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-          <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
-          <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
-        </svg>
-      </div>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="relative group/sortable"
+      {...(isMobile ? { ...attributes, ...listeners } : {})}
+    >
+      {/* ドラッグハンドル（デスクトップのみ） */}
+      {!isMobile && (
+        <div
+          {...attributes}
+          {...listeners}
+          className="absolute left-0 top-0 bottom-0 w-5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 z-10 touch-none"
+          style={{ left: "-20px" }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+            <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
+            <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
+          </svg>
+        </div>
+      )}
       <TaskItem
         task={task}
         isSelected={isSelected}
@@ -665,6 +678,7 @@ function TaskSection({
   onReorder,
   onInlineCreate,
   defaultCollapsed = false,
+  isMobile = false,
 }: {
   label: string
   sectionStatus: string
@@ -677,6 +691,7 @@ function TaskSection({
   onReorder: (tasks: TaskInfo[]) => void
   onInlineCreate?: (title: string, status: string) => Promise<void>
   defaultCollapsed?: boolean
+  isMobile?: boolean
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
 
@@ -685,7 +700,7 @@ function TaskSection({
       activationConstraint: { distance: 8 },
     }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 200, tolerance: 5 },
+      activationConstraint: { delay: 300, tolerance: 8 },
     })
   )
 
@@ -762,6 +777,7 @@ function TaskSection({
                     isSelected={selectedId === task.id}
                     onSelect={() => onSelect(task.id)}
                     onStatusChange={onStatusChange}
+                    isMobile={isMobile}
                   />
                 ))}
               </div>
