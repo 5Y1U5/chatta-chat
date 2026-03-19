@@ -902,10 +902,22 @@ function SortableSubTaskItem({
     isDragging,
   } = useSortable({ id: subTask.id })
 
+  // ドラッグ中はクリックを無効化
+  const isDraggingRef = useRef(false)
+  useEffect(() => {
+    if (isDragging) {
+      isDraggingRef.current = true
+    } else {
+      const timer = setTimeout(() => { isDraggingRef.current = false }, 200)
+      return () => clearTimeout(timer)
+    }
+  }, [isDragging])
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    ...(isMobile ? { touchAction: "none" as const } : {}),
   }
 
   // 優先度のインジケーター色
@@ -914,6 +926,10 @@ function SortableSubTaskItem({
     : subTask.priority === "low"
       ? "bg-gray-300 dark:bg-gray-600"
       : ""
+
+  const handleNavigate = useCallback(() => {
+    if (!isDraggingRef.current) onNavigate(subTask)
+  }, [onNavigate, subTask])
 
   return (
     <div
@@ -961,7 +977,7 @@ function SortableSubTaskItem({
         )}
         {/* タイトル（クリックでナビゲート） */}
         <button
-          onClick={() => onNavigate(subTask)}
+          onClick={handleNavigate}
           className={cn(
             "text-sm text-left truncate flex-1 hover:text-primary transition-colors",
             subTask.status === "done" && "line-through text-muted-foreground"
@@ -990,7 +1006,7 @@ function SortableSubTaskItem({
           )}
           {/* 開くアイコン */}
           <button
-            onClick={() => onNavigate(subTask)}
+            onClick={handleNavigate}
             className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
             title="詳細を開く"
           >
