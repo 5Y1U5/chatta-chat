@@ -15,7 +15,7 @@ AI ネイティブなチャットコミュニケーションツール。Slack/Ch
 | 項目 | 選択 |
 |------|------|
 | フレームワーク | Next.js 16.1.6 (App Router) + TypeScript |
-| DB | Supabase Pro (PostgreSQL) |
+| DB | Supabase Free (PostgreSQL) |
 | リアルタイム | Supabase Realtime (postgres_changes + Presence) |
 | ORM | Prisma 7.x + PrismaPg adapter（出力先: `src/generated/prisma`） |
 | 認証 | Supabase Auth (Email + Google OAuth) |
