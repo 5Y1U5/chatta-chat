@@ -24,6 +24,7 @@ import { CSS } from "@dnd-kit/utilities"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DatePicker } from "@/components/ui/date-picker"
 import { RECURRENCE_PRESETS, presetToRRule, rruleToText, type RecurrencePreset } from "@/lib/recurrence"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import type { TaskInfo, TaskCommentInfo } from "@/types/chat"
 
 type MemberInfo = { id: string; userId: string; displayName: string | null; avatarUrl: string | null }
@@ -85,6 +86,7 @@ export function TaskDetailPanel({
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
   const [detailsLoaded, setDetailsLoaded] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const isMobile = useIsMobile()
 
   // ルートタスクが切り替わったらスタックとキャッシュをリセット
   useEffect(() => {
@@ -397,7 +399,7 @@ export function TaskDetailPanel({
   // サブタスク並び替え用
   const subTaskSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } })
   )
   const subTaskIds = useMemo(() => subTasks.map((t) => t.id), [subTasks])
 
@@ -805,6 +807,7 @@ export function TaskDetailPanel({
                     subTask={st}
                     onStatusChange={handleSubTaskStatusChange}
                     onNavigate={navigateToSubTask}
+                    isMobile={isMobile}
                   />
                 ))}
               </SortableContext>
@@ -883,10 +886,12 @@ function SortableSubTaskItem({
   subTask,
   onStatusChange,
   onNavigate,
+  isMobile,
 }: {
   subTask: TaskInfo
   onStatusChange: (id: string, status: string) => void
   onNavigate: (task: TaskInfo) => void
+  isMobile: boolean
 }) {
   const {
     attributes,
@@ -911,19 +916,26 @@ function SortableSubTaskItem({
       : ""
 
   return (
-    <div ref={setNodeRef} style={style} className="group/subtask">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group/subtask"
+      {...(isMobile ? { ...attributes, ...listeners } : {})}
+    >
       <div className="flex items-center gap-2">
-        {/* ドラッグハンドル */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="flex shrink-0 items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover/subtask:opacity-100 transition-opacity touch-none"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-            <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
-            <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
-          </svg>
-        </div>
+        {/* ドラッグハンドル（デスクトップのみ） */}
+        {!isMobile && (
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex shrink-0 items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover/subtask:opacity-100 transition-opacity touch-none"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+              <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
+              <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
+            </svg>
+          </div>
+        )}
         {/* チェックボタン */}
         <button
           onClick={(e) => {
