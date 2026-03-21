@@ -399,7 +399,7 @@ export function TaskDetailPanel({
   // サブタスク並び替え用
   const subTaskSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } })
+    useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 5 } })
   )
   const subTaskIds = useMemo(() => subTasks.map((t) => t.id), [subTasks])
 
@@ -913,11 +913,21 @@ function SortableSubTaskItem({
     }
   }, [isDragging])
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    ...(isMobile ? { touchAction: "none" as const } : {}),
+    transition: isDragging
+      ? `${transition}, box-shadow 200ms ease, transform 200ms ease`
+      : transition,
+    opacity: isDragging ? 0.9 : 1,
+    ...(isDragging
+      ? {
+          scale: "1.02",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          borderRadius: "6px",
+          background: "var(--color-card, white)",
+          zIndex: 50,
+        }
+      : {}),
   }
 
   // 優先度のインジケーター色

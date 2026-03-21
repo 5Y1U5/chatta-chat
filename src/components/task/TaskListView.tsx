@@ -578,12 +578,21 @@ function SortableTaskItem({
     }
   }, [isDragging])
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging
+      ? `${transition}, box-shadow 200ms ease, transform 200ms ease`
+      : transition,
+    opacity: isDragging ? 0.9 : 1,
     zIndex: isDragging ? 50 : undefined,
-    ...(isMobile ? { touchAction: "none" as const } : {}),
+    ...(isDragging
+      ? {
+          scale: "1.02",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          borderRadius: "8px",
+          background: "var(--color-card, white)",
+        }
+      : {}),
   }
 
   const handleSelect = useCallback(() => {
@@ -717,7 +726,7 @@ function TaskSection({
       activationConstraint: { distance: 8 },
     }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 300, tolerance: 8 },
+      activationConstraint: { delay: 500, tolerance: 5 },
     })
   )
 
