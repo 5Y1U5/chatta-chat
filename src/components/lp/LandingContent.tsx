@@ -294,7 +294,23 @@ const plans = [
 
 export function LandingContent() {
   return (
-    <div className="h-dvh overflow-y-auto bg-background text-foreground">
+    <div
+      className="h-dvh overflow-y-auto bg-background text-foreground"
+      style={{
+        colorScheme: "light",
+        "--background": "oklch(1 0 0)",
+        "--foreground": "oklch(0.145 0 0)",
+        "--card": "oklch(1 0 0)",
+        "--card-foreground": "oklch(0.145 0 0)",
+        "--muted": "oklch(0.97 0 0)",
+        "--muted-foreground": "oklch(0.556 0 0)",
+        "--border": "oklch(0.922 0 0)",
+        "--primary": "oklch(0.55 0.2 265)",
+        "--primary-foreground": "oklch(0.985 0 0)",
+        "--secondary": "oklch(0.97 0 0)",
+        "--secondary-foreground": "oklch(0.205 0 0)",
+      } as React.CSSProperties}
+    >
       {/* ヒーローアニメーション用CSS */}
       <style>{`
         @keyframes heroFloat {
