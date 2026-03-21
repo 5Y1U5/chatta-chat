@@ -917,7 +917,6 @@ function SortableSubTaskItem({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    ...(isMobile ? { touchAction: "none" as const } : {}),
   }
 
   // 優先度のインジケーター色
@@ -936,11 +935,21 @@ function SortableSubTaskItem({
       ref={setNodeRef}
       style={style}
       className="group/subtask"
-      {...(isMobile ? { ...attributes, ...listeners } : {})}
     >
       <div className="flex items-center gap-2">
-        {/* ドラッグハンドル（デスクトップのみ） */}
-        {!isMobile && (
+        {/* ドラッグハンドル */}
+        {isMobile ? (
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex shrink-0 items-center justify-center cursor-grab active:cursor-grabbing touch-none"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/60">
+              <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
+              <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
+            </svg>
+          </div>
+        ) : (
           <div
             {...attributes}
             {...listeners}
