@@ -578,11 +578,21 @@ function SortableTaskItem({
     }
   }, [isDragging])
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging
+      ? `${transition}, box-shadow 200ms ease, transform 200ms ease`
+      : transition,
+    opacity: isDragging ? 0.9 : 1,
     zIndex: isDragging ? 50 : undefined,
+    ...(isDragging
+      ? {
+          scale: "1.02",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          borderRadius: "8px",
+          background: "var(--color-card, white)",
+        }
+      : {}),
   }
 
   const handleSelect = useCallback(() => {
@@ -593,21 +603,11 @@ function SortableTaskItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="relative group/sortable flex items-center"
+      className="relative group/sortable"
+      {...(isMobile ? { ...attributes, ...listeners } : {})}
     >
-      {/* ドラッグハンドル */}
-      {isMobile ? (
-        <div
-          {...attributes}
-          {...listeners}
-          className="shrink-0 w-6 flex items-center justify-center cursor-grab active:cursor-grabbing z-10 touch-none self-stretch"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/60">
-            <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
-            <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
-          </svg>
-        </div>
-      ) : (
+      {/* ドラッグハンドル（デスクトップのみ） */}
+      {!isMobile && (
         <div
           {...attributes}
           {...listeners}
@@ -620,14 +620,12 @@ function SortableTaskItem({
           </svg>
         </div>
       )}
-      <div className="flex-1 min-w-0">
       <TaskItem
         task={task}
         isSelected={isSelected}
         onSelect={handleSelect}
         onStatusChange={onStatusChange}
       />
-      </div>
     </div>
   )
 }
@@ -728,7 +726,7 @@ function TaskSection({
       activationConstraint: { distance: 8 },
     }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 300, tolerance: 8 },
+      activationConstraint: { delay: 500, tolerance: 5 },
     })
   )
 
