@@ -133,6 +133,35 @@ function IconFileText() {
   )
 }
 
+function IconClipboardList() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M12 11h4" /><path d="M12 16h4" />
+      <path d="M8 11h.01" /><path d="M8 16h.01" />
+    </svg>
+  )
+}
+
+function IconBell() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  )
+}
+
+function IconRepeat() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+      <path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" />
+    </svg>
+  )
+}
+
 function IconDashboard() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -248,11 +277,13 @@ const plans = [
     description: "本格的にチーム運営したい組織に",
     features: [
       "スタンダードの全機能",
-      "タスク管理 / プロジェクト管理",
-      "ダッシュボード（タスク統計）",
+      "タスク管理（サブタスク・優先度・担当者）",
+      "繰り返しタスク（毎日/毎週/毎月...）",
+      "プロジェクト管理",
+      "ダッシュボード（進捗・完了率の可視化）",
+      "受信トレイ（タスク通知）",
       "ファイルアップロード 100GB",
       "優先サポート",
-      "管理者権限の詳細設定",
     ],
     cta: "無料トライアルを始める",
     highlighted: false,
@@ -334,8 +365,8 @@ export function LandingContent() {
             </h1>
 
             <p className="mt-4 max-w-lg text-base text-muted-foreground lg:text-lg">
-              会話の要約、議事録の自動生成、返信候補の提案。<br />
-              <strong className="text-foreground">AIがチームのコミュニケーションを加速する</strong>、<br className="hidden md:block" />
+              会話の要約、議事録の自動生成、タスク管理まで。<br />
+              <strong className="text-foreground">AIがチームの会話と仕事を一つにつなぐ</strong>、<br className="hidden md:block" />
               これからのビジネスチャット。
             </p>
 
@@ -481,7 +512,7 @@ export function LandingContent() {
             なぜ chatta-chat なのか
           </SectionTitle>
 
-          <div className="mt-14 grid gap-6 md:grid-cols-2">
+          <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <GrowthCard
               title="会話が長くても、一瞬で追いつける"
               description="AIが会話を自動で要約。休み明けやミーティング後でも、重要なポイントをすぐに把握できます。"
@@ -502,6 +533,16 @@ export function LandingContent() {
               description="決定事項、締め切り、アクションアイテムをAIが自動で検出・記録。後から「あの話どうなった？」がなくなります。"
               icon={<IconCheck />}
             />
+            <GrowthCard
+              title="会話からタスクへ、シームレスに"
+              description="チャットで生まれたToDoをその場でタスク化。サブタスク、繰り返し設定、優先度管理で日々の作業を本格的に管理できます。"
+              icon={<IconClipboardList />}
+            />
+            <GrowthCard
+              title="チームの進捗を、数字で把握"
+              description="ダッシュボードで完了率・期限超過・今日の期限をひと目で確認。受信トレイでタスクの更新もリアルタイムに通知されます。"
+              icon={<IconDashboard />}
+            />
           </div>
         </div>
       </section>
@@ -513,7 +554,9 @@ export function LandingContent() {
             主な機能
           </SectionTitle>
 
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {/* AI × チャット機能 */}
+          <h3 className="mt-14 mb-6 text-lg font-semibold text-muted-foreground">AI × チャット</h3>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <FeatureCard
               title="AIチャットアシスタント"
               description="@AI でメンションするだけ。質問への回答、アイデア出し、文章の推敲など、何でも相談できます。"
@@ -525,14 +568,14 @@ export function LandingContent() {
               icon={<IconFileText />}
             />
             <FeatureCard
-              title="タスク管理"
-              description="チャットの中でタスクを作成・管理。プロジェクト単位での整理、担当者の割り当て、期日設定まで。"
-              icon={<IconCheck />}
+              title="AI返信候補"
+              description="会話の文脈を読んで、適切な返信候補をAIが提案。ワンクリックで入力、そのまま送信。"
+              icon={<IconSparkles />}
             />
             <FeatureCard
-              title="ダッシュボード"
-              description="タスクの進捗状況、プロジェクトの全体像を可視化。チームの状況がひと目でわかります。"
-              icon={<IconDashboard />}
+              title="重要事項の自動検出"
+              description="決定事項、締め切り、アクションアイテムをAIが自動検出。見逃しを防ぎ、チームの意思決定を記録します。"
+              icon={<IconShield />}
             />
             <FeatureCard
               title="リアルタイムチャット"
@@ -544,15 +587,30 @@ export function LandingContent() {
               description="マイクボタンを押して話すだけ。音声がテキストに変換され、ハンズフリーでメッセージを送信できます。"
               icon={<IconMic />}
             />
+          </div>
+
+          {/* タスク管理機能 */}
+          <h3 className="mt-12 mb-6 text-lg font-semibold text-muted-foreground">タスク × プロジェクト管理</h3>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <FeatureCard
-              title="AI返信候補"
-              description="会話の文脈を読んで、適切な返信候補をAIが提案。ワンクリックで入力、そのまま送信。"
-              icon={<IconSparkles />}
+              title="タスク管理"
+              description="サブタスク、優先度、担当者、期日設定を備えた本格タスク管理。ドラッグ&ドロップで直感的に並び替え。"
+              icon={<IconClipboardList />}
             />
             <FeatureCard
-              title="重要事項の自動検出"
-              description="決定事項、締め切り、アクションアイテムをAIが自動検出。見逃しを防ぎ、チームの意思決定を記録します。"
-              icon={<IconShield />}
+              title="繰り返しタスク"
+              description="毎日・平日・毎週・毎月など、定例作業を繰り返しタスクで自動化。完了すると次回分が自動生成されます。"
+              icon={<IconRepeat />}
+            />
+            <FeatureCard
+              title="プロジェクト管理"
+              description="タスクをプロジェクト単位で整理。メンバーごとの担当やステータスでチームの全体像を把握できます。"
+              icon={<IconDashboard />}
+            />
+            <FeatureCard
+              title="受信トレイ"
+              description="タスクの割り当て・完了・コメントをリアルタイム通知。やるべきことと最新の更新を一箇所で確認。"
+              icon={<IconBell />}
             />
           </div>
         </div>
