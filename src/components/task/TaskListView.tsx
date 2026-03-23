@@ -7,11 +7,11 @@ import {
   DndContext,
   closestCenter,
   PointerSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core"
+import { LongPressTouchSensor } from "@/lib/LongPressTouchSensor"
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -603,7 +603,7 @@ function SortableTaskItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="relative group/sortable"
+      className={cn("relative group/sortable", isMobile && "touch-manipulation")}
       {...(isMobile ? { ...attributes, ...listeners } : {})}
     >
       {/* ドラッグハンドル（デスクトップのみ） */}
@@ -725,8 +725,8 @@ function TaskSection({
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
     }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 500, tolerance: 5 },
+    useSensor(LongPressTouchSensor, {
+      activationConstraint: { delay: 400, tolerance: 10 },
     })
   )
 

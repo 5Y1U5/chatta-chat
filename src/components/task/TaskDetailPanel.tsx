@@ -10,11 +10,11 @@ import {
   DndContext,
   closestCenter,
   PointerSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core"
+import { LongPressTouchSensor } from "@/lib/LongPressTouchSensor"
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -399,7 +399,7 @@ export function TaskDetailPanel({
   // サブタスク並び替え用
   const subTaskSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 5 } })
+    useSensor(LongPressTouchSensor, { activationConstraint: { delay: 400, tolerance: 10 } })
   )
   const subTaskIds = useMemo(() => subTasks.map((t) => t.id), [subTasks])
 
@@ -945,7 +945,7 @@ function SortableSubTaskItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="group/subtask"
+      className={cn("group/subtask", isMobile && "touch-manipulation")}
       {...(isMobile ? { ...attributes, ...listeners } : {})}
     >
       <div className="flex items-center gap-2">
