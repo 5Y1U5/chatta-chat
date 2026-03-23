@@ -1,14 +1,17 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { SummarizeDialog } from "@/components/chat/SummarizeDialog"
-import { MinutesDialog } from "@/components/chat/MinutesDialog"
-import { MemoryPanel } from "@/components/chat/MemoryPanel"
-import { VoiceRecorder } from "@/components/chat/VoiceRecorder"
 import type { ChannelMemberInfo } from "@/types/chat"
+
+// 使用頻度の低いダイアログ系を遅延ロード（初期バンドル削減）
+const SummarizeDialog = dynamic(() => import("@/components/chat/SummarizeDialog").then((m) => m.SummarizeDialog))
+const MinutesDialog = dynamic(() => import("@/components/chat/MinutesDialog").then((m) => m.MinutesDialog))
+const MemoryPanel = dynamic(() => import("@/components/chat/MemoryPanel").then((m) => m.MemoryPanel))
+const VoiceRecorder = dynamic(() => import("@/components/chat/VoiceRecorder").then((m) => m.VoiceRecorder))
 
 export type FileAttachment = {
   fileUrl: string

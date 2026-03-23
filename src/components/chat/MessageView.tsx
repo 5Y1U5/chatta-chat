@@ -1,18 +1,21 @@
 "use client"
 
-import { useRef, useEffect, useCallback, useState } from "react"
+import { useRef, useEffect, useCallback, useState, memo } from "react"
+import dynamic from "next/dynamic"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageInput, type FileAttachment } from "@/components/chat/MessageInput"
-import { ThreadPanel } from "@/components/chat/ThreadPanel"
-import { EmojiPicker } from "@/components/chat/EmojiPicker"
 import { TypingIndicator } from "@/components/chat/TypingIndicator"
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
-import { ChannelMembersDialog } from "@/components/chat/ChannelMembersDialog"
 import { cn } from "@/lib/utils"
 import type { MessageWithUser, ChannelMemberInfo, ChannelInfo, ReactionInfo } from "@/types/chat"
+
+// 使用時のみロード（スレッド展開・絵文字・メンバー管理）
+const ThreadPanel = dynamic(() => import("@/components/chat/ThreadPanel").then((m) => m.ThreadPanel))
+const EmojiPicker = dynamic(() => import("@/components/chat/EmojiPicker").then((m) => m.EmojiPicker))
+const ChannelMembersDialog = dynamic(() => import("@/components/chat/ChannelMembersDialog").then((m) => m.ChannelMembersDialog))
 
 type Props = {
   channel: ChannelInfo
@@ -346,8 +349,8 @@ export function MessageView({
   )
 }
 
-// メッセージバブル
-function MessageBubble({
+// メッセージバブル（メモ化で再レンダリング抑制）
+const MessageBubble = memo(function MessageBubble({
   message,
   isOwn,
   onReply,
@@ -552,7 +555,7 @@ function MessageBubble({
       )}
     </div>
   )
-}
+})
 
 function ActionButton({
   children,

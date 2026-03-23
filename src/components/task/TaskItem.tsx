@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { cn } from "@/lib/utils"
 import { rruleToText } from "@/lib/recurrence"
 import type { TaskInfo } from "@/types/chat"
@@ -45,7 +45,7 @@ function formatDueDate(dueDate: string | null): { text: string; className: strin
   }
 }
 
-export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) {
+export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) {
   const dueInfo = formatDueDate(task.dueDate)
   const isDone = task.status === "done"
   const [celebrating, setCelebrating] = useState(false)
@@ -197,4 +197,4 @@ export function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) 
       )}
     </div>
   )
-}
+})

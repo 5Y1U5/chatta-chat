@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -882,7 +882,7 @@ export function TaskDetailPanel({
 }
 
 // ドラッグ可能なサブタスクアイテム（クリックで詳細にナビゲート）
-function SortableSubTaskItem({
+const SortableSubTaskItem = memo(function SortableSubTaskItem({
   subTask,
   onStatusChange,
   onNavigate,
@@ -1028,7 +1028,7 @@ function SortableSubTaskItem({
       </div>
     </div>
   )
-}
+})
 
 function PropField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
