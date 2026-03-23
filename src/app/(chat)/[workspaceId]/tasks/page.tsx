@@ -43,47 +43,46 @@ export default async function MyTasksPage({
   ])
 
   // 初期ビューのデータを取得
-  let validProjectId: string | undefined = initialProjectId && projects.some((p) => p.id === initialProjectId)
+  const validProjectId: string | undefined = initialProjectId && projects.some((p) => p.id === initialProjectId)
     ? initialProjectId
     : undefined
+
+  const taskInclude = {
+    assignee: { select: userSelect },
+    creator: { select: userSelect },
+    project: { select: { id: true, name: true, color: true } },
+    _count: { select: { subTasks: true, comments: true } },
+  } as const
+  const taskOrderBy = [{ status: "asc" as const }, { dueDate: "asc" as const }, { createdAt: "desc" as const }]
 
   let initialTasks
   let initialProjectMembers: { id: string; displayName: string | null; avatarUrl: string | null }[] = []
 
   if (validProjectId) {
-    // プロジェクトメンバーか確認
-    const isMember = await prisma.projectMember.findUnique({
-      where: { projectId_userId: { projectId: validProjectId, userId: auth.userId } },
-    })
+    // メンバー確認とタスク・メンバー取得を並列実行
+    const [isMember, tasks, pmRaw] = await Promise.all([
+      prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId: validProjectId, userId: auth.userId } },
+      }),
+      prisma.task.findMany({
+        where: { workspaceId, projectId: validProjectId, parentTaskId: null },
+        include: taskInclude,
+        orderBy: taskOrderBy,
+      }),
+      prisma.projectMember.findMany({
+        where: { projectId: validProjectId },
+        include: { user: { select: userSelect } },
+        orderBy: { createdAt: "asc" },
+      }),
+    ])
 
     if (isMember) {
-      const [tasks, pmRaw] = await Promise.all([
-        prisma.task.findMany({
-          where: { workspaceId, projectId: validProjectId, parentTaskId: null },
-          include: {
-            assignee: { select: userSelect },
-            creator: { select: userSelect },
-            project: { select: { id: true, name: true, color: true } },
-            _count: { select: { subTasks: true, comments: true } },
-          },
-          orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
-        }),
-        prisma.projectMember.findMany({
-          where: { projectId: validProjectId },
-          include: { user: { select: userSelect } },
-          orderBy: { createdAt: "asc" },
-        }),
-      ])
-
       initialTasks = tasks
       initialProjectMembers = pmRaw.map((pm) => pm.user)
-    } else {
-      // メンバーでなければマイタスクにフォールバック
-      validProjectId = undefined
     }
   }
 
-  if (!validProjectId) {
+  if (!initialTasks) {
     initialTasks = await prisma.task.findMany({
       where: {
         workspaceId,
@@ -95,13 +94,8 @@ export default async function MyTasksPage({
           { members: { some: { userId: auth.userId } } },
         ],
       },
-      include: {
-        assignee: { select: userSelect },
-        creator: { select: userSelect },
-        project: { select: { id: true, name: true, color: true } },
-        _count: { select: { subTasks: true, comments: true } },
-      },
-      orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+      include: taskInclude,
+      orderBy: taskOrderBy,
     })
   }
 
@@ -115,7 +109,7 @@ export default async function MyTasksPage({
       }))))}
       members={membersRaw.map((m) => m.user)}
       initialTasks={JSON.parse(JSON.stringify(initialTasks))}
-      initialProjectId={validProjectId}
+      initialProjectId={initialTasks && validProjectId && initialProjectMembers.length > 0 ? validProjectId : undefined}
       initialProjectMembers={initialProjectMembers}
       initialSelectedTaskId={initialTaskId}
     />

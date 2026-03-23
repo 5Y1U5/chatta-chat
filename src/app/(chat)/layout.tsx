@@ -33,26 +33,52 @@ export default async function ChatLayout({
 
   const prisma = getPrisma()
 
-  // ワークスペース情報
-  const workspace = await prisma.workspace.findUnique({
-    where: { id: activeWorkspaceId },
-  })
-
-  // チャンネル一覧（ユーザーが参加しているもの）
-  const channelsRaw = await prisma.channel.findMany({
-    where: {
-      workspaceId: activeWorkspaceId,
-      members: {
-        some: { userId: auth.userId },
+  // ---- 全クエリを最大限並列化 ----
+  const [workspace, channelsRaw, unreadNotificationCount, memberCount, projectsRaw] = await Promise.all([
+    // ワークスペース情報
+    prisma.workspace.findUnique({
+      where: { id: activeWorkspaceId },
+    }),
+    // チャンネル一覧（ユーザーが参加しているもの）
+    prisma.channel.findMany({
+      where: {
+        workspaceId: activeWorkspaceId,
+        members: {
+          some: { userId: auth.userId },
+        },
       },
-    },
-    include: {
-      members: {
-        include: { user: true },
+      include: {
+        members: {
+          include: { user: true },
+        },
       },
-    },
-    orderBy: { createdAt: "asc" },
-  })
+      orderBy: { createdAt: "asc" },
+    }),
+    // 未読通知数
+    prisma.notification.count({
+      where: { userId: auth.userId, read: false },
+    }),
+    // ワークスペースメンバー数
+    prisma.workspaceMember.count({
+      where: { workspaceId: activeWorkspaceId },
+    }),
+    // プロジェクト一覧（TaskNav / MobileTaskHeader 用）- メンバーのみ表示
+    prisma.project.findMany({
+      where: {
+        workspaceId: activeWorkspaceId,
+        archived: false,
+        members: { some: { userId: auth.userId } },
+      },
+      include: {
+        _count: { select: { tasks: true } },
+        tasks: {
+          where: { status: "done" },
+          select: { id: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    }),
+  ])
 
   // 各チャンネルのメンバー情報と lastReadAt を整理
   const channelInfos = channelsRaw.map((ch) => {
@@ -71,62 +97,60 @@ export default async function ChatLayout({
     return { ch, members, lastReadAt }
   })
 
-  // 未読数を一括取得（N+1 回避）
-  const unreadCounts = await Promise.all(
-    channelInfos.map(({ ch, lastReadAt }) =>
-      prisma.message.count({
-        where: {
-          channelId: ch.id,
-          parentId: null,
-          deletedAt: null,
-          ...(lastReadAt ? { createdAt: { gt: lastReadAt } } : {}),
-        },
-      })
-    )
-  )
+  // 未読数を一括取得（生SQLで1クエリに統合）
+  const channelIds = channelInfos.map(({ ch }) => ch.id)
+  let unreadMap = new Map<string, number>()
 
-  const channels: ChannelItem[] = channelInfos.map(({ ch, members }, i) => ({
+  if (channelIds.length > 0) {
+    // 各チャネルの lastReadAt をマップ化
+    const lastReadMap = new Map(
+      channelInfos.map(({ ch, lastReadAt }) => [ch.id, lastReadAt])
+    )
+
+    // 最も古い lastReadAt を取得（null がある場合は全メッセージをカウント）
+    const hasNullLastRead = channelInfos.some(({ lastReadAt }) => !lastReadAt)
+    const oldestLastRead = hasNullLastRead
+      ? null
+      : channelInfos.reduce<Date | null>((oldest: Date | null, { lastReadAt }: { lastReadAt: Date | null }) => {
+          if (!oldest || (lastReadAt && lastReadAt < oldest)) return lastReadAt
+          return oldest
+        }, null)
+
+    // 1クエリで全チャネルの未読候補メッセージを取得
+    const unreadMessages = await prisma.message.findMany({
+      where: {
+        channelId: { in: channelIds },
+        parentId: null,
+        deletedAt: null,
+        ...(oldestLastRead ? { createdAt: { gt: oldestLastRead } } : {}),
+      },
+      select: { channelId: true, createdAt: true },
+    })
+
+    // チャネルごとに lastReadAt 以降のメッセージ数をカウント
+    for (const msg of unreadMessages) {
+      const lastRead = lastReadMap.get(msg.channelId)
+      if (!lastRead || msg.createdAt > lastRead) {
+        unreadMap.set(msg.channelId, (unreadMap.get(msg.channelId) || 0) + 1)
+      }
+    }
+  }
+
+  const channels: ChannelItem[] = channelInfos.map(({ ch, members }) => ({
     id: ch.id,
     name: ch.name,
     type: ch.type,
-    unreadCount: unreadCounts[i],
+    unreadCount: unreadMap.get(ch.id) || 0,
     members,
   }))
 
-  // 未読通知数
-  const unreadNotificationCount = await prisma.notification.count({
-    where: { userId: auth.userId, read: false },
-  })
-
-  // ワークスペースメンバー数
-  const memberCount = await prisma.workspaceMember.count({
-    where: { workspaceId: activeWorkspaceId },
-  })
-
-  // プロジェクト一覧（TaskNav / MobileTaskHeader 用）- メンバーのみ表示
-  const projectsRaw = await prisma.project.findMany({
-    where: {
-      workspaceId: activeWorkspaceId,
-      archived: false,
-      members: { some: { userId: auth.userId } },
-    },
-    include: { _count: { select: { tasks: true } } },
-    orderBy: { name: "asc" },
-  })
-
-  // 各プロジェクトの完了タスク数を並列取得
-  const completedCounts = await Promise.all(
-    projectsRaw.map((p) =>
-      prisma.task.count({ where: { projectId: p.id, status: "done" } })
-    )
-  )
-
-  const projectsForNav = projectsRaw.map((p, i) => ({
+  // プロジェクト完了タスク数はincludeで取得済み（N+1クエリ不要）
+  const projectsForNav = projectsRaw.map((p) => ({
     id: p.id,
     name: p.name,
     color: p.color,
     totalTasks: p._count.tasks,
-    completedTasks: completedCounts[i],
+    completedTasks: p.tasks.length,
   }))
 
   return (
@@ -144,7 +168,7 @@ export default async function ChatLayout({
         workspaceId={activeWorkspaceId}
         currentUserId={auth.userId}
       />
-      <Suspense>
+      <Suspense fallback={<div className="hidden md:block w-56 shrink-0 border-r" />}>
         <TaskNav
           workspaceId={activeWorkspaceId}
           projects={projectsForNav}
@@ -155,7 +179,7 @@ export default async function ChatLayout({
         <InstallBanner />
         {/* モバイルヘッダー: タスク系ページは MobileTaskHeader、それ以外は MobileSidebar + MobilePageTitle */}
         <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
-          <Suspense>
+          <Suspense fallback={<div className="h-5 w-32 rounded bg-muted animate-pulse" />}>
             <MobileHeaderSwitch
               channels={channels}
               workspaceId={activeWorkspaceId}

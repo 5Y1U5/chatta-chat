@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useRef, memo, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import {
@@ -543,8 +543,8 @@ export function TaskListView({
   )
 }
 
-// ドラッグ可能なタスクアイテム
-function SortableTaskItem({
+// ドラッグ可能なタスクアイテム（メモ化で再レンダリング抑制）
+const SortableTaskItem = memo(function SortableTaskItem({
   task,
   isSelected,
   onSelect,
@@ -628,7 +628,7 @@ function SortableTaskItem({
       />
     </div>
   )
-}
+})
 
 // インラインタスク追加コンポーネント
 function InlineAddTask({
