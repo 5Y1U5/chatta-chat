@@ -18,12 +18,20 @@ const taskInclude = {
 
 // ルートタスク取得時はサブタスクも含める（詳細パネルで即表示するため）
 const taskIncludeWithSubTasks = {
-  ...taskInclude,
+  assignee: { select: userSelect },
+  creator: { select: userSelect },
+  project: { select: { id: true, name: true, color: true } },
+  _count: { select: { subTasks: true, comments: true, members: true } },
   subTasks: {
-    include: taskInclude,
-    orderBy: [{ sortOrder: "asc" as const }, { createdAt: "desc" as const }],
+    include: {
+      assignee: { select: userSelect },
+      creator: { select: userSelect },
+      project: { select: { id: true, name: true, color: true } },
+      _count: { select: { subTasks: true, comments: true, members: true } },
+    },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
   },
-} as const
+}
 
 // タスク一覧取得
 export async function GET(request: NextRequest) {
@@ -77,9 +85,10 @@ export async function GET(request: NextRequest) {
 
     // ルートタスク一覧の場合はサブタスクも含める
     const isRootQuery = !parentTaskId && where.parentTaskId === null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tasks = await prisma.task.findMany({
       where,
-      include: isRootQuery ? taskIncludeWithSubTasks : taskInclude,
+      include: isRootQuery ? taskIncludeWithSubTasks as any : taskInclude,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     })
 
@@ -314,10 +323,14 @@ export async function PATCH(request: Request) {
         data.completedAt = new Date()
 
         // 繰り返しタスクの場合、次回タスクを自動生成
-        if (task.recurrenceRule) {
+        // ただし、既に完了済み（completedAt あり）のタスクを再度完了した場合は生成しない（重複防止）
+        if (task.recurrenceRule && !task.completedAt) {
           try {
-            const nextDate = getNextOccurrence(task.recurrenceRule, new Date())
-            console.log("[繰り返しタスク] ルール:", task.recurrenceRule, "→ 次回:", nextDate)
+            const baseDate = task.dueDate && task.dueDate > new Date()
+              ? task.dueDate   // 期日が未来の場合、期日を基準に次回を計算
+              : new Date()     // 期日が過去または未設定の場合、今日を基準
+            const nextDate = getNextOccurrence(task.recurrenceRule, baseDate)
+            console.log("[繰り返しタスク] ルール:", task.recurrenceRule, "基準日:", baseDate, "→ 次回:", nextDate)
             if (nextDate) {
               generatedNextTask = await prisma.task.create({
                 data: {
