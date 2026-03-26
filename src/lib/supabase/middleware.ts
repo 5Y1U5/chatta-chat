@@ -5,10 +5,17 @@ import { getPrisma } from "@/lib/prisma"
 // chatta-chat の認証パス判定
 const AUTH_REQUIRED = /^\/[^/]+\/(channel|tasks|inbox|dashboard|projects)(\/|$)/
 const AUTH_PAGE = /^\/(login|signup)(\/|$)/
-const WORKSPACE_ROOT = /^\/[^/]+\/?$/
+// ワークスペースルート（UUID or 英数字のみ。拡張子付きは除外）
+const WORKSPACE_ROOT = /^\/[a-zA-Z0-9_-]+\/?$/
+const STATIC_FILE = /\.[a-z]{2,5}$/i
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // 静的ファイルはスキップ
+  if (STATIC_FILE.test(pathname)) {
+    return NextResponse.next({ request })
+  }
 
   // 認証チェックが不要なパスはスキップ
   const needsAuth = pathname === "/" || AUTH_REQUIRED.test(pathname) || AUTH_PAGE.test(pathname) || WORKSPACE_ROOT.test(pathname)
