@@ -25,3 +25,14 @@
 **問題**: `useIsMobile()` の MOBILE_BREAKPOINT=768 では Galaxy Z Fold の開いた状態を「モバイル」と判定できない場合がある。
 
 **ルール**: TaskDetailPanel のように `md:hidden` で戻るボタンを制御する場合、完了ボタン等も同じ `md:` ブレークポイントで統一する。`isMobile` と CSS `md:` を混在させない。
+
+## 2026-03-26: .env.local の DB URL に \n リテラルが含まれていた
+
+**問題**: `prisma db push` が `postgres\n` という別のデータベースにスキーマを適用し、本番DBにテーブルが作成されなかった。統合APIが500エラーを返し、サブタスク・コメントが表示されなくなった。
+
+**原因**: `.env.local` の DATABASE_URL / DIRECT_URL の末尾に `\n` がリテラル文字列として含まれていた。
+
+**ルール**:
+- `prisma db push` 実行時、出力の `database "xxx"` 部分を必ず確認する。`postgres\n` のように余計な文字がないか注意。
+- `prisma.config.ts` で URL に `.trim()` を適用する。
+- スキーマ変更後は SQL で新テーブルの存在を実際に確認する。
