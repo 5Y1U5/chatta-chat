@@ -39,7 +39,7 @@ export default async function ChatLayout({
     prisma.workspace.findUnique({
       where: { id: activeWorkspaceId },
     }),
-    // チャンネル一覧（ユーザーが参加しているもの）
+    // チャンネル一覧（ユーザーが参加しているもの）— 必要フィールドのみ取得
     prisma.channel.findMany({
       where: {
         workspaceId: activeWorkspaceId,
@@ -49,7 +49,13 @@ export default async function ChatLayout({
       },
       include: {
         members: {
-          include: { user: true },
+          select: {
+            userId: true,
+            lastReadAt: true,
+            user: {
+              select: { id: true, displayName: true, avatarUrl: true },
+            },
+          },
         },
       },
       orderBy: { createdAt: "asc" },
