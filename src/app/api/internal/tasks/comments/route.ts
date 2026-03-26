@@ -90,21 +90,67 @@ export async function POST(request: Request) {
       notifyUserIds.add(task.creatorId)
     }
 
-    if (notifyUserIds.size > 0) {
-      const actor = await prisma.user.findUnique({
-        where: { id: auth.userId },
-        select: { displayName: true },
+    // メンション通知: @表示名 をパースして対象ユーザーに通知
+    const mentionNames = [...content.trim().matchAll(/@(\S+)/g)].map((m) => m[1])
+    const mentionedUserIds = new Set<string>()
+    if (mentionNames.length > 0) {
+      // displayName でマッチングする
+      const mentionedUsers = await prisma.user.findMany({
+        where: {
+          displayName: { in: mentionNames },
+          workspaceMembers: { some: { workspaceId: auth.workspaceId } },
+        },
+        select: { id: true },
       })
-      await prisma.notification.createMany({
-        data: Array.from(notifyUserIds).map((userId) => ({
+      for (const u of mentionedUsers) {
+        if (u.id !== auth.userId) {
+          mentionedUserIds.add(u.id)
+        }
+      }
+    }
+
+    const actor = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { displayName: true },
+    })
+
+    const notifications: Array<{
+      userId: string
+      type: string
+      title: string
+      taskId: string
+      projectId: string | null
+      actorId: string
+    }> = []
+
+    // 通常のコメント通知（メンションされていないユーザーのみ）
+    for (const userId of notifyUserIds) {
+      if (!mentionedUserIds.has(userId)) {
+        notifications.push({
           userId,
           type: "task_comment",
           title: `${actor?.displayName || "メンバー"}がタスク「${task.title}」にコメントしました`,
           taskId: task.id,
           projectId: task.projectId,
           actorId: auth.userId,
-        })),
+        })
+      }
+    }
+
+    // メンション通知
+    for (const userId of mentionedUserIds) {
+      notifications.push({
+        userId,
+        type: "task_mentioned",
+        title: `${actor?.displayName || "メンバー"}がタスク「${task.title}」であなたをメンションしました`,
+        taskId: task.id,
+        projectId: task.projectId,
+        actorId: auth.userId,
       })
+    }
+
+    if (notifications.length > 0) {
+      await prisma.notification.createMany({ data: notifications })
     }
 
     return NextResponse.json(comment)

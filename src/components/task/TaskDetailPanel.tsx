@@ -49,6 +49,19 @@ type Props = {
   onTaskDeleted: (taskId: string) => void
 }
 
+// コメント内の @メンション を強調表示
+function renderCommentContent(content: string) {
+  const parts = content.split(/(@\S+)/g)
+  if (parts.length === 1) return content
+  return parts.map((part, i) =>
+    part.startsWith("@") ? (
+      <span key={i} className="text-primary font-medium">{part}</span>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  )
+}
+
 function parseDateStr(dateStr: string): Date {
   const p = dateStr.slice(0, 10).split("-")
   return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
@@ -88,6 +101,8 @@ export function TaskDetailPanel({
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
   const [detailsLoaded, setDetailsLoaded] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [showMentionList, setShowMentionList] = useState(false)
+  const commentInputRef = useRef<HTMLInputElement>(null)
   const isMobile = useIsMobile()
 
   // ルートタスクが切り替わったらスタックとキャッシュをリセット
@@ -338,6 +353,15 @@ export function TaskDetailPanel({
     fetch(`/api/internal/tasks/members?taskId=${currentTask.id}&userId=${userId}`, { method: "DELETE" })
   }
 
+  // メンション挿入
+  const handleInsertMention = (name: string) => {
+    const mention = `@${name} `
+    setNewComment((prev) => prev + mention)
+    setShowMentionList(false)
+    // 入力欄にフォーカスを戻す
+    setTimeout(() => commentInputRef.current?.focus(), 50)
+  }
+
   // 楽観的コメント追加
   const handleAddComment = () => {
     if (!newComment.trim()) return
@@ -394,6 +418,27 @@ export function TaskDetailPanel({
   // メンバー追加候補
   const memberIds = new Set(taskMembers.map((m) => m.userId))
   const availableMembers = members.filter((m) => !memberIds.has(m.id))
+
+  // メンション対象: タスク関係者（担当者 + 作成者 + TaskMember）から自分を除外
+  const mentionTargets = useMemo(() => {
+    const ids = new Set<string>()
+    const targets: { id: string; displayName: string | null }[] = []
+    const addTarget = (id: string, name: string | null) => {
+      if (id === currentUserId || ids.has(id)) return
+      ids.add(id)
+      targets.push({ id, displayName: name })
+    }
+    if (currentTask.assigneeId && currentTask.assignee) {
+      addTarget(currentTask.assigneeId, currentTask.assignee.displayName)
+    }
+    if (currentTask.creator) {
+      addTarget(currentTask.creatorId, currentTask.creator.displayName)
+    }
+    for (const m of taskMembers) {
+      addTarget(m.userId, m.displayName)
+    }
+    return targets
+  }, [currentTask.assigneeId, currentTask.assignee, currentTask.creatorId, currentTask.creator, taskMembers, currentUserId])
 
   const completedSubTasks = subTasks.filter((t) => t.status === "done").length
   const subTaskProgress = subTasks.length > 0 ? (completedSubTasks / subTasks.length) * 100 : 0
@@ -603,8 +648,100 @@ export function TaskDetailPanel({
           </div>
         )}
 
+        {/* コラボレーター（Asanaスタイル） */}
+        {detailsLoaded && (
+          <div className="px-4 pt-3 flex items-center gap-1.5">
+            {/* 担当者アバター */}
+            {currentTask.assignee && (
+              <div
+                className={cn(
+                  "flex items-center justify-center rounded-full bg-primary/10 text-xs font-medium shrink-0 ring-2 ring-background",
+                  isMobile ? "h-8 w-8" : "h-7 w-7 text-[10px]"
+                )}
+                title={`担当: ${currentTask.assignee.displayName || "不明"}`}
+              >
+                {currentTask.assignee.avatarUrl ? (
+                  <img src={currentTask.assignee.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  currentTask.assignee.displayName?.charAt(0) || "?"
+                )}
+              </div>
+            )}
+            {/* 作成者アバター（担当者と異なる場合） */}
+            {currentTask.creator && currentTask.creatorId !== currentTask.assigneeId && (
+              <div
+                className={cn(
+                  "flex items-center justify-center rounded-full bg-muted text-xs font-medium shrink-0 ring-2 ring-background -ml-2",
+                  isMobile ? "h-8 w-8" : "h-7 w-7 text-[10px]"
+                )}
+                title={`作成者: ${currentTask.creator.displayName || "不明"}`}
+              >
+                {currentTask.creator.avatarUrl ? (
+                  <img src={currentTask.creator.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  currentTask.creator.displayName?.charAt(0) || "?"
+                )}
+              </div>
+            )}
+            {/* TaskMember アバター */}
+            {taskMembers.map((m) => (
+              <div
+                key={m.userId}
+                className={cn(
+                  "flex items-center justify-center rounded-full bg-muted text-xs font-medium shrink-0 ring-2 ring-background -ml-2",
+                  isMobile ? "h-8 w-8" : "h-7 w-7 text-[10px]"
+                )}
+                title={m.displayName || "不明"}
+              >
+                {m.avatarUrl ? (
+                  <img src={m.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  m.displayName?.charAt(0) || "?"
+                )}
+              </div>
+            ))}
+            {/* メンバー追加ボタン */}
+            {availableMembers.length > 0 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className={cn(
+                      "flex items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary transition-colors",
+                      isMobile ? "h-8 w-8 -ml-1" : "h-7 w-7 -ml-1"
+                    )}
+                    title="コラボレーターを追加"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "16" : "14"} height={isMobile ? "16" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent side="bottom" align="start" className="w-56 p-1">
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">コラボレーターを追加</p>
+                  {availableMembers.map((m) => (
+                    <button
+                      key={m.id}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+                      onClick={() => handleAddMember(m.id)}
+                    >
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium shrink-0">
+                        {m.avatarUrl ? (
+                          <img src={m.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                        ) : (
+                          m.displayName?.charAt(0) || "?"
+                        )}
+                      </div>
+                      {m.displayName || m.id.slice(0, 8)}
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+        )}
+
         {/* タイトル（編集可能） */}
-        <div className="px-4 pt-4 pb-2">
+        <div className="px-4 pt-3 pb-2">
           {editingTitle ? (
             <textarea
               ref={titleInputRef}
@@ -710,50 +847,6 @@ export function TaskDetailPanel({
             </PropField>
           </div>
 
-          {/* 共有（2列グリッドの外。幅を使いたい） */}
-          <div className="mt-2">
-            <PropField label={`共有${detailsLoaded ? ` (${taskMembers.length})` : ""}`} mobile={isMobile}>
-              <p className={cn("text-muted-foreground mb-1", isMobile ? "text-xs" : "text-[10px]")}>共有すると相手のマイタスクにも表示されます</p>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {taskMembers.map((m) => (
-                  <div
-                    key={m.userId}
-                    className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
-                  >
-                    <div className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-[8px] font-medium">
-                      {m.displayName?.charAt(0) || "?"}
-                    </div>
-                    <span className="max-w-20 truncate">{m.displayName || "不明"}</span>
-                    <button
-                      onClick={() => handleRemoveMember(m.userId)}
-                      className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-                {availableMembers.length > 0 && (
-                  <Select key={taskMembers.length} onValueChange={(v) => v && handleAddMember(v)}>
-                    <SelectTrigger className="h-6 w-auto min-w-0 border-dashed text-xs px-2 gap-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
-                      追加
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableMembers.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.displayName || m.id.slice(0, 8)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            </PropField>
-          </div>
         </div>
 
         <div className="border-t mx-4" />
@@ -863,49 +956,85 @@ export function TaskDetailPanel({
           </SectionLabel>
           <div className={cn(isMobile ? "space-y-4" : "space-y-3")}>
             {comments.map((c) => (
-              <div key={c.id} className={cn("text-sm", isMobile && "flex gap-3 items-start")}>
-                {isMobile ? (
-                  <>
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium mt-0.5">
-                      {c.user.displayName?.charAt(0) || "?"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 mb-0.5">
-                        <span className="font-medium text-sm">{c.user.displayName || "不明"}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(c.createdAt).toLocaleString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                      <p className="whitespace-pre-wrap text-sm">{c.content}</p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-medium shrink-0">
-                        {c.user.displayName?.charAt(0) || "?"}
-                      </div>
-                      <span className="font-medium text-xs">{c.user.displayName || "不明"}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {new Date(c.createdAt).toLocaleString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-                    <p className="text-muted-foreground whitespace-pre-wrap ml-7">{c.content}</p>
-                  </>
-                )}
+              <div key={c.id} className="flex gap-2.5 items-start text-sm">
+                <div className={cn(
+                  "flex shrink-0 items-center justify-center rounded-full bg-muted font-medium mt-0.5",
+                  isMobile ? "h-8 w-8 text-xs" : "h-6 w-6 text-[10px]"
+                )}>
+                  {c.user.avatarUrl ? (
+                    <img src={c.user.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                  ) : (
+                    c.user.displayName?.charAt(0) || "?"
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 mb-0.5">
+                    <span className={cn("font-medium", isMobile ? "text-sm" : "text-xs")}>{c.user.displayName || "不明"}</span>
+                    <span className={cn("text-muted-foreground", isMobile ? "text-xs" : "text-[10px]")}>
+                      {new Date(c.createdAt).toLocaleString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className={cn("whitespace-pre-wrap", isMobile ? "text-sm" : "text-sm text-foreground/90")}>
+                    {renderCommentContent(c.content)}
+                  </p>
+                </div>
               </div>
             ))}
-            <div className="flex gap-2">
-              <Input
-                className={cn(isMobile ? "h-10 text-sm rounded-lg" : "h-8 text-sm")}
-                placeholder="メッセージを入力..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment() } }}
-              />
-              <Button size="sm" variant="outline" className={cn("shrink-0", isMobile ? "h-10 px-4" : "h-8")} onClick={handleAddComment}>
-                送信
-              </Button>
+            {/* 入力エリア */}
+            <div className="relative">
+              <div className="flex gap-2 items-center">
+                {/* メンションボタン */}
+                {mentionTargets.length > 0 && (
+                  <Popover open={showMentionList} onOpenChange={setShowMentionList}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={cn(
+                          "flex shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-muted transition-colors",
+                          isMobile ? "h-10 w-10" : "h-8 w-8"
+                        )}
+                        title="メンション"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "20" : "16"} height={isMobile ? "20" : "16"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="4" />
+                          <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+                        </svg>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" className="w-56 p-1">
+                      <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">メンション</p>
+                      {mentionTargets.map((t) => (
+                        <button
+                          key={t.id}
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+                          onClick={() => handleInsertMention(t.displayName || t.id.slice(0, 8))}
+                        >
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium shrink-0">
+                            {t.displayName?.charAt(0) || "?"}
+                          </div>
+                          {t.displayName || t.id.slice(0, 8)}
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                )}
+                <Input
+                  ref={commentInputRef}
+                  className={cn(isMobile ? "h-10 text-sm rounded-lg" : "h-8 text-sm")}
+                  placeholder={mentionTargets.length > 0 ? "@でメンション..." : "メッセージを入力..."}
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment() } }}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={cn("shrink-0", isMobile ? "h-10 px-4" : "h-8")}
+                  onClick={handleAddComment}
+                  disabled={!newComment.trim()}
+                >
+                  送信
+                </Button>
+              </div>
             </div>
           </div>
         </div>
