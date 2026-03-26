@@ -41,6 +41,7 @@ export class LongPressTouchSensor implements SensorInstance {
   private boundHandleCancel: () => void
   private boundHandleKeydown: (e: KeyboardEvent) => void
   private boundHandleContextMenu: (e: Event) => void
+  private boundPreventSelect: (e: Event) => void
   private targetElement: HTMLElement | null = null
   private originalTouchAction: string = ""
 
@@ -59,6 +60,7 @@ export class LongPressTouchSensor implements SensorInstance {
     this.boundHandleCancel = this.handleCancel.bind(this)
     this.boundHandleKeydown = this.handleKeydown.bind(this)
     this.boundHandleContextMenu = (e: Event) => e.preventDefault()
+    this.boundPreventSelect = (e: Event) => e.preventDefault()
 
     this.attach()
   }
@@ -74,8 +76,9 @@ export class LongPressTouchSensor implements SensorInstance {
     document.addEventListener("touchend", this.boundHandleEnd)
     document.addEventListener("touchcancel", this.boundHandleCancel)
     document.addEventListener("keydown", this.boundHandleKeydown)
-    // 長押しのコンテキストメニューを抑制
+    // 長押しのコンテキストメニューとテキスト選択を抑制
     window.addEventListener("contextmenu", this.boundHandleContextMenu)
+    document.addEventListener("selectstart", this.boundPreventSelect)
 
     // delay 後にドラッグ有効化
     this.timeoutId = setTimeout(() => {
@@ -97,6 +100,7 @@ export class LongPressTouchSensor implements SensorInstance {
     document.removeEventListener("touchcancel", this.boundHandleCancel)
     document.removeEventListener("keydown", this.boundHandleKeydown)
     window.removeEventListener("contextmenu", this.boundHandleContextMenu)
+    document.removeEventListener("selectstart", this.boundPreventSelect)
 
     if (this.timeoutId !== null) {
       clearTimeout(this.timeoutId)
@@ -210,6 +214,12 @@ export class LongPressTouchSensor implements SensorInstance {
         // マルチタッチは無視
         if (touches.length > 1) {
           return false
+        }
+
+        // ブラウザの長押しテキスト選択を防止
+        // （CSSのuser-select:noneではAndroidで防げないケースがある）
+        if (nativeEvent.cancelable) {
+          nativeEvent.preventDefault()
         }
 
         return true
