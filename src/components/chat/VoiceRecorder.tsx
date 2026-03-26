@@ -34,6 +34,10 @@ export function VoiceRecorder({ onTranscript, size = "default" }: Props) {
   const [error, setError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // ユーザーが明示的に停止したかどうか（onend での自動再開を制御）
+  const stoppedByUserRef = useRef(false)
+  const onTranscriptRef = useRef(onTranscript)
+  onTranscriptRef.current = onTranscript
 
   // 録音時間のタイマー
   useEffect(() => {
@@ -53,66 +57,97 @@ export function VoiceRecorder({ onTranscript, size = "default" }: Props) {
     }
   }, [listening])
 
-  const startListening = useCallback(() => {
-    setError(null)
-    setInterimText("")
-
+  const createRecognition = useCallback(() => {
     const SpeechRecognition =
       (window as unknown as Record<string, unknown>).SpeechRecognition ||
       (window as unknown as Record<string, unknown>).webkitSpeechRecognition
 
-    if (!SpeechRecognition) {
-      setError("このブラウザは音声入力に対応していません")
-      return
-    }
+    if (!SpeechRecognition) return null
 
     const recognition = new (SpeechRecognition as new () => SpeechRecognitionInstance)()
     recognition.lang = "ja-JP"
     recognition.interimResults = true
-    recognition.continuous = true
+    // continuous: false — 1発話ごとに確定。重複認識を根本防止
+    recognition.continuous = false
 
     recognition.onresult = (e: SpeechRecognitionEvent) => {
-      let interim = ""
-      let final = ""
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const transcript = e.results[i][0].transcript
-        if (e.results[i].isFinal) {
-          final += transcript
-        } else {
-          interim += transcript
+      // continuous: false なので results は常に1つだけ
+      const result = e.results[0]
+      if (!result) return
+
+      const transcript = result[0].transcript
+
+      if (result.isFinal) {
+        // 確定結果 → テキストエリアに追加
+        if (transcript && onTranscriptRef.current) {
+          onTranscriptRef.current(transcript)
         }
-      }
-      if (final && onTranscript) {
-        onTranscript(final)
         setInterimText("")
       } else {
-        setInterimText(interim)
+        // 中間結果 → プレビュー表示
+        setInterimText(transcript)
       }
     }
 
     recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
       if (e.error === "not-allowed") {
         setError("マイクへのアクセスが許可されていません")
+        stoppedByUserRef.current = true
       } else if (e.error === "no-speech") {
-        // 無視
+        // 無言 → 自動再開に任せる
+      } else if (e.error === "aborted") {
+        // ユーザー停止 → 何もしない
       } else {
         setError("音声認識エラーが発生しました")
       }
-      setListening(false)
     }
 
     recognition.onend = () => {
-      setListening(false)
-      setInterimText("")
       recognitionRef.current = null
+
+      if (stoppedByUserRef.current) {
+        // ユーザーが停止ボタンを押した → 終了
+        setListening(false)
+        setInterimText("")
+      } else {
+        // 1発話が終わった → 自動で次の認識を開始（連続入力）
+        try {
+          const next = createRecognition()
+          if (next) {
+            recognitionRef.current = next
+            next.start()
+          } else {
+            setListening(false)
+            setInterimText("")
+          }
+        } catch {
+          setListening(false)
+          setInterimText("")
+        }
+      }
+    }
+
+    return recognition
+  }, [])
+
+  const startListening = useCallback(() => {
+    setError(null)
+    setInterimText("")
+    stoppedByUserRef.current = false
+
+    const recognition = createRecognition()
+    if (!recognition) {
+      setError("このブラウザは音声入力に対応していません")
+      return
     }
 
     recognitionRef.current = recognition
     recognition.start()
     setListening(true)
-  }, [onTranscript])
+  }, [createRecognition])
 
   const stopListening = useCallback(() => {
+    stoppedByUserRef.current = true
     if (recognitionRef.current) {
       recognitionRef.current.stop()
     }
