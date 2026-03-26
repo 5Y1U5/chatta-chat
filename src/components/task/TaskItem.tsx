@@ -3,6 +3,7 @@
 import { useState, memo } from "react"
 import { cn } from "@/lib/utils"
 import { rruleToText } from "@/lib/recurrence"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import type { TaskInfo } from "@/types/chat"
 
 type Props = {
@@ -46,6 +47,7 @@ function formatDueDate(dueDate: string | null): { text: string; className: strin
 }
 
 export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) {
+  const isMobile = useIsMobile()
   const dueInfo = formatDueDate(task.dueDate)
   const isDone = task.status === "done"
   const [celebrating, setCelebrating] = useState(false)
@@ -67,7 +69,8 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
   return (
     <div
       className={cn(
-        "group relative flex items-center gap-3 border-b border-border/50 px-3 py-2.5 cursor-pointer transition-colors duration-150",
+        "group relative flex items-center border-b border-border/50 cursor-pointer transition-colors duration-150",
+        isMobile ? "gap-3 px-3 py-3.5" : "gap-3 px-3 py-2.5",
         "hover:bg-muted/30",
         isSelected && "bg-muted/50",
         celebrating && "bg-blue-50 dark:bg-blue-950/20"
@@ -87,7 +90,8 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
       <button
         onClick={handleCheck}
         className={cn(
-          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
+          "flex shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
+          isMobile ? "h-6 w-6" : "h-5 w-5",
           isDone
             ? "border-primary bg-primary text-primary-foreground scale-110"
             : "border-muted-foreground/40 hover:border-primary hover:scale-110 active:scale-90",
@@ -95,7 +99,7 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
         )}
       >
         {(isDone || celebrating) && (
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 14 : 12} height={isMobile ? 14 : 12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         )}
@@ -104,16 +108,17 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
       {/* タスク情報 */}
       <div className="flex-1 min-w-0">
         <div className={cn(
-          "text-sm truncate transition-all duration-300",
+          "truncate transition-all duration-300",
+          isMobile ? "text-base" : "text-sm",
           isDone && "line-through text-muted-foreground",
           celebrating && "line-through text-primary dark:text-primary"
         )}>
           {task.title}
         </div>
-        <div className="flex items-center gap-2 mt-0.5">
+        <div className={cn("flex items-center gap-2", isMobile ? "mt-1" : "mt-0.5")}>
           {task.project && (
             <span
-              className="text-[11px] px-1.5 py-0.5 rounded-sm"
+              className={cn(isMobile ? "text-xs" : "text-[11px]", "px-1.5 py-0.5 rounded-sm")}
               style={{
                 backgroundColor: task.project.color ? `${task.project.color}20` : undefined,
                 color: task.project.color || undefined,
