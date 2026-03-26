@@ -1,6 +1,6 @@
 // chatta-chat Service Worker — キャッシュ戦略付き
 
-const CACHE_NAME = "chatta-v2"
+const CACHE_NAME = "chatta-v3"
 
 // キャッシュ対象の静的アセットパターン
 const STATIC_CACHE_PATTERNS = [
@@ -55,9 +55,14 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  // ナビゲーション（HTML ページ）→ Network First
+  // ナビゲーション（HTML ページ）→ Stale While Revalidate（キャッシュ即表示 + バックグラウンド更新）
+  // 認証ページはNetwork First（最新状態が必要）
   if (request.mode === "navigate") {
-    event.respondWith(networkFirst(request))
+    if (pathname === "/login" || pathname === "/signup") {
+      event.respondWith(networkFirst(request))
+    } else {
+      event.respondWith(staleWhileRevalidate(request))
+    }
     return
   }
 
