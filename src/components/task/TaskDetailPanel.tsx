@@ -583,11 +583,12 @@ export function TaskDetailPanel({
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
+            {/* PC: 完了ボタンを左側に配置 */}
             <Button
               size="sm"
               variant={currentTask.status === "done" ? "outline" : "default"}
               className={cn(
-                "h-7 text-xs",
+                "hidden md:inline-flex h-7 text-xs",
                 currentTask.status === "done" && "border-primary text-primary hover:bg-blue-50 dark:hover:bg-blue-950/20"
               )}
               onClick={() => handleUpdate("status", currentTask.status === "done" ? "todo" : "done")}
@@ -611,6 +612,33 @@ export function TaskDetailPanel({
             </Button>
           </div>
           <div className="flex items-center gap-1">
+            {/* モバイル: 完了ボタンを右側に配置（戻るボタンと離す） */}
+            <Button
+              size="sm"
+              variant={currentTask.status === "done" ? "outline" : "default"}
+              className={cn(
+                "md:hidden h-7 text-xs",
+                currentTask.status === "done" && "border-primary text-primary hover:bg-blue-50 dark:hover:bg-blue-950/20"
+              )}
+              onClick={() => handleUpdate("status", currentTask.status === "done" ? "todo" : "done")}
+            >
+              {currentTask.status === "done" ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  完了済み
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <path d="M9 11l3 3L22 4" />
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                  </svg>
+                  完了にする
+                </>
+              )}
+            </Button>
             <Button
               variant="ghost"
               size="icon"
