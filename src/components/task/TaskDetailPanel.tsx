@@ -608,7 +608,7 @@ export function TaskDetailPanel({
           {editingTitle ? (
             <textarea
               ref={titleInputRef}
-              className="w-full text-lg font-bold resize-none border-0 bg-transparent outline-none focus:ring-1 focus:ring-primary/30 rounded px-1 -mx-1"
+              className={cn("w-full font-bold resize-none border-0 bg-transparent outline-none focus:ring-1 focus:ring-primary/30 rounded px-1 -mx-1", isMobile ? "text-xl" : "text-lg")}
               value={title}
               rows={Math.min(Math.ceil(title.length / 30) || 1, 3)}
               onChange={(e) => setTitle(e.target.value)}
@@ -620,7 +620,7 @@ export function TaskDetailPanel({
             />
           ) : (
             <h2
-              className="text-lg font-bold cursor-text hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 transition-colors"
+              className={cn("font-bold cursor-text hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 transition-colors", isMobile ? "text-xl" : "text-lg")}
               onClick={() => setEditingTitle(true)}
             >
               {currentTask.title}
@@ -630,11 +630,11 @@ export function TaskDetailPanel({
 
         {/* プロパティ: 2列グリッド */}
         <div className="px-4 pb-3">
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+          <div className={cn("grid grid-cols-2", isMobile ? "gap-x-4 gap-y-3" : "gap-x-3 gap-y-2")}>
             {/* 優先度 */}
-            <PropField label="優先度">
+            <PropField label="優先度" mobile={isMobile}>
               <Select value={currentTask.priority} onValueChange={(v) => handleUpdate("priority", v)}>
-                <SelectTrigger className="h-7 text-xs">
+                <SelectTrigger className={isMobile ? "h-9 text-sm" : "h-7 text-xs"}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -646,12 +646,12 @@ export function TaskDetailPanel({
             </PropField>
 
             {/* 担当者 */}
-            <PropField label="担当者">
+            <PropField label="担当者" mobile={isMobile}>
               <Select
                 value={currentTask.assigneeId || "_none"}
                 onValueChange={(v) => handleUpdate("assigneeId", v === "_none" ? null : v)}
               >
-                <SelectTrigger className="h-7 text-xs">
+                <SelectTrigger className={isMobile ? "h-9 text-sm" : "h-7 text-xs"}>
                   <SelectValue placeholder="未割当" />
                 </SelectTrigger>
                 <SelectContent>
@@ -666,21 +666,21 @@ export function TaskDetailPanel({
             </PropField>
 
             {/* 期日 */}
-            <PropField label="期日">
+            <PropField label="期日" mobile={isMobile}>
               <DatePicker
                 value={currentTask.dueDate ? parseDateStr(currentTask.dueDate) : undefined}
                 onChange={(date) => handleUpdate("dueDate", date ? formatDateLocal(date) : null)}
-                className="w-full h-7 text-xs"
+                className={cn("w-full", isMobile ? "h-9 text-sm" : "h-7 text-xs")}
               />
             </PropField>
 
             {/* プロジェクト */}
-            <PropField label="プロジェクト">
+            <PropField label="プロジェクト" mobile={isMobile}>
               <Select
                 value={currentTask.projectId || "_none"}
                 onValueChange={(v) => handleUpdate("projectId", v === "_none" ? null : v)}
               >
-                <SelectTrigger className="h-7 text-xs">
+                <SelectTrigger className={isMobile ? "h-9 text-sm" : "h-7 text-xs"}>
                   <SelectValue placeholder="なし" />
                 </SelectTrigger>
                 <SelectContent>
@@ -700,20 +700,20 @@ export function TaskDetailPanel({
             </PropField>
 
             {/* 繰り返し */}
-            <PropField label="繰り返し">
+            <PropField label="繰り返し" mobile={isMobile}>
               <RecurrenceSelect
                 value={currentTask.recurrenceRule || null}
                 onChange={(rule) => handleUpdate("recurrenceRule", rule)}
                 dueDate={currentTask.dueDate ? parseDateStr(currentTask.dueDate) : undefined}
-                compact
+                compact={!isMobile}
               />
             </PropField>
           </div>
 
           {/* 共有（2列グリッドの外。幅を使いたい） */}
           <div className="mt-2">
-            <PropField label={`共有${detailsLoaded ? ` (${taskMembers.length})` : ""}`}>
-              <p className="text-[10px] text-muted-foreground mb-1">共有すると相手のマイタスクにも表示されます</p>
+            <PropField label={`共有${detailsLoaded ? ` (${taskMembers.length})` : ""}`} mobile={isMobile}>
+              <p className={cn("text-muted-foreground mb-1", isMobile ? "text-xs" : "text-[10px]")}>共有すると相手のマイタスクにも表示されます</p>
               <div className="flex flex-wrap items-center gap-1.5">
                 {taskMembers.map((m) => (
                   <div
@@ -760,7 +760,7 @@ export function TaskDetailPanel({
 
         {/* 説明 */}
         <div className="px-4 py-3">
-          <SectionLabel>説明</SectionLabel>
+          <SectionLabel mobile={isMobile}>説明</SectionLabel>
           <Textarea
             className="text-sm min-h-28 resize-none break-all"
             placeholder="タスクの説明を入力..."
@@ -782,7 +782,7 @@ export function TaskDetailPanel({
 
         {/* サブタスク */}
         <div className="px-4 py-3">
-          <SectionLabel>
+          <SectionLabel mobile={isMobile}>
             サブタスク{detailsLoaded ? ` (${completedSubTasks}/${subTasks.length})` : ""}
           </SectionLabel>
           <div className="space-y-1">
@@ -837,13 +837,13 @@ export function TaskDetailPanel({
             {subTasks.length < 15 && (
               <div className="flex gap-2 mt-2">
                 <Input
-                  className="h-7 text-sm"
+                  className={cn(isMobile ? "h-9 text-sm" : "h-7 text-sm")}
                   placeholder="サブタスクを追加..."
                   value={newSubTaskTitle}
                   onChange={(e) => setNewSubTaskTitle(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddSubTask() } }}
                 />
-                <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={handleAddSubTask}>
+                <Button size="sm" variant="outline" className={cn("shrink-0", isMobile ? "h-9" : "h-7")} onClick={handleAddSubTask}>
                   追加
                 </Button>
               </div>
@@ -857,41 +857,53 @@ export function TaskDetailPanel({
         <div className="border-t mx-4" />
 
         {/* コメント（タスク内チャット） */}
-        <div className="px-4 py-3">
-          <SectionLabel>
+        <div className={cn("px-4", isMobile ? "py-4" : "py-3")}>
+          <SectionLabel mobile={isMobile}>
             チャット{detailsLoaded ? ` (${comments.length})` : ""}
           </SectionLabel>
-          <div className="space-y-3">
+          <div className={cn(isMobile ? "space-y-4" : "space-y-3")}>
             {comments.map((c) => (
-              <div key={c.id} className="text-sm">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-medium shrink-0">
-                    {c.user.displayName?.charAt(0) || "?"}
-                  </div>
-                  <span className="font-medium text-xs">
-                    {c.user.displayName || "不明"}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {new Date(c.createdAt).toLocaleString("ja-JP", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-                <p className="text-muted-foreground whitespace-pre-wrap ml-7">{c.content}</p>
+              <div key={c.id} className={cn("text-sm", isMobile && "flex gap-3 items-start")}>
+                {isMobile ? (
+                  <>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium mt-0.5">
+                      {c.user.displayName?.charAt(0) || "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 mb-0.5">
+                        <span className="font-medium text-sm">{c.user.displayName || "不明"}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(c.createdAt).toLocaleString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm">{c.content}</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-medium shrink-0">
+                        {c.user.displayName?.charAt(0) || "?"}
+                      </div>
+                      <span className="font-medium text-xs">{c.user.displayName || "不明"}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {new Date(c.createdAt).toLocaleString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground whitespace-pre-wrap ml-7">{c.content}</p>
+                  </>
+                )}
               </div>
             ))}
             <div className="flex gap-2">
               <Input
-                className="h-8 text-sm"
+                className={cn(isMobile ? "h-10 text-sm rounded-lg" : "h-8 text-sm")}
                 placeholder="メッセージを入力..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment() } }}
               />
-              <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={handleAddComment}>
+              <Button size="sm" variant="outline" className={cn("shrink-0", isMobile ? "h-10 px-4" : "h-8")} onClick={handleAddComment}>
                 送信
               </Button>
             </div>
@@ -1041,17 +1053,23 @@ const SortableSubTaskItem = memo(function SortableSubTaskItem({
   )
 })
 
-function PropField({ label, children }: { label: string; children: React.ReactNode }) {
+function PropField({ label, children, mobile }: { label: string; children: React.ReactNode; mobile?: boolean }) {
   return (
     <div>
-      <span className="text-[10px] font-medium text-muted-foreground block mb-0.5">{label}</span>
+      <span className={cn(
+        "font-medium text-muted-foreground block",
+        mobile ? "text-xs mb-1" : "text-[10px] mb-0.5"
+      )}>{label}</span>
       {children}
     </div>
   )
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children, mobile }: { children: React.ReactNode; mobile?: boolean }) {
   return (
-    <span className="text-xs font-semibold text-muted-foreground block mb-1.5">{children}</span>
+    <span className={cn(
+      "font-semibold text-muted-foreground block",
+      mobile ? "text-sm mb-2" : "text-xs mb-1.5"
+    )}>{children}</span>
   )
 }
