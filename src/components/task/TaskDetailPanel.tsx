@@ -160,11 +160,17 @@ export function TaskDetailPanel({
       setComments(cached.comments)
       setTaskMembers(cached.members)
       setDetailsLoaded(true)
+    } else if (currentTask.subTasks && currentTask.subTasks.length > 0) {
+      // 初期データにサブタスクが含まれていれば即座に表示
+      setSubTasks(currentTask.subTasks)
+      setComments([])
+      setTaskMembers([])
+      setDetailsLoaded(true)
     } else {
       setSubTasks([])
       setComments([])
       setTaskMembers([])
-      setDetailsLoaded(false)
+      setDetailsLoaded(currentTask._count?.subTasks === 0)
     }
   }, [currentTask.id, currentTask.title, currentTask.description])
 
