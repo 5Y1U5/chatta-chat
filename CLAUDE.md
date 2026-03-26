@@ -144,6 +144,13 @@ ANTHROPIC_API_KEY=       # Claude API キー
 
 **重要**: main へのマージはユーザーの明示的な指示があるまで行わない
 
+## セキュリティ
+
+- **RLS（Row Level Security）**: 全テーブルで有効化済み。ポリシーは未設定（= anon/authenticated からの直接アクセスを完全遮断）
+- **データアクセス**: 全て Next.js API + Prisma 経由。Supabase REST API は認証確認のみに使用
+- **認可**: アプリケーションレベルで `requireAuth()` + メンバーシップ確認
+- **RLS 設定 SQL**: `supabase/enable-rls.sql`（テーブル追加時は更新すること）
+
 ## 事業開始チェックリスト
 
 `tasks/business-launch-checklist.md` に、電気通信事業届出・利用規約・料金プラン等の事業化に必要なタスク一覧を管理。
