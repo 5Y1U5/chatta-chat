@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { DatePicker } from "@/components/ui/date-picker"
-import { RECURRENCE_PRESETS, presetToRRule, type RecurrencePreset } from "@/lib/recurrence"
 import { useIsMobile } from "@/hooks/useIsMobile"
+import { RecurrenceSelect } from "@/components/task/RecurrenceSelect"
 import type { TaskInfo } from "@/types/chat"
 
 type Props = {
@@ -39,7 +39,7 @@ export function CreateTaskDialog({
   const [assigneeId, setAssigneeId] = useState("")
   const [priority, setPriority] = useState("medium")
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined)
-  const [recurrence, setRecurrence] = useState<RecurrencePreset>("none")
+  const [recurrenceRule, setRecurrenceRule] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [collaboratorIds, setCollaboratorIds] = useState<string[]>([])
   const [file, setFile] = useState<{ url: string; name: string; type: string } | null>(null)
@@ -56,7 +56,7 @@ export function CreateTaskDialog({
     setAssigneeId("")
     setPriority("medium")
     setDueDate(undefined)
-    setRecurrence("none")
+    setRecurrenceRule(null)
     setCollaboratorIds([])
     setFile(null)
   }
@@ -92,7 +92,7 @@ export function CreateTaskDialog({
         assigneeId: effectiveAssigneeId || null,
         priority: isMobile ? "medium" : priority,
         dueDate: dueDate ? `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}-${String(dueDate.getDate()).padStart(2, "0")}` : null,
-        recurrenceRule: isMobile ? null : presetToRRule(recurrence, dueDate),
+        recurrenceRule: recurrenceRule,
         fileUrl: file?.url || null,
         fileName: file?.name || null,
         fileType: file?.type || null,
@@ -181,6 +181,13 @@ export function CreateTaskDialog({
                 className="h-9 flex-1"
               />
             </div>
+
+            {/* 繰り返し */}
+            <RecurrenceSelect
+              value={recurrenceRule}
+              onChange={setRecurrenceRule}
+              dueDate={dueDate}
+            />
 
             {/* コラボレーター */}
             {members.length > 1 && (
@@ -397,18 +404,11 @@ export function CreateTaskDialog({
 
             <div className="col-span-2">
               <label className="text-xs text-muted-foreground mb-1 block">繰り返し</label>
-              <Select value={recurrence} onValueChange={(v) => setRecurrence(v as RecurrencePreset)}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {RECURRENCE_PRESETS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <RecurrenceSelect
+                value={recurrenceRule}
+                onChange={setRecurrenceRule}
+                dueDate={dueDate}
+              />
             </div>
           </div>
 

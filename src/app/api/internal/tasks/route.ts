@@ -303,8 +303,9 @@ export async function PATCH(request: Request) {
         // 繰り返しタスクの場合、次回タスクを自動生成
         if (task.recurrenceRule) {
           const nextDate = getNextOccurrence(task.recurrenceRule, new Date())
+          console.log("[繰り返しタスク] ルール:", task.recurrenceRule, "→ 次回:", nextDate)
           if (nextDate) {
-            await prisma.task.create({
+            const nextTask = await prisma.task.create({
               data: {
                 workspaceId: task.workspaceId,
                 title: task.title,
@@ -317,7 +318,9 @@ export async function PATCH(request: Request) {
                 recurrenceRule: task.recurrenceRule,
                 nextOccurrence: nextDate,
               },
+              include: taskInclude,
             })
+            console.log("[繰り返しタスク] 次回タスク生成完了:", nextTask.id, "期日:", nextDate)
           }
         }
 
