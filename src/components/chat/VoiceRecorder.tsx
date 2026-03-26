@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 type Props = {
   onTranscript?: (text: string) => void
+  size?: "default" | "large"
 }
 
 // Web Speech API の型定義
@@ -26,7 +27,7 @@ type SpeechRecognitionInstance = {
   onend: (() => void) | null
 }
 
-export function VoiceRecorder({ onTranscript }: Props) {
+export function VoiceRecorder({ onTranscript, size = "default" }: Props) {
   const [listening, setListening] = useState(false)
   const [interimText, setInterimText] = useState("")
   const [duration, setDuration] = useState(0)
@@ -129,23 +130,39 @@ export function VoiceRecorder({ onTranscript }: Props) {
     <>
       {/* マイクボタン */}
       {!listening ? (
-        <button
-          title="音声入力"
-          onClick={startListening}
-          className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="23" />
-            <line x1="8" y1="23" x2="16" y2="23" />
-          </svg>
-        </button>
+        size === "large" ? (
+          <button
+            title="タップして話す"
+            onClick={startListening}
+            className="flex items-center gap-2 h-10 px-4 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="8" y1="23" x2="16" y2="23" />
+            </svg>
+            タップして話す
+          </button>
+        ) : (
+          <button
+            title="音声入力"
+            onClick={startListening}
+            className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="8" y1="23" x2="16" y2="23" />
+            </svg>
+          </button>
+        )
       ) : (
         <button
           title="音声入力を停止"
           onClick={stopListening}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-sm shadow-red-500/30 transition-all"
+          className={`flex items-center justify-center rounded-full bg-red-500 text-white shadow-sm shadow-red-500/30 transition-all ${size === "large" ? "h-10 w-10" : "h-8 w-8"}`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
             <rect x="6" y="6" width="12" height="12" rx="2" />
