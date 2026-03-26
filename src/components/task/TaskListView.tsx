@@ -587,6 +587,11 @@ const SortableTaskItem = memo(function SortableTaskItem({
     // ドラッグ中はプレースホルダとして半透明表示（DragOverlay が実体を表示）
     opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? -1 : undefined,
+    ...(isMobile ? {
+      WebkitUserSelect: "none",
+      userSelect: "none",
+      WebkitTouchCallout: "none",
+    } as React.CSSProperties : {}),
   }
 
   const handleSelect = useCallback(() => {
