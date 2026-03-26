@@ -40,6 +40,7 @@ src/
 │   │       └── dashboard/             # ダッシュボード（タスク統計）
 │   ├── invite/[code]/                 # ワークスペース招待ランディング
 │   ├── ch/[code]/                     # グループチャット招待ランディング
+│   ├── t/[token]/                     # ゲストタスク共有ページ（認証不要）
 │   └── api/
 │       ├── auth/signup, callback      # 認証 + 招待コード処理
 │       └── internal/                  # 内部 API（認証必須）
@@ -52,9 +53,11 @@ src/
 │           ├── upload/                # ファイルアップロード
 │           ├── workspaces/invite,join # ワークスペース招待
 │           ├── projects/              # プロジェクト CRUD
-│           ├── tasks/                 # タスク CRUD + ステータス更新 + comments
+│           ├── tasks/                 # タスク CRUD + ステータス更新 + comments + share
 │           ├── notifications/         # 通知一覧 + 既読更新
 │           └── ai/suggest-reply       # AI 返信候補生成
+│       └── guest/                     # ゲスト用 API（認証不要、トークン検証）
+│           └── tasks/[token]/         # ゲストタスク閲覧 + コメント投稿
 ├── components/
 │   ├── ui/           # shadcn（Calendar, DatePicker, Popover 等）
 │   ├── auth/         # LoginForm, SignupForm, GoogleLoginButton
@@ -98,7 +101,9 @@ public/
 - **Project**: workspaceId, name, description, color, archived
 - **Task**: workspaceId, projectId, parentTaskId（サブタスク）, title, description, status (todo/in_progress/done), priority (none/low/medium/high), assigneeId, creatorId, dueDate, recurrenceRule (RRULE文字列), nextOccurrence
 - **TaskComment**: taskId, userId, content
-- **Notification**: workspaceId, userId, actorId, type (task_assigned/task_completed/task_commented), title, taskId, projectId, read
+- **TaskShareLink**: taskId, token (unique, 32文字hex), createdBy, active, expiresAt — ゲスト共有リンク
+- **GuestComment**: taskId, shareLinkId, guestName, content — 未登録ゲストのコメント
+- **Notification**: workspaceId, userId, actorId, type (task_assigned/task_completed/task_commented/guest_comment), title, taskId, projectId, read
 
 ## コマンド
 
@@ -126,6 +131,7 @@ ANTHROPIC_API_KEY=       # Claude API キー
 - **Prisma 出力先**: `src/generated/prisma`。`.gitignore` 対象のため、ビルド時に `prisma generate` 必須
 - **`useSearchParams()`**: 使用するコンポーネントは `<Suspense>` でラップ必須（Next.js 要件）
 - **招待フロー**: `inviteCode` 12文字（`crypto.randomUUID().replace(/-/g, "").slice(0, 12)`）
+- **ゲスト共有**: `TaskShareLink.token` 32文字hex（`crypto.randomBytes(16).toString("hex")`）。`/t/[token]` で認証不要アクセス。GuestComment は TaskComment と別テーブル（userId NOT NULL 制約を壊さない）
 - **AI チャット**: `@AI` メンション → `after()` でバックグラウンド応答生成 → Realtime で配信。失敗時はエラーメッセージをチャットに投稿
 - **AI 機能**: 返信候補生成、会話要約、議事録生成、重要事項自動検出（5メッセージごとにバッチ分析）
 - **繰り返しタスク**: RFC 5545 RRULE 形式。`rrule` ライブラリで処理。完了時に次回タスクを自動生成

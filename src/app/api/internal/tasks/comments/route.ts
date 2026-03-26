@@ -32,13 +32,39 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const comments = await prisma.taskComment.findMany({
-      where: { taskId },
-      include: { user: { select: userSelect } },
-      orderBy: { createdAt: "asc" },
-    })
+    const [comments, guestComments] = await Promise.all([
+      prisma.taskComment.findMany({
+        where: { taskId },
+        include: { user: { select: userSelect } },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.guestComment.findMany({
+        where: { taskId },
+        orderBy: { createdAt: "asc" },
+      }),
+    ])
 
-    return NextResponse.json(comments)
+    // ゲストコメントを TaskCommentInfo 互換の形式に変換してマージ
+    const merged = [
+      ...comments.map((c) => ({ ...c, isGuest: false as const })),
+      ...guestComments.map((gc) => ({
+        id: gc.id,
+        taskId: gc.taskId,
+        content: gc.content,
+        fileUrl: null,
+        fileName: null,
+        fileType: null,
+        createdAt: gc.createdAt,
+        user: {
+          id: `guest-${gc.id}`,
+          displayName: `${gc.guestName}（ゲスト）`,
+          avatarUrl: null,
+        },
+        isGuest: true as const,
+      })),
+    ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
+    return NextResponse.json(merged)
   } catch (error) {
     console.error("タスクコメント取得エラー:", error)
     return NextResponse.json(

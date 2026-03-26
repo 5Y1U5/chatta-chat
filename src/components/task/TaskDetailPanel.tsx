@@ -126,6 +126,9 @@ export function TaskDetailPanel({
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
   const [detailsLoaded, setDetailsLoaded] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [shareToken, setShareToken] = useState<string | null>(null)
+  const [shareLoading, setShareLoading] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
   const [showMentionList, setShowMentionList] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -198,6 +201,15 @@ export function TaskDetailPanel({
       setTaskMembers(data.members)
       setDetailsLoaded(true)
     })
+
+    // 共有リンクの存在確認（GET として share API を叩く代わりに、タスクIDで検索）
+    fetch(`/api/internal/tasks/share?taskId=${taskId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!cancelled && data?.token) setShareToken(data.token)
+        else if (!cancelled) setShareToken(null)
+      })
+      .catch(() => { if (!cancelled) setShareToken(null) })
 
     return () => { cancelled = true }
   }, [currentTask.id, fetchDetails])
@@ -640,38 +652,140 @@ export function TaskDetailPanel({
                 </>
               )}
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground"
-              title="リンクをコピー"
-              onClick={async () => {
-                const url = `${window.location.origin}/${workspaceId}/tasks?taskId=${currentTask.id}`
-                try {
-                  await navigator.clipboard.writeText(url)
-                } catch {
-                  const textarea = document.createElement("textarea")
-                  textarea.value = url
-                  document.body.appendChild(textarea)
-                  textarea.select()
-                  document.execCommand("copy")
-                  document.body.removeChild(textarea)
-                }
-                setLinkCopied(true)
-                setTimeout(() => setLinkCopied(false), 2000)
-              }}
-            >
-              {linkCopied ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
-              )}
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground"
+                  title="共有"
+                >
+                  {linkCopied || shareCopied ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-56 p-1">
+                {/* 内部リンクをコピー */}
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+                  onClick={async () => {
+                    const url = `${window.location.origin}/${workspaceId}/tasks?taskId=${currentTask.id}`
+                    try {
+                      await navigator.clipboard.writeText(url)
+                    } catch {
+                      const textarea = document.createElement("textarea")
+                      textarea.value = url
+                      document.body.appendChild(textarea)
+                      textarea.select()
+                      document.execCommand("copy")
+                      document.body.removeChild(textarea)
+                    }
+                    setLinkCopied(true)
+                    setTimeout(() => setLinkCopied(false), 2000)
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                  </svg>
+                  {linkCopied ? "コピーしました" : "内部リンクをコピー"}
+                </button>
+
+                <div className="my-1 border-t" />
+
+                {/* ゲスト共有リンク */}
+                {shareToken ? (
+                  <>
+                    <button
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+                      onClick={async () => {
+                        const url = `${window.location.origin}/t/${shareToken}`
+                        try {
+                          await navigator.clipboard.writeText(url)
+                        } catch {
+                          const textarea = document.createElement("textarea")
+                          textarea.value = url
+                          document.body.appendChild(textarea)
+                          textarea.select()
+                          document.execCommand("copy")
+                          document.body.removeChild(textarea)
+                        }
+                        setShareCopied(true)
+                        setTimeout(() => setShareCopied(false), 2000)
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                      </svg>
+                      {shareCopied ? "コピーしました" : "ゲスト共有リンクをコピー"}
+                    </button>
+                    <button
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                      onClick={async () => {
+                        const res = await fetch("/api/internal/tasks/share", {
+                          method: "DELETE",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ taskId: currentTask.id }),
+                        })
+                        if (res.ok) setShareToken(null)
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                      </svg>
+                      共有リンクを無効化
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+                    disabled={shareLoading}
+                    onClick={async () => {
+                      setShareLoading(true)
+                      try {
+                        const res = await fetch("/api/internal/tasks/share", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ taskId: currentTask.id }),
+                        })
+                        if (res.ok) {
+                          const { token } = await res.json()
+                          setShareToken(token)
+                          // 生成後すぐにコピー
+                          const url = `${window.location.origin}/t/${token}`
+                          try {
+                            await navigator.clipboard.writeText(url)
+                          } catch {
+                            const textarea = document.createElement("textarea")
+                            textarea.value = url
+                            document.body.appendChild(textarea)
+                            textarea.select()
+                            document.execCommand("copy")
+                            document.body.removeChild(textarea)
+                          }
+                          setShareCopied(true)
+                          setTimeout(() => setShareCopied(false), 2000)
+                        }
+                      } finally {
+                        setShareLoading(false)
+                      }
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                    </svg>
+                    {shareLoading ? "作成中..." : "ゲスト共有リンクを作成"}
+                  </button>
+                )}
+              </PopoverContent>
+            </Popover>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
