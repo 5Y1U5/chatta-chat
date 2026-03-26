@@ -148,10 +148,14 @@ export class LongPressTouchSensor implements SensorInstance {
 
   private handleCancel() {
     this.detach()
-    if (!this.activated) {
+    if (this.activated) {
+      // ドラッグ有効化後の touchcancel は正常終了として扱う
+      // （ブラウザが長押し中に touchcancel を発火するケースへの対策）
+      this.props.onEnd()
+    } else {
       this.props.onAbort(this.props.active)
+      this.props.onCancel()
     }
-    this.props.onCancel()
   }
 
   private handleKeydown(event: KeyboardEvent) {
