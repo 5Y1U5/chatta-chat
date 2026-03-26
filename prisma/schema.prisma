@@ -29,6 +29,7 @@ model User {
   taskMembers      TaskMember[]
   notifications    Notification[]  @relation("NotificationRecipient")
   actedNotifications Notification[] @relation("NotificationActor")
+  taskShareLinks   TaskShareLink[] @relation("TaskShareLinkCreator")
 }
 
 // === ワークスペース（組織/チーム単位）===
@@ -205,8 +206,10 @@ model Task {
   creator    User          @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   parentTask Task?         @relation("SubTasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
   subTasks   Task[]        @relation("SubTasks")
-  comments   TaskComment[]
-  members    TaskMember[]
+  comments      TaskComment[]
+  members       TaskMember[]
+  shareLinks    TaskShareLink[]
+  guestComments GuestComment[]
 
   @@index([workspaceId, assigneeId, status])
   @@index([projectId, status])
@@ -260,4 +263,36 @@ model Notification {
   actor User @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
 
   @@index([userId, read, createdAt])
+}
+
+// === タスク共有リンク（ゲストアクセス用）===
+model TaskShareLink {
+  id        String    @id @default(uuid())
+  taskId    String
+  token     String    @unique  // 32文字 hex（推測不可能）
+  createdBy String               // リンク生成者
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?            // v1は無期限
+
+  task    Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator User @relation("TaskShareLinkCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  guestComments GuestComment[]
+
+  @@index([taskId])
+}
+
+// === ゲストコメント（未登録ユーザー）===
+model GuestComment {
+  id          String   @id @default(uuid())
+  taskId      String
+  shareLinkId String
+  guestName   String
+  content     String
+  createdAt   DateTime @default(now())
+
+  task      Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  shareLink TaskShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
 }

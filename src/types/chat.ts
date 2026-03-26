@@ -96,6 +96,7 @@ export type TaskInfo = {
   } | null
   subTasks?: TaskInfo[]
   _count?: { subTasks: number; comments: number; members?: number }
+  shareToken?: string | null
 }
 
 // タスクコメント情報
@@ -112,6 +113,31 @@ export type TaskCommentInfo = {
     displayName: string | null
     avatarUrl: string | null
   }
+}
+
+// ゲストコメント情報
+export type GuestCommentInfo = {
+  id: string
+  taskId: string
+  guestName: string
+  content: string
+  createdAt: string
+  isGuest: true
+}
+
+// ゲスト用タスク表示（内部IDを含まない）
+export type GuestTaskView = {
+  title: string
+  description: string | null
+  status: string
+  priority: string
+  dueDate: string | null
+  assigneeName: string | null
+  creatorName: string | null
+  projectName: string | null
+  projectColor: string | null
+  comments: (TaskCommentInfo | GuestCommentInfo)[]
+  shareLinkId: string
 }
 
 // 通知情報
