@@ -49,6 +49,31 @@ type Props = {
   onTaskDeleted: (taskId: string) => void
 }
 
+// コメント添付ファイルの表示
+function renderFileAttachment(fileUrl: string, fileName: string | null, fileType: string | null) {
+  const isImage = fileType?.startsWith("image/")
+  if (isImage) {
+    return (
+      <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="block mt-1">
+        <img src={fileUrl} alt={fileName || ""} className="max-w-full max-h-48 rounded-md object-contain" />
+      </a>
+    )
+  }
+  return (
+    <a
+      href={fileUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 mt-1 p-2 rounded-md bg-muted/50 text-sm hover:bg-muted transition-colors"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+      </svg>
+      <span className="truncate text-primary">{fileName || "ファイル"}</span>
+    </a>
+  )
+}
+
 // コメント内の @メンション を強調表示
 function renderCommentContent(content: string) {
   const parts = content.split(/(@\S+)/g)
@@ -102,7 +127,12 @@ export function TaskDetailPanel({
   const [detailsLoaded, setDetailsLoaded] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [showMentionList, setShowMentionList] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const commentInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const isMobile = useIsMobile()
 
   // ルートタスクが切り替わったらスタックとキャッシュをリセット
@@ -362,15 +392,31 @@ export function TaskDetailPanel({
     setTimeout(() => commentInputRef.current?.focus(), 50)
   }
 
-  // 楽観的コメント追加
-  const handleAddComment = () => {
-    if (!newComment.trim()) return
+  // ファイル選択ハンドラ
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert("ファイルサイズは10MB以下にしてください")
+        return
+      }
+      setPendingFile(file)
+    }
+    e.target.value = ""
+  }
+
+  // 楽観的コメント追加（ファイル対応）
+  const handleAddComment = async () => {
+    if (!newComment.trim() && !pendingFile) return
 
     const currentMember = members.find((m) => m.id === currentUserId)
     const tempComment: TaskCommentInfo = {
       id: crypto.randomUUID(),
       taskId: currentTask.id,
       content: newComment.trim(),
+      fileUrl: pendingFile ? URL.createObjectURL(pendingFile) : null,
+      fileName: pendingFile?.name || null,
+      fileType: pendingFile?.type || null,
       createdAt: new Date().toISOString(),
       user: {
         id: currentUserId,
@@ -388,12 +434,37 @@ export function TaskDetailPanel({
     }
 
     const content = newComment.trim()
+    const file = pendingFile
     setNewComment("")
+    setPendingFile(null)
+
+    // ファイルアップロード
+    let fileUrl: string | null = null
+    let fileName: string | null = null
+    let fileType: string | null = null
+    if (file) {
+      setUploading(true)
+      try {
+        const formData = new FormData()
+        formData.append("file", file)
+        const uploadRes = await fetch("/api/internal/upload", { method: "POST", body: formData })
+        if (uploadRes.ok) {
+          const data = await uploadRes.json()
+          fileUrl = data.fileUrl
+          fileName = data.fileName
+          fileType = data.fileType
+        }
+      } catch {
+        // アップロード失敗しても本文は送信
+      } finally {
+        setUploading(false)
+      }
+    }
 
     fetch("/api/internal/tasks/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: currentTask.id, content }),
+      body: JSON.stringify({ taskId: currentTask.id, content, fileUrl, fileName, fileType }),
     })
   }
 
@@ -950,7 +1021,7 @@ export function TaskDetailPanel({
         <div className="border-t mx-4" />
 
         {/* コメント（タスク内チャット） */}
-        <div className={cn("px-4", isMobile ? "py-4" : "py-3")}>
+        <div className={cn("px-4", isMobile ? "py-4 pb-2" : "py-3")}>
           <SectionLabel mobile={isMobile}>
             チャット{detailsLoaded ? ` (${comments.length})` : ""}
           </SectionLabel>
@@ -958,7 +1029,7 @@ export function TaskDetailPanel({
             {comments.map((c) => (
               <div key={c.id} className="flex gap-2.5 items-start text-sm">
                 <div className={cn(
-                  "flex shrink-0 items-center justify-center rounded-full bg-muted font-medium mt-0.5",
+                  "flex shrink-0 items-center justify-center rounded-full bg-muted font-medium mt-0.5 overflow-hidden",
                   isMobile ? "h-8 w-8 text-xs" : "h-6 w-6 text-[10px]"
                 )}>
                   {c.user.avatarUrl ? (
@@ -974,68 +1045,233 @@ export function TaskDetailPanel({
                       {new Date(c.createdAt).toLocaleString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
-                  <p className={cn("whitespace-pre-wrap", isMobile ? "text-sm" : "text-sm text-foreground/90")}>
-                    {renderCommentContent(c.content)}
-                  </p>
+                  {c.content && (
+                    <p className={cn("whitespace-pre-wrap", isMobile ? "text-sm" : "text-sm text-foreground/90")}>
+                      {renderCommentContent(c.content)}
+                    </p>
+                  )}
+                  {c.fileUrl && renderFileAttachment(c.fileUrl, c.fileName, c.fileType)}
                 </div>
               </div>
             ))}
-            {/* 入力エリア */}
-            <div className="relative">
-              <div className="flex gap-2 items-center">
-                {/* メンションボタン */}
-                {mentionTargets.length > 0 && (
-                  <Popover open={showMentionList} onOpenChange={setShowMentionList}>
+          </div>
+        </div>
+        {/* モバイル: スクロール末尾の余白（下部固定バーの裏に隠れないよう） */}
+        {isMobile && <div className="h-32" />}
+      </div>
+
+      {/* 隠しファイル入力 */}
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileSelect} className="hidden" />
+      <input ref={imageInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+      <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" onChange={handleFileSelect} className="hidden" />
+
+      {/* 入力エリア — モバイル: 下部固定, PC: インライン */}
+      <div className={cn(
+        "shrink-0 border-t bg-background",
+        isMobile ? "px-4 pb-[env(safe-area-inset-bottom)] pt-2" : "px-4 py-3"
+      )}>
+        {/* 添付ファイルプレビュー */}
+        {pendingFile && (
+          <div className="flex items-center gap-2 mb-2 p-2 rounded-md bg-muted/50 text-sm">
+            {pendingFile.type.startsWith("image/") ? (
+              <img src={URL.createObjectURL(pendingFile)} alt="" className="h-10 w-10 rounded object-cover" />
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+              </svg>
+            )}
+            <span className="flex-1 truncate">{pendingFile.name}</span>
+            <button onClick={() => setPendingFile(null)} className="text-muted-foreground hover:text-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* テキスト入力 */}
+        <Input
+          ref={commentInputRef}
+          className={cn(isMobile ? "h-10 text-sm rounded-lg" : "h-8 text-sm")}
+          placeholder="質問や最新情報を投稿..."
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment() } }}
+          disabled={uploading}
+        />
+
+        {/* ツールバー行: アイコンボタン + コラボレーター + 送信 */}
+        <div className="flex items-center justify-between mt-1.5">
+          <div className="flex items-center gap-0.5">
+            {/* カメラ撮影 */}
+            <button
+              title="カメラで撮影"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={uploading}
+              className={cn(
+                "flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 transition-colors",
+                isMobile ? "h-10 w-10" : "h-8 w-8"
+              )}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "20" : "16"} height={isMobile ? "20" : "16"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                <circle cx="12" cy="13" r="3" />
+              </svg>
+            </button>
+
+            {/* 写真を選択 */}
+            <button
+              title="写真を選択"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={uploading}
+              className={cn(
+                "flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 transition-colors",
+                isMobile ? "h-10 w-10" : "h-8 w-8"
+              )}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "20" : "16"} height={isMobile ? "20" : "16"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </button>
+
+            {/* ファイル添付 */}
+            <button
+              title="ファイルを添付"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className={cn(
+                "flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 transition-colors",
+                isMobile ? "h-10 w-10" : "h-8 w-8"
+              )}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "20" : "16"} height={isMobile ? "20" : "16"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+            </button>
+
+            {/* メンション */}
+            {mentionTargets.length > 0 && (
+              <Popover open={showMentionList} onOpenChange={setShowMentionList}>
+                <PopoverTrigger asChild>
+                  <button
+                    title="メンション"
+                    className={cn(
+                      "flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+                      isMobile ? "h-10 w-10" : "h-8 w-8"
+                    )}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "20" : "16"} height={isMobile ? "20" : "16"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="4" />
+                      <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+                    </svg>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent side="top" align="start" className="w-56 p-1">
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">メンション</p>
+                  {mentionTargets.map((t) => (
+                    <button
+                      key={t.id}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+                      onClick={() => handleInsertMention(t.displayName || t.id.slice(0, 8))}
+                    >
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium shrink-0">
+                        {t.displayName?.charAt(0) || "?"}
+                      </div>
+                      {t.displayName || t.id.slice(0, 8)}
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+
+          {/* 右側: コラボレーター + 送信 */}
+          <div className="flex items-center gap-1.5">
+            {/* コラボレーターアバター（コンパクト） */}
+            {detailsLoaded && (
+              <div className="flex items-center">
+                {[
+                  currentTask.assignee && { id: currentTask.assigneeId!, name: currentTask.assignee.displayName, avatar: currentTask.assignee.avatarUrl },
+                  ...(currentTask.creator && currentTask.creatorId !== currentTask.assigneeId
+                    ? [{ id: currentTask.creatorId, name: currentTask.creator.displayName, avatar: currentTask.creator.avatarUrl }]
+                    : []),
+                  ...taskMembers.map((m) => ({ id: m.userId, name: m.displayName, avatar: m.avatarUrl })),
+                ].filter(Boolean).slice(0, 3).map((p, i) => (
+                  <div
+                    key={p!.id}
+                    className={cn(
+                      "flex items-center justify-center rounded-full bg-muted text-[8px] font-medium shrink-0 ring-2 ring-background overflow-hidden",
+                      isMobile ? "h-7 w-7" : "h-6 w-6",
+                      i > 0 && "-ml-1.5"
+                    )}
+                    title={p!.name || ""}
+                  >
+                    {p!.avatar ? (
+                      <img src={p!.avatar} alt="" className="h-full w-full rounded-full object-cover" />
+                    ) : (
+                      p!.name?.charAt(0) || "?"
+                    )}
+                  </div>
+                ))}
+                {availableMembers.length > 0 && (
+                  <Popover>
                     <PopoverTrigger asChild>
                       <button
                         className={cn(
-                          "flex shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-muted transition-colors",
-                          isMobile ? "h-10 w-10" : "h-8 w-8"
+                          "flex items-center justify-center rounded-full border border-dashed border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary transition-colors -ml-1",
+                          isMobile ? "h-7 w-7" : "h-6 w-6"
                         )}
-                        title="メンション"
+                        title="コラボレーターを追加"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "20" : "16"} height={isMobile ? "20" : "16"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="4" />
-                          <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent side="top" align="start" className="w-56 p-1">
-                      <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">メンション</p>
-                      {mentionTargets.map((t) => (
+                    <PopoverContent side="top" align="end" className="w-56 p-1">
+                      <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">コラボレーターを追加</p>
+                      {availableMembers.map((m) => (
                         <button
-                          key={t.id}
+                          key={m.id}
                           className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
-                          onClick={() => handleInsertMention(t.displayName || t.id.slice(0, 8))}
+                          onClick={() => handleAddMember(m.id)}
                         >
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium shrink-0">
-                            {t.displayName?.charAt(0) || "?"}
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium shrink-0 overflow-hidden">
+                            {m.avatarUrl ? (
+                              <img src={m.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                            ) : (
+                              m.displayName?.charAt(0) || "?"
+                            )}
                           </div>
-                          {t.displayName || t.id.slice(0, 8)}
+                          {m.displayName || m.id.slice(0, 8)}
                         </button>
                       ))}
                     </PopoverContent>
                   </Popover>
                 )}
-                <Input
-                  ref={commentInputRef}
-                  className={cn(isMobile ? "h-10 text-sm rounded-lg" : "h-8 text-sm")}
-                  placeholder={mentionTargets.length > 0 ? "@でメンション..." : "メッセージを入力..."}
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment() } }}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={cn("shrink-0", isMobile ? "h-10 px-4" : "h-8")}
-                  onClick={handleAddComment}
-                  disabled={!newComment.trim()}
-                >
-                  送信
-                </Button>
               </div>
-            </div>
+            )}
+
+            {/* 送信ボタン */}
+            <Button
+              size="sm"
+              className={cn("shrink-0 rounded-full", isMobile ? "h-9 w-9 p-0" : "h-8 w-8 p-0")}
+              onClick={handleAddComment}
+              disabled={(!newComment.trim() && !pendingFile) || uploading}
+            >
+              {uploading ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              )}
+            </Button>
           </div>
         </div>
       </div>

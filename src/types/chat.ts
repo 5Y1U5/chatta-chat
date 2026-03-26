@@ -103,6 +103,9 @@ export type TaskCommentInfo = {
   id: string
   taskId: string
   content: string
+  fileUrl: string | null
+  fileName: string | null
+  fileType: string | null
   createdAt: string
   user: {
     id: string

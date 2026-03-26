@@ -52,11 +52,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     const auth = await requireAuth()
-    const { taskId, content } = await request.json()
+    const { taskId, content, fileUrl, fileName, fileType } = await request.json()
 
-    if (!taskId || !content?.trim()) {
+    if (!taskId || (!content?.trim() && !fileUrl)) {
       return NextResponse.json(
-        { error: "タスクIDとコメント内容は必須です" },
+        { error: "タスクIDとコメント内容またはファイルは必須です" },
         { status: 400 }
       )
     }
@@ -76,7 +76,10 @@ export async function POST(request: Request) {
       data: {
         taskId,
         userId: auth.userId,
-        content: content.trim(),
+        content: content?.trim() || "",
+        fileUrl: fileUrl || null,
+        fileName: fileName || null,
+        fileType: fileType || null,
       },
       include: { user: { select: userSelect } },
     })
