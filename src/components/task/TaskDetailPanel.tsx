@@ -8,11 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils"
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core"
 import { LongPressTouchSensor } from "@/lib/LongPressTouchSensor"
 import {
@@ -397,13 +399,22 @@ export function TaskDetailPanel({
   const subTaskProgress = subTasks.length > 0 ? (completedSubTasks / subTasks.length) * 100 : 0
 
   // サブタスク並び替え用
-  const subTaskSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(LongPressTouchSensor, { activationConstraint: { delay: 400, tolerance: 10 } })
+  const [activeSubTaskId, setActiveSubTaskId] = useState<string | null>(null)
+  const subTaskDesktopSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
+  const subTaskMobileSensors = useSensors(
+    useSensor(LongPressTouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } })
+  )
+  const subTaskSensors = isMobile ? subTaskMobileSensors : subTaskDesktopSensors
   const subTaskIds = useMemo(() => subTasks.map((t) => t.id), [subTasks])
 
+  const handleSubTaskDragStart = useCallback((event: DragStartEvent) => {
+    setActiveSubTaskId(event.active.id as string)
+  }, [])
+
   const handleSubTaskDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveSubTaskId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -424,6 +435,12 @@ export function TaskDetailPanel({
       body: JSON.stringify({ taskIds: updated.map((t) => t.id) }),
     })
   }, [subTasks])
+
+  const handleSubTaskDragCancel = useCallback(() => {
+    setActiveSubTaskId(null)
+  }, [])
+
+  const activeSubTask = activeSubTaskId ? subTasks.find((t) => t.id === activeSubTaskId) : null
 
   // パンくずリスト用の階層情報
   const breadcrumbs = useMemo(() => {
@@ -782,7 +799,10 @@ export function TaskDetailPanel({
             <DndContext
               sensors={subTaskSensors}
               collisionDetection={closestCenter}
+              onDragStart={handleSubTaskDragStart}
               onDragEnd={handleSubTaskDragEnd}
+              onDragCancel={handleSubTaskDragCancel}
+              autoScroll={{ threshold: { x: 0, y: 0.2 }, interval: 5 }}
             >
               <SortableContext items={subTaskIds} strategy={verticalListSortingStrategy}>
                 {subTasks.map((st) => (
@@ -795,6 +815,23 @@ export function TaskDetailPanel({
                   />
                 ))}
               </SortableContext>
+              <DragOverlay dropAnimation={null}>
+                {activeSubTask && (
+                  <div
+                    style={{
+                      transform: "scale(1.03)",
+                      boxShadow: "0 8px 20px rgba(0,0,0,0.18)",
+                      borderRadius: "6px",
+                      background: "var(--color-card, white)",
+                      opacity: 0.95,
+                      padding: "4px 8px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {activeSubTask.title}
+                  </div>
+                )}
+              </DragOverlay>
             </DndContext>
 
             {subTasks.length < 15 && (
@@ -899,19 +936,9 @@ const SortableSubTaskItem = memo(function SortableSubTaskItem({
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging
-      ? `${transition}, box-shadow 200ms ease, transform 200ms ease`
-      : transition,
-    opacity: isDragging ? 0.9 : 1,
-    ...(isDragging
-      ? {
-          scale: "1.02",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-          borderRadius: "6px",
-          background: "var(--color-card, white)",
-          zIndex: 50,
-        }
-      : {}),
+    transition: transition || undefined,
+    opacity: isDragging ? 0.3 : 1,
+    zIndex: isDragging ? -1 : undefined,
   }
 
   // 優先度のインジケーター色
