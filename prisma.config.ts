@@ -8,6 +8,6 @@ export default defineConfig({
   },
   datasource: {
     // マイグレーションは直接接続を使用
-    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
+    url: (process.env["DIRECT_URL"] || process.env["DATABASE_URL"] || "").trim(),
   },
 })
