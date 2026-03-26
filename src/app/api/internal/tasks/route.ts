@@ -276,6 +276,8 @@ export async function PATCH(request: Request) {
     }
 
     const data: Record<string, unknown> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let generatedNextTask: any = null
 
     if (updates.title !== undefined) data.title = updates.title.trim()
     if (updates.description !== undefined)
@@ -302,25 +304,32 @@ export async function PATCH(request: Request) {
 
         // 繰り返しタスクの場合、次回タスクを自動生成
         if (task.recurrenceRule) {
-          const nextDate = getNextOccurrence(task.recurrenceRule, new Date())
-          console.log("[繰り返しタスク] ルール:", task.recurrenceRule, "→ 次回:", nextDate)
-          if (nextDate) {
-            const nextTask = await prisma.task.create({
-              data: {
-                workspaceId: task.workspaceId,
-                title: task.title,
-                description: task.description,
-                projectId: task.projectId,
-                assigneeId: task.assigneeId,
-                creatorId: task.creatorId,
-                priority: task.priority,
-                dueDate: nextDate,
-                recurrenceRule: task.recurrenceRule,
-                nextOccurrence: nextDate,
-              },
-              include: taskInclude,
-            })
-            console.log("[繰り返しタスク] 次回タスク生成完了:", nextTask.id, "期日:", nextDate)
+          try {
+            const nextDate = getNextOccurrence(task.recurrenceRule, new Date())
+            console.log("[繰り返しタスク] ルール:", task.recurrenceRule, "→ 次回:", nextDate)
+            if (nextDate) {
+              generatedNextTask = await prisma.task.create({
+                data: {
+                  workspaceId: task.workspaceId,
+                  title: task.title,
+                  description: task.description,
+                  projectId: task.projectId,
+                  assigneeId: task.assigneeId,
+                  creatorId: task.creatorId,
+                  priority: task.priority,
+                  dueDate: nextDate,
+                  recurrenceRule: task.recurrenceRule,
+                  nextOccurrence: nextDate,
+                },
+                include: taskInclude,
+              })
+              console.log("[繰り返しタスク] 次回タスク生成完了:", generatedNextTask.id, "期日:", nextDate)
+            } else {
+              console.warn("[繰り返しタスク] 次回日時の計算に失敗:", task.recurrenceRule)
+            }
+          } catch (recurrenceError) {
+            console.error("[繰り返しタスク] 次回タスク生成エラー:", recurrenceError)
+            // 繰り返しタスク生成に失敗しても、元タスクの完了は成功させる
           }
         }
 
@@ -375,6 +384,10 @@ export async function PATCH(request: Request) {
       include: taskInclude,
     })
 
+    // 繰り返しタスクが生成された場合、レスポンスに含める
+    if (generatedNextTask) {
+      return NextResponse.json({ ...updated, _generatedNextTask: generatedNextTask })
+    }
     return NextResponse.json(updated)
   } catch (error) {
     console.error("タスク更新エラー:", error)

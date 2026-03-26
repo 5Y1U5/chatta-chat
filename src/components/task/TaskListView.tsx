@@ -178,7 +178,6 @@ export function TaskListView({
 
   // 楽観的ステータス変更
   const handleStatusChange = useCallback((taskId: string, status: string) => {
-    const targetTask = tasks.find((t) => t.id === taskId)
     // 即座にローカル state を更新
     setTasks((prev) =>
       prev.map((t) =>
@@ -192,13 +191,15 @@ export function TaskListView({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId, status }),
-    }).then(() => {
-      // 繰り返しタスクの場合、サーバーが次回タスクを生成するのでバックグラウンド同期
-      if (targetTask?.recurrenceRule && status === "done") {
-        syncInBackground()
-      }
     })
-  }, [tasks, syncInBackground])
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        // 繰り返しタスクの場合、サーバーが生成した次回タスクを即座に追加
+        if (data?._generatedNextTask) {
+          setTasks((prev) => [...prev, data._generatedNextTask])
+        }
+      })
+  }, [])
 
   const handleReorder = useCallback((reorderedTasks: TaskInfo[]) => {
     const taskIds = reorderedTasks.map((t) => t.id)
