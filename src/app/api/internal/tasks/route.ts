@@ -16,6 +16,15 @@ const taskInclude = {
   _count: { select: { subTasks: true, comments: true, members: true } },
 } as const
 
+// ルートタスク取得時はサブタスクも含める（詳細パネルで即表示するため）
+const taskIncludeWithSubTasks = {
+  ...taskInclude,
+  subTasks: {
+    include: taskInclude,
+    orderBy: [{ sortOrder: "asc" as const }, { createdAt: "desc" as const }],
+  },
+} as const
+
 // タスク一覧取得
 export async function GET(request: NextRequest) {
   try {
@@ -66,9 +75,11 @@ export async function GET(request: NextRequest) {
       // 何も指定なしの場合は全タスク（従来通り）
     }
 
+    // ルートタスク一覧の場合はサブタスクも含める
+    const isRootQuery = !parentTaskId && where.parentTaskId === null
     const tasks = await prisma.task.findMany({
       where,
-      include: taskInclude,
+      include: isRootQuery ? taskIncludeWithSubTasks : taskInclude,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     })
 

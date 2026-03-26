@@ -51,8 +51,20 @@ export default async function MyTasksPage({
     assignee: { select: userSelect },
     creator: { select: userSelect },
     project: { select: { id: true, name: true, color: true } },
-    _count: { select: { subTasks: true, comments: true } },
-  } as const
+    _count: { select: { subTasks: true, comments: true, members: true } },
+    subTasks: {
+      include: {
+        assignee: { select: userSelect },
+        creator: { select: userSelect },
+        project: { select: { id: true, name: true, color: true } },
+        _count: { select: { subTasks: true, comments: true, members: true } },
+      },
+      orderBy: [
+        { sortOrder: "asc" as const },
+        { createdAt: "desc" as const },
+      ],
+    },
+  }
   const taskOrderBy = [{ status: "asc" as const }, { dueDate: "asc" as const }, { createdAt: "desc" as const }]
 
   let initialTasks
