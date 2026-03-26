@@ -168,26 +168,21 @@ export function TaskDetailPanel({
     }
   }, [currentTask.id, currentTask.title, currentTask.description])
 
-  // 詳細データの取得（キャッシュ有 → バックグラウンド再検証、キャッシュ無 → フル取得）
+  // 詳細データの一括取得（サブタスク + コメント + メンバー + 共有リンク）
   const fetchDetails = useCallback(async (taskId: string) => {
-    const [subRes, commentRes, memberRes] = await Promise.all([
-      fetch(`/api/internal/tasks?parentTaskId=${taskId}`),
-      fetch(`/api/internal/tasks/comments?taskId=${taskId}`),
-      fetch(`/api/internal/tasks/members?taskId=${taskId}`),
-    ])
-    const newSubTasks = subRes.ok ? await subRes.json() : []
-    const newComments = commentRes.ok ? await commentRes.json() : []
-    const newMembers = memberRes.ok ? await memberRes.json() : []
+    const res = await fetch(`/api/internal/tasks/details?taskId=${taskId}`)
+    if (!res.ok) return { subTasks: [], comments: [], members: [], shareToken: null }
+    const data = await res.json()
 
     // キャッシュに保存
     detailsCacheRef.current[taskId] = {
-      subTasks: newSubTasks,
-      comments: newComments,
-      members: newMembers,
+      subTasks: data.subTasks,
+      comments: data.comments,
+      members: data.members,
       fetchedAt: Date.now(),
     }
 
-    return { subTasks: newSubTasks, comments: newComments, members: newMembers }
+    return data as { subTasks: TaskInfo[]; comments: TaskCommentInfo[]; members: MemberInfo[]; shareToken: string | null }
   }, [])
 
   useEffect(() => {
@@ -199,17 +194,9 @@ export function TaskDetailPanel({
       setSubTasks(data.subTasks)
       setComments(data.comments)
       setTaskMembers(data.members)
+      setShareToken(data.shareToken)
       setDetailsLoaded(true)
     })
-
-    // 共有リンクの存在確認（GET として share API を叩く代わりに、タスクIDで検索）
-    fetch(`/api/internal/tasks/share?taskId=${taskId}`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (!cancelled && data?.token) setShareToken(data.token)
-        else if (!cancelled) setShareToken(null)
-      })
-      .catch(() => { if (!cancelled) setShareToken(null) })
 
     return () => { cancelled = true }
   }, [currentTask.id, fetchDetails])

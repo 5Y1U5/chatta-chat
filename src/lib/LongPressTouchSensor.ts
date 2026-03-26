@@ -27,6 +27,7 @@ interface LongPressOptions extends SensorOptions {
  * - 長押し待機中 (delay ms) は touchmove を preventDefault → スクロール抑制
  * - tolerance を超えて指が動いたら即キャンセル → 通常スクロールに戻る
  * - delay 経過後にドラッグを有効化
+ * - ドラッグ有効化後は touchend（指を離す）でのみ終了、touchcancel は無視
  */
 export class LongPressTouchSensor implements SensorInstance {
   autoScrollEnabled = true
@@ -40,12 +41,18 @@ export class LongPressTouchSensor implements SensorInstance {
   private boundHandleCancel: () => void
   private boundHandleKeydown: (e: KeyboardEvent) => void
   private boundHandleContextMenu: (e: Event) => void
+  private targetElement: HTMLElement | null = null
+  private originalTouchAction: string = ""
 
   constructor(props: SensorProps<LongPressOptions>) {
     this.props = props
     const { event } = props
     const coords = getEventCoordinates(event)
     this.initialCoordinates = coords ?? { x: 0, y: 0 }
+
+    // ドラッグ対象の要素を取得し、touch-action を制御
+    const nativeEvent = (event as unknown as { nativeEvent?: Event }).nativeEvent || event
+    this.targetElement = (nativeEvent as TouchEvent).target as HTMLElement | null
 
     this.boundHandleMove = this.handleMove.bind(this)
     this.boundHandleEnd = this.handleEnd.bind(this)
@@ -95,10 +102,24 @@ export class LongPressTouchSensor implements SensorInstance {
       clearTimeout(this.timeoutId)
       this.timeoutId = null
     }
+
+    // touch-action を復元
+    if (this.targetElement) {
+      this.targetElement.style.touchAction = this.originalTouchAction
+      this.targetElement = null
+    }
   }
 
   private handleStart() {
     this.activated = true
+
+    // ドラッグ有効化時に touch-action: none を設定
+    // ブラウザがタッチを乗っ取って touchcancel を発火するのを防ぐ
+    if (this.targetElement) {
+      this.originalTouchAction = this.targetElement.style.touchAction
+      this.targetElement.style.touchAction = "none"
+    }
+
     // 触覚フィードバック
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(50)
@@ -147,20 +168,30 @@ export class LongPressTouchSensor implements SensorInstance {
   }
 
   private handleCancel() {
-    this.detach()
     if (this.activated) {
-      // ドラッグ有効化後の touchcancel は正常終了として扱う
-      // （ブラウザが長押し中に touchcancel を発火するケースへの対策）
-      this.props.onEnd()
-    } else {
-      this.props.onAbort(this.props.active)
-      this.props.onCancel()
+      // ドラッグ有効化後の touchcancel は完全に無視する。
+      // 指を離す（touchend）でのみドラッグを終了する。
+      // ブラウザが長押し中に touchcancel を発火しても、
+      // ユーザーが指を離すまでドラッグ状態を維持する。
+      return
     }
+
+    // 有効化前のキャンセル（スクロール等）は通常通り処理
+    this.detach()
+    this.props.onAbort(this.props.active)
+    this.props.onCancel()
   }
 
   private handleKeydown(event: KeyboardEvent) {
     if (event.key === "Escape") {
-      this.handleCancel()
+      // Escape は有効化後でも即座にキャンセル
+      this.detach()
+      if (this.activated) {
+        this.props.onEnd()
+      } else {
+        this.props.onAbort(this.props.active)
+        this.props.onCancel()
+      }
     }
   }
 
