@@ -1,4 +1,4 @@
-// chatta-chat Service Worker — キャッシュ戦略付き
+// chatta-chat Service Worker — 自動更新 + キャッシュ戦略
 
 const CACHE_NAME = "chatta-v3"
 
@@ -22,16 +22,22 @@ self.addEventListener("install", () => {
   self.skipWaiting()
 })
 
-// アクティベート時: 古いキャッシュを削除
+// アクティベート時: 古いキャッシュを削除 + 全クライアントにリロード通知
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((names) =>
-      Promise.all(
+    caches.keys().then(async (names) => {
+      // 古いキャッシュを削除
+      await Promise.all(
         names
           .filter((name) => name !== CACHE_NAME)
           .map((name) => caches.delete(name))
       )
-    )
+      // 全クライアント（タブ/PWA）に更新通知を送信
+      const clients = await self.clients.matchAll({ type: "window" })
+      for (const client of clients) {
+        client.postMessage({ type: "SW_UPDATED" })
+      }
+    })
   )
   self.clients.claim()
 })
