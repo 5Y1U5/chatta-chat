@@ -808,7 +808,7 @@ function TaskSection({
               items={tasks.map((t) => t.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className="pl-2">
+              <div className={isMobile ? "" : "pl-2"}>
                 {tasks.map((task) => (
                   <SortableTaskItem
                     key={task.id}
