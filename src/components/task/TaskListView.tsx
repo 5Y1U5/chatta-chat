@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core"
 import { LongPressTouchSensor } from "@/lib/LongPressTouchSensor"
 import {
@@ -580,19 +582,10 @@ const SortableTaskItem = memo(function SortableTaskItem({
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging
-      ? `${transition}, box-shadow 200ms ease, transform 200ms ease`
-      : transition,
-    opacity: isDragging ? 0.9 : 1,
-    zIndex: isDragging ? 50 : undefined,
-    ...(isDragging
-      ? {
-          scale: "1.02",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-          borderRadius: "8px",
-          background: "var(--color-card, white)",
-        }
-      : {}),
+    transition: transition || undefined,
+    // ドラッグ中はプレースホルダとして半透明表示（DragOverlay が実体を表示）
+    opacity: isDragging ? 0.3 : 1,
+    zIndex: isDragging ? -1 : undefined,
   }
 
   const handleSelect = useCallback(() => {
@@ -720,17 +713,27 @@ function TaskSection({
   isMobile?: boolean
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
+  const [activeId, setActiveId] = useState<string | null>(null)
 
-  const sensors = useSensors(
+  // モバイルでは LongPressTouchSensor のみ（PointerSensor がタッチを奪う問題を回避）
+  const desktopSensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
-    }),
-    useSensor(LongPressTouchSensor, {
-      activationConstraint: { delay: 400, tolerance: 10 },
     })
   )
+  const mobileSensors = useSensors(
+    useSensor(LongPressTouchSensor, {
+      activationConstraint: { delay: 300, tolerance: 8 },
+    })
+  )
+  const sensors = isMobile ? mobileSensors : desktopSensors
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
 
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -754,6 +757,12 @@ function TaskSection({
     // サーバーに保存
     onReorder(updatedSection)
   }
+
+  const handleDragCancel = () => {
+    setActiveId(null)
+  }
+
+  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null
 
   if (tasks.length === 0 && defaultCollapsed) return null
 
@@ -789,7 +798,10 @@ function TaskSection({
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+            autoScroll={{ threshold: { x: 0, y: 0.2 }, interval: 5 }}
           >
             <SortableContext
               items={tasks.map((t) => t.id)}
@@ -808,6 +820,26 @@ function TaskSection({
                 ))}
               </div>
             </SortableContext>
+            <DragOverlay dropAnimation={null}>
+              {activeTask && (
+                <div
+                  style={{
+                    transform: "scale(1.03)",
+                    boxShadow: "0 12px 28px rgba(0,0,0,0.2)",
+                    borderRadius: "8px",
+                    background: "var(--color-card, white)",
+                    opacity: 0.95,
+                  }}
+                >
+                  <TaskItem
+                    task={activeTask}
+                    isSelected={false}
+                    onSelect={() => {}}
+                    onStatusChange={() => {}}
+                  />
+                </div>
+              )}
+            </DragOverlay>
           </DndContext>
           {/* インラインタスク追加 */}
           {onInlineCreate && (
