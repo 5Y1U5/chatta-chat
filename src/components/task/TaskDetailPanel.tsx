@@ -1469,7 +1469,7 @@ const SortableSubTaskItem = memo(function SortableSubTaskItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={cn("group/subtask", isMobile && "touch-manipulation")}
+      className={cn("group/subtask", isMobile && "touch-manipulation select-none")}
       {...(isMobile ? { ...attributes, ...listeners } : {})}
     >
       <div className="flex items-center gap-2">

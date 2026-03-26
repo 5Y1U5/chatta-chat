@@ -597,7 +597,7 @@ const SortableTaskItem = memo(function SortableTaskItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={cn("relative group/sortable", isMobile && "touch-manipulation")}
+      className={cn("relative group/sortable", isMobile && "touch-manipulation select-none")}
       {...(isMobile ? { ...attributes, ...listeners } : {})}
     >
       {/* ドラッグハンドル（デスクトップのみ） */}
