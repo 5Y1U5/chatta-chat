@@ -1452,6 +1452,11 @@ const SortableSubTaskItem = memo(function SortableSubTaskItem({
     transition: transition || undefined,
     opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? -1 : undefined,
+    ...(isMobile ? {
+      WebkitUserSelect: "none",
+      userSelect: "none",
+      WebkitTouchCallout: "none",
+    } as React.CSSProperties : {}),
   }
 
   // 優先度のインジケーター色

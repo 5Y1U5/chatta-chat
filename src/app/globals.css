@@ -165,6 +165,14 @@
   animation: shimmer 1.5s infinite;
 }
 
+/* モバイルドラッグ時のテキスト選択防止 */
+.select-none,
+.select-none * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
 /* iOS Safe Area 対応 */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
