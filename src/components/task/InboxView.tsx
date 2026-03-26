@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import type { NotificationInfo } from "@/types/chat"
 
 type Props = {
@@ -45,6 +46,7 @@ const typeConfig: Record<string, { label: string; color: string; icon: React.Rea
 
 export function InboxView({ notifications: initial, workspaceId }: Props) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [notifications, setNotifications] = useState(initial)
 
   const handleMarkAllRead = async () => {
@@ -110,7 +112,8 @@ export function InboxView({ notifications: initial, workspaceId }: Props) {
                 <button
                   key={n.id}
                   className={cn(
-                    "flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-all duration-200 stagger-item",
+                    "flex w-full items-start gap-3 text-left hover:bg-muted/50 transition-all duration-200 stagger-item",
+                    isMobile ? "px-4 py-4" : "px-4 py-3",
                     !n.read && "bg-primary/5"
                   )}
                   style={{ animationDelay: `${i * 30}ms` }}
@@ -119,26 +122,37 @@ export function InboxView({ notifications: initial, workspaceId }: Props) {
                   {/* 未読ドット */}
                   <div className="mt-2 shrink-0">
                     {!n.read ? (
-                      <span className="block h-2 w-2 rounded-full bg-primary animate-pulse" />
+                      <span className={cn("block rounded-full bg-primary animate-pulse", isMobile ? "h-2.5 w-2.5" : "h-2 w-2")} />
                     ) : (
-                      <span className="block h-2 w-2" />
+                      <span className={cn("block", isMobile ? "h-2.5 w-2.5" : "h-2 w-2")} />
                     )}
                   </div>
 
                   {/* アクターアバター */}
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                    {n.actor.displayName?.charAt(0) || "?"}
+                  <div className={cn(
+                    "flex shrink-0 items-center justify-center rounded-full bg-muted font-medium",
+                    isMobile ? "h-11 w-11 text-sm" : "h-9 w-9 text-xs"
+                  )}>
+                    {n.actor.avatarUrl ? (
+                      <img src={n.actor.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                    ) : (
+                      n.actor.displayName?.charAt(0) || "?"
+                    )}
                   </div>
 
                   {/* 内容 */}
                   <div className="flex-1 min-w-0">
-                    <p className={cn("text-sm leading-snug", !n.read && "font-medium")}>{n.title}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={cn("inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium", config.color)}>
+                    <p className={cn("leading-snug", isMobile ? "text-[15px]" : "text-sm", !n.read && "font-medium")}>{n.title}</p>
+                    <div className={cn("flex items-center gap-2", isMobile ? "mt-1.5" : "mt-1")}>
+                      <span className={cn(
+                        "inline-flex items-center gap-1 rounded-full font-medium",
+                        isMobile ? "text-xs px-2 py-0.5" : "text-[10px] px-1.5 py-0.5",
+                        config.color
+                      )}>
                         {config.icon}
                         {config.label}
                       </span>
-                      <span className="text-[11px] text-muted-foreground tabular-nums">
+                      <span className={cn("text-muted-foreground tabular-nums", isMobile ? "text-xs" : "text-[11px]")}>
                         {new Date(n.createdAt).toLocaleString("ja-JP", {
                           month: "short",
                           day: "numeric",

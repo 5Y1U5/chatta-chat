@@ -10,6 +10,7 @@ import { TypingIndicator } from "@/components/chat/TypingIndicator"
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import { cn } from "@/lib/utils"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import type { MessageWithUser, ChannelMemberInfo, ChannelInfo, ReactionInfo } from "@/types/chat"
 
 // 使用時のみロード（スレッド展開・絵文字・メンバー管理）
@@ -365,6 +366,7 @@ const MessageBubble = memo(function MessageBubble({
   onDelete: (messageId: string) => void
   onReaction: (messageId: string, emoji: string) => void
 }) {
+  const isMobile = useIsMobile()
   const [showActions, setShowActions] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -404,35 +406,39 @@ const MessageBubble = memo(function MessageBubble({
   return (
     <div
       className={cn(
-        "group relative flex gap-3 py-1.5 hover:bg-muted/50 rounded-md px-1 -mx-1 animate-message-in",
+        "group relative flex gap-3 hover:bg-muted/50 rounded-md animate-message-in",
+        isMobile ? "py-2.5 px-2 -mx-2" : "py-1.5 px-1 -mx-1",
         message.aiGenerated && "bg-ai-bubble border border-ai-bubble-border"
       )}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => { setShowActions(false); setShowEmojiPicker(false) }}
     >
-      <Avatar className="h-8 w-8 shrink-0 mt-0.5">
-        <AvatarFallback className={`text-xs ${message.aiGenerated ? "bg-violet-200 text-violet-700 dark:bg-violet-900 dark:text-violet-300" : ""}`}>
+      <Avatar className={cn("shrink-0 mt-0.5", isMobile ? "h-10 w-10" : "h-8 w-8")}>
+        <AvatarFallback className={cn(
+          isMobile ? "text-sm" : "text-xs",
+          message.aiGenerated && "bg-violet-200 text-violet-700 dark:bg-violet-900 dark:text-violet-300"
+        )}>
           {message.aiGenerated ? "AI" : (message.user.displayName?.charAt(0)?.toUpperCase() || "?")}
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium">
+          <span className={cn("font-medium", isMobile ? "text-[15px]" : "text-sm")}>
             {message.user.displayName || "不明"}
           </span>
           {message.aiGenerated && (
-            <span className="rounded bg-gradient-to-r from-violet-500 to-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            <span className={cn("rounded bg-gradient-to-r from-violet-500 to-blue-500 font-medium text-white", isMobile ? "px-2 py-0.5 text-xs" : "px-1.5 py-0.5 text-[10px]")}>
               AI
             </span>
           )}
-          <span className="text-xs text-muted-foreground">{time}</span>
+          <span className={cn("text-muted-foreground", isMobile ? "text-xs" : "text-xs")}>{time}</span>
           {isEdited && (
-            <span className="text-xs text-muted-foreground">（編集済み）</span>
+            <span className={cn("text-muted-foreground", isMobile ? "text-xs" : "text-xs")}>（編集済み）</span>
           )}
         </div>
 
         {isDeleted ? (
-          <p className="text-sm italic text-muted-foreground">
+          <p className={cn("italic text-muted-foreground", isMobile ? "text-[15px]" : "text-sm")}>
             このメッセージは削除されました
           </p>
         ) : editing ? (
@@ -441,7 +447,7 @@ const MessageBubble = memo(function MessageBubble({
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
               onKeyDown={handleKeyDownEdit}
-              className="min-h-[36px] max-h-[120px] resize-none text-sm"
+              className={cn("max-h-[120px] resize-none", isMobile ? "min-h-[44px] text-[15px]" : "min-h-[36px] text-sm")}
               rows={1}
               autoFocus
             />
@@ -457,12 +463,12 @@ const MessageBubble = memo(function MessageBubble({
         ) : (
           <>
             {message.content && !message.fileUrl && (
-              <p className="text-sm whitespace-pre-wrap break-words">
+              <p className={cn("whitespace-pre-wrap break-words", isMobile ? "text-[15px]" : "text-sm")}>
                 {message.content}
               </p>
             )}
             {message.content && message.fileUrl && !message.content.startsWith("[ファイル]") && (
-              <p className="text-sm whitespace-pre-wrap break-words">
+              <p className={cn("whitespace-pre-wrap break-words", isMobile ? "text-[15px]" : "text-sm")}>
                 {message.content}
               </p>
             )}
@@ -480,14 +486,16 @@ const MessageBubble = memo(function MessageBubble({
 
         {/* リアクション表示 */}
         {!isDeleted && message.reactions && message.reactions.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className={cn("mt-1 flex flex-wrap", isMobile ? "gap-1.5" : "gap-1")}>
             {message.reactions.map((r) => (
               <button
                 key={r.emoji}
                 onClick={() => onReaction(message.id, r.emoji)}
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs hover:bg-muted animate-pop-in ${
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border hover:bg-muted animate-pop-in",
+                  isMobile ? "px-2.5 py-1 text-sm" : "px-2 py-0.5 text-xs",
                   r.userReacted ? "border-primary/50 bg-primary/10" : "border-border"
-                }`}
+                )}
               >
                 <span>{r.emoji}</span>
                 <span className="text-muted-foreground">{r.count}</span>
@@ -500,9 +508,9 @@ const MessageBubble = memo(function MessageBubble({
         {!isDeleted && (message.replyCount || 0) > 0 && (
           <button
             onClick={onReply}
-            className="mt-1 flex items-center gap-1 text-xs text-primary hover:underline"
+            className={cn("mt-1 flex items-center gap-1 text-primary hover:underline", isMobile ? "text-sm py-1" : "text-xs")}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "16" : "14"} height={isMobile ? "16" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
             {message.replyCount} 件の返信
@@ -512,11 +520,11 @@ const MessageBubble = memo(function MessageBubble({
 
       {/* アクションメニュー */}
       {showActions && !isDeleted && !editing && (
-        <div className="absolute -top-3 right-1 flex gap-0.5 rounded-md border bg-background shadow-sm animate-fade-in">
+        <div className={cn("absolute -top-3 right-1 flex rounded-md border bg-background shadow-sm animate-fade-in", isMobile ? "gap-1" : "gap-0.5")}>
           {/* リアクション */}
           <div className="relative">
-            <ActionButton title="リアクション" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <ActionButton title="リアクション" onClick={() => setShowEmojiPicker(!showEmojiPicker)} mobile={isMobile}>
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "18" : "14"} height={isMobile ? "18" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M8 14s1.5 2 4 2 4-2 4-2" />
                 <line x1="9" y1="9" x2="9.01" y2="9" />
@@ -530,22 +538,22 @@ const MessageBubble = memo(function MessageBubble({
               />
             )}
           </div>
-          <ActionButton title="返信" onClick={onReply}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <ActionButton title="返信" onClick={onReply} mobile={isMobile}>
+            <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "18" : "14"} height={isMobile ? "18" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </ActionButton>
           {isOwn && (
-            <ActionButton title="編集" onClick={() => { setEditing(true); setEditContent(message.content) }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <ActionButton title="編集" onClick={() => { setEditing(true); setEditContent(message.content) }} mobile={isMobile}>
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "18" : "14"} height={isMobile ? "18" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
             </ActionButton>
           )}
           {isOwn && (
-            <ActionButton title="削除" onClick={() => onDelete(message.id)}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <ActionButton title="削除" onClick={() => onDelete(message.id)} mobile={isMobile}>
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "18" : "14"} height={isMobile ? "18" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
@@ -561,16 +569,21 @@ function ActionButton({
   children,
   title,
   onClick,
+  mobile,
 }: {
   children: React.ReactNode
   title: string
   onClick: () => void
+  mobile?: boolean
 }) {
   return (
     <button
       title={title}
       onClick={onClick}
-      className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+      className={cn(
+        "flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground",
+        mobile ? "h-9 w-9" : "h-7 w-7"
+      )}
     >
       {children}
     </button>
