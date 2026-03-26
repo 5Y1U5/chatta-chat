@@ -532,7 +532,7 @@ export function TaskDetailPanel({
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
   const subTaskMobileSensors = useSensors(
-    useSensor(LongPressTouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } })
+    useSensor(LongPressTouchSensor, { activationConstraint: { delay: 250, tolerance: 15 } })
   )
   const subTaskSensors = isMobile ? subTaskMobileSensors : subTaskDesktopSensors
   const subTaskIds = useMemo(() => subTasks.map((t) => t.id), [subTasks])
