@@ -23,7 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DatePicker } from "@/components/ui/date-picker"
-import { RECURRENCE_PRESETS, presetToRRule, rruleToText, type RecurrencePreset } from "@/lib/recurrence"
+import { RecurrenceSelect } from "@/components/task/RecurrenceSelect"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import type { TaskInfo, TaskCommentInfo } from "@/types/chat"
 
@@ -684,28 +684,12 @@ export function TaskDetailPanel({
 
             {/* 繰り返し */}
             <PropField label="繰り返し">
-              <Select
-                value={currentTask.recurrenceRule ? "_current" : "none"}
-                onValueChange={(v) => {
-                  if (v === "_current") return
-                  const preset = v as RecurrencePreset
-                  const rule = presetToRRule(preset, currentTask.dueDate ? parseDateStr(currentTask.dueDate) : undefined)
-                  handleUpdate("recurrenceRule", rule)
-                }}
-              >
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue>
-                    {currentTask.recurrenceRule ? rruleToText(currentTask.recurrenceRule) : "なし"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {RECURRENCE_PRESETS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <RecurrenceSelect
+                value={currentTask.recurrenceRule || null}
+                onChange={(rule) => handleUpdate("recurrenceRule", rule)}
+                dueDate={currentTask.dueDate ? parseDateStr(currentTask.dueDate) : undefined}
+                compact
+              />
             </PropField>
           </div>
 
