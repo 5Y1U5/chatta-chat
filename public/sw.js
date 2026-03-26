@@ -1,6 +1,6 @@
 // chatta-chat Service Worker — 自動更新 + キャッシュ戦略
 
-const CACHE_NAME = "chatta-v3"
+const CACHE_NAME = "chatta-v4"
 
 // キャッシュ対象の静的アセットパターン
 const STATIC_CACHE_PATTERNS = [
