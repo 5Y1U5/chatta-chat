@@ -724,7 +724,7 @@ function TaskSection({
   )
   const mobileSensors = useSensors(
     useSensor(LongPressTouchSensor, {
-      activationConstraint: { delay: 300, tolerance: 8 },
+      activationConstraint: { delay: 250, tolerance: 15 },
     })
   )
   const sensors = isMobile ? mobileSensors : desktopSensors
