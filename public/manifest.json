@@ -1,11 +1,11 @@
 {
-  "name": "chatta-chat",
-  "short_name": "chatta",
+  "name": "ChattaChat",
+  "short_name": "ChattaChat",
   "description": "AI ネイティブチャットコミュニケーションツール",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#0a0a0a",
+  "theme_color": "#2563EB",
   "orientation": "portrait-primary",
   "icons": [
     {

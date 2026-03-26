@@ -15,21 +15,22 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "chatta-chat",
+  title: "ChattaChat",
   description: "AI ネイティブチャットコミュニケーションツール",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "chatta-chat",
+    title: "ChattaChat",
   },
   icons: {
+    icon: "/icons/icon-192.png",
     apple: "/icons/apple-touch-icon.png",
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#2563EB",
 }
 
 export default function RootLayout({
