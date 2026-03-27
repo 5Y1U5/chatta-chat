@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server"
 import { requireAuth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
 import { detectAiMention, generateAiResponse } from "@/lib/ai/assistant"
+import { detectTaskRequest, extractTasksFromChat } from "@/lib/ai/extract-tasks"
 import { detectImportantItems } from "@/lib/ai/detect-important"
 
 // 過去メッセージ取得（カーソルベースページネーション）
@@ -199,13 +200,25 @@ export async function POST(request: Request) {
     // @AI メンション検出 → レスポンス送信後に AI 応答を生成
     // after() で Vercel サーバーレス環境でもバックグラウンド処理を完了させる
     if (detectAiMention(trimmedContent) && !parentId) {
-      after(async () => {
-        try {
-          await generateAiResponse(channelId, message.id, trimmedContent, auth.userId)
-        } catch (err) {
-          console.error("AI 応答生成エラー:", err)
-        }
-      })
+      if (detectTaskRequest(trimmedContent)) {
+        // タスク登録リクエスト → 会話からタスクを抽出して登録
+        after(async () => {
+          try {
+            await extractTasksFromChat(channelId, auth.userId, auth.workspaceId)
+          } catch (err) {
+            console.error("タスク抽出エラー:", err)
+          }
+        })
+      } else {
+        // 通常の AI 応答
+        after(async () => {
+          try {
+            await generateAiResponse(channelId, message.id, trimmedContent, auth.userId)
+          } catch (err) {
+            console.error("AI 応答生成エラー:", err)
+          }
+        })
+      }
     }
 
     // 重要事項の自動検出（5メッセージごとにバッチ分析、スレッド返信は除外）

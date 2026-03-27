@@ -110,7 +110,7 @@ export async function generateAiResponse(
 }
 
 // AI ユーザーを取得（なければ作成）
-async function getOrCreateAiUser(channelId: string) {
+export async function getOrCreateAiUser(channelId: string) {
   const prisma = getPrisma()
 
   // AI ユーザーを検索
