@@ -84,12 +84,12 @@ export function DashboardView({
   const completionRate = totalAll > 0 ? Math.round((stats.completedTodayTasks / totalAll) * 100) : 0
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto page-enter">
+    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden page-enter">
       <div className="flex h-12 shrink-0 items-center border-b px-4">
         <h1 className="text-lg font-semibold">ダッシュボード</h1>
       </div>
 
-      <div className="p-4 space-y-6 max-w-4xl w-full">
+      <div className="p-4 space-y-6 max-w-full w-full">
         {/* 統計カード */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
