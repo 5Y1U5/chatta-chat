@@ -24,6 +24,7 @@ export default function ChannelInvitePage({ params }: PageProps) {
   const [status, setStatus] = useState<"loading" | "ready" | "joining" | "done" | "error">("loading")
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
+  const [alreadyMember, setAlreadyMember] = useState(false)
   const router = useRouter()
 
   // セッション確認
@@ -53,10 +54,13 @@ export default function ChannelInvitePage({ params }: PageProps) {
         return
       }
 
-      const { workspaceId, channelId } = await res.json()
+      const data = await res.json()
+      setAlreadyMember(!!data.already)
       setStatus("done")
-      router.push(`/${workspaceId}/channel/${channelId}`)
-      router.refresh()
+      setTimeout(() => {
+        router.push(`/${data.workspaceId}/channel/${data.channelId}`)
+        router.refresh()
+      }, 1500)
     } catch {
       setErrorMsg("参加に失敗しました")
       setStatus("error")
@@ -89,7 +93,7 @@ export default function ChannelInvitePage({ params }: PageProps) {
             )}
             {status === "done" && (
               <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-700">
-                グループチャットに参加しました。リダイレクトしています...
+                {alreadyMember ? "既に参加済みです。リダイレクトしています..." : "グループチャットに参加しました。リダイレクトしています..."}
               </div>
             )}
           </CardContent>

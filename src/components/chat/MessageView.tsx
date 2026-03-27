@@ -608,7 +608,7 @@ function FilePreview({
         <img
           src={fileUrl}
           alt={fileName}
-          className="max-h-64 max-w-xs rounded-md border object-contain"
+          className="max-h-64 max-w-full sm:max-w-xs rounded-md border object-contain"
           loading="lazy"
         />
       </a>

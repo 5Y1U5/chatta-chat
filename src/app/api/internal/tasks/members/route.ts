@@ -83,8 +83,8 @@ export async function POST(request: Request) {
       await prisma.notification.create({
         data: {
           userId,
-          type: "task_assigned",
-          title: `${actor?.displayName || "メンバー"}がタスク「${task.title}」に招待しました`,
+          type: "task_collaborator",
+          title: `${actor?.displayName || "メンバー"}があなたをタスク「${task.title}」のコラボレーターに追加しました`,
           taskId,
           projectId: task.projectId,
           actorId: auth.userId,

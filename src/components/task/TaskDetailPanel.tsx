@@ -830,7 +830,7 @@ export function TaskDetailPanel({
       <div className="flex-1 overflow-y-auto">
         {/* パンくずリスト（サブタスク表示中のみ） */}
         {viewStack.length > 0 && (
-          <div className="px-4 pt-2 pb-0 flex items-center gap-1 text-xs text-muted-foreground overflow-x-auto">
+          <div className="px-4 pt-2 pb-0 flex items-center gap-1 text-xs text-muted-foreground overflow-x-hidden min-w-0">
             {breadcrumbs.map((bc, i) => {
               const isLast = i === breadcrumbs.length - 1
               return (

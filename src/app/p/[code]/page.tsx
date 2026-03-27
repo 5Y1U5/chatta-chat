@@ -24,6 +24,7 @@ export default function ProjectInvitePage({ params }: PageProps) {
   const [status, setStatus] = useState<"loading" | "ready" | "joining" | "done" | "error">("loading")
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
+  const [alreadyMember, setAlreadyMember] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -52,10 +53,13 @@ export default function ProjectInvitePage({ params }: PageProps) {
         return
       }
 
-      const { workspaceId, projectId } = await res.json()
+      const data = await res.json()
+      setAlreadyMember(!!data.alreadyMember)
       setStatus("done")
-      router.push(`/${workspaceId}/tasks?projectId=${projectId}`)
-      router.refresh()
+      setTimeout(() => {
+        router.push(`/${data.workspaceId}/tasks?projectId=${data.projectId}`)
+        router.refresh()
+      }, 1500)
     } catch {
       setErrorMsg("参加に失敗しました")
       setStatus("error")
@@ -88,7 +92,7 @@ export default function ProjectInvitePage({ params }: PageProps) {
             )}
             {status === "done" && (
               <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-700">
-                プロジェクトに参加しました。リダイレクトしています...
+                {alreadyMember ? "既に参加済みです。リダイレクトしています..." : "プロジェクトに参加しました。リダイレクトしています..."}
               </div>
             )}
           </CardContent>
