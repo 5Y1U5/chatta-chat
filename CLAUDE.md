@@ -6,9 +6,9 @@ AI ネイティブなチャットコミュニケーションツール。Slack/Ch
 
 | コード内 | UI 表示 | 説明 |
 |---------|---------|------|
-| channel (public) | グループチャット | 複数人のチャットルーム |
+| channel (public) | グループチャット | 複数人のチャットルーム。手動招待制（自動参加なし） |
 | channel (dm) | ダイレクトメッセージ | 1対1のチャット |
-| general | マイチャット | 新規ワークスペース作成時のデフォルトグループチャット名 |
+| マイチャット | マイチャット | ユーザーごとに自動作成される個人専用チャット。メンバー追加不可・非共有。AI質問やメモ用 |
 
 ## 技術スタック
 
@@ -135,7 +135,7 @@ ANTHROPIC_API_KEY=       # Claude API キー
 - **モバイル対応**: `h-dvh`（`h-screen` ではなく）、`shrink-0` でヘッダー固定、`min-h-0` で flex overflow 制御
 - **Prisma 出力先**: `src/generated/prisma`。`.gitignore` 対象のため、ビルド時に `prisma generate` 必須
 - **`useSearchParams()`**: 使用するコンポーネントは `<Suspense>` でラップ必須（Next.js 要件）
-- **招待フロー**: `inviteCode` 12文字（`crypto.randomUUID().replace(/-/g, "").slice(0, 12)`）。ワークスペース・チャンネル・プロジェクト共通パターン。再参加時は「既に参加済みです」表示
+- **招待フロー**: `inviteCode` 12文字（`crypto.randomUUID().replace(/-/g, "").slice(0, 12)`）。ワークスペース・チャンネル・プロジェクト共通パターン。再参加時は「既に参加済みです」表示。**ワークスペース参加時はマイチャットのみ自動作成、他チャンネルは手動招待制**（Chatwork方式）
 - **ゲスト共有**: `TaskShareLink.token` 32文字hex（`crypto.randomBytes(16).toString("hex")`）。`/t/[token]` で認証不要アクセス。GuestComment は TaskComment と別テーブル（userId NOT NULL 制約を壊さない）
 - **AI チャット**: `@AI` メンション → `after()` でバックグラウンド応答生成 → Realtime で配信。失敗時はエラーメッセージをチャットに投稿
 - **AI 機能**: 返信候補生成、会話要約、議事録生成、重要事項自動検出（5メッセージごとにバッチ分析）、チャット会話からのタスク自動抽出・登録（`@AI タスクに登録して` で親タスク+サブタスクを一括作成）
@@ -143,7 +143,7 @@ ANTHROPIC_API_KEY=       # Claude API キー
 - **AIユーザー除外**: タスク担当者選択時に `ai@chatta-chat.local` をフィルタ
 - **Realtime**: `postgres_changes` で Message, Task, TaskComment, Notification テーブルを購読。Presence でタイピングインジケータ
 - **プルトゥリフレッシュ**: `PullToRefresh` コンポーネントでタスク一覧・受信トレイ・プロジェクト一覧に適用
-- **受信トレイ**: スワイプでアーカイブ、タップで詳細パネル表示。コメント通知は本文プレビュー付き
+- **受信トレイ**: スワイプでアーカイブ、タップで詳細パネル表示。一覧でtitle 2行+body 3行プレビュー、「もっと見る」で展開/折りたたみ。コメント通知から直接返信可能。`isMyChat()` 判定（`name === "マイチャット" || name === "general"`）でマイチャットのメンバー追加をAPI・UIで拒否
 - **プロジェクト招待**: `inviteCode` 12文字。`/p/[code]` で招待ランディング。ワークスペースメンバーのみ参加可
 - **Google認証紐付け**: プロフィール設定で `linkIdentity()` により既存メールアカウントにGoogle連携
 - **サイドバー**: WorkspaceSidebar はトグルで展開/折りたたみ可能（展開時: アイコン+ラベル、折りたたみ時: アイコンのみ）
