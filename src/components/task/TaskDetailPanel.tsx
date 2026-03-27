@@ -27,6 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DatePicker } from "@/components/ui/date-picker"
 import { RecurrenceSelect } from "@/components/task/RecurrenceSelect"
 import { useIsMobile } from "@/hooks/useIsMobile"
+import { useRealtimeComments } from "@/hooks/useRealtimeComments"
 import type { TaskInfo, TaskCommentInfo } from "@/types/chat"
 
 type MemberInfo = { id: string; userId: string; displayName: string | null; avatarUrl: string | null }
@@ -206,6 +207,23 @@ export function TaskDetailPanel({
 
     return () => { cancelled = true }
   }, [currentTask.id, fetchDetails])
+
+  // コメントのリアルタイム購読
+  useRealtimeComments({
+    taskId: currentTask.id,
+    onNewComment: useCallback((comment: TaskCommentInfo) => {
+      setComments((prev) => {
+        // 楽観的更新で追加済みなら無視（自分の投稿）
+        if (prev.some((c) => c.id === comment.id)) return prev
+        // ユーザー情報が不足している場合はメンバーリストから補完
+        const member = members.find((m) => m.id === comment.user.id)
+        if (member && !comment.user.displayName) {
+          comment = { ...comment, user: { ...comment.user, displayName: member.displayName, avatarUrl: member.avatarUrl } }
+        }
+        return [...prev, comment]
+      })
+    }, [members]),
+  })
 
   // タイトル編集開始時にフォーカス
   useEffect(() => {

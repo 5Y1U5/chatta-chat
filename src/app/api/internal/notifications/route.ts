@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const notifications = await prisma.notification.findMany({
       where: {
         userId: auth.userId,
+        archived: false,
         ...(unreadOnly && { read: false }),
       },
       include: { actor: { select: actorSelect } },
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     // 未読数も一緒に返す
     const unreadCount = await prisma.notification.count({
-      where: { userId: auth.userId, read: false },
+      where: { userId: auth.userId, read: false, archived: false },
     })
 
     return NextResponse.json({ notifications, unreadCount })
@@ -45,9 +46,22 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: Request) {
   try {
     const auth = await requireAuth()
-    const { notificationId, markAllRead } = await request.json()
+    const { notificationId, markAllRead, archiveId } = await request.json()
 
     const prisma = getPrisma()
+
+    // 単一通知をアーカイブ
+    if (archiveId) {
+      const notification = await prisma.notification.findUnique({ where: { id: archiveId } })
+      if (!notification || notification.userId !== auth.userId) {
+        return NextResponse.json({ error: "通知が見つかりません" }, { status: 404 })
+      }
+      await prisma.notification.update({
+        where: { id: archiveId },
+        data: { archived: true },
+      })
+      return NextResponse.json({ success: true })
+    }
 
     if (markAllRead) {
       // 全て既読

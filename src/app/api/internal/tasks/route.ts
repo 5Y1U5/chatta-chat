@@ -357,22 +357,47 @@ export async function PATCH(request: Request) {
           }
         }
 
-        // 作成者に完了通知（自分以外の場合）
-        if (task.creatorId !== auth.userId) {
+        // 完了通知: 作成者 + 同プロジェクトメンバー + タスクメンバーに通知（自分以外）
+        {
           const actor = await prisma.user.findUnique({
             where: { id: auth.userId },
             select: { displayName: true },
           })
-          await prisma.notification.create({
-            data: {
-              userId: task.creatorId,
-              type: "task_completed",
-              title: `${actor?.displayName || "メンバー"}がタスク「${task.title}」を完了しました`,
-              taskId: task.id,
-              projectId: task.projectId,
-              actorId: auth.userId,
-            },
+          const notifyUserIds = new Set<string>()
+          // 作成者
+          if (task.creatorId !== auth.userId) notifyUserIds.add(task.creatorId)
+          // 担当者
+          if (task.assigneeId && task.assigneeId !== auth.userId) notifyUserIds.add(task.assigneeId)
+          // タスクメンバー
+          const taskMembers = await prisma.taskMember.findMany({
+            where: { taskId: task.id },
+            select: { userId: true },
           })
+          for (const m of taskMembers) {
+            if (m.userId !== auth.userId) notifyUserIds.add(m.userId)
+          }
+          // プロジェクトメンバー
+          if (task.projectId) {
+            const projectMembers = await prisma.projectMember.findMany({
+              where: { projectId: task.projectId },
+              select: { userId: true },
+            })
+            for (const m of projectMembers) {
+              if (m.userId !== auth.userId) notifyUserIds.add(m.userId)
+            }
+          }
+          if (notifyUserIds.size > 0) {
+            await prisma.notification.createMany({
+              data: Array.from(notifyUserIds).map((userId) => ({
+                userId,
+                type: "task_completed",
+                title: `${actor?.displayName || "メンバー"}がタスク「${task.title}」を完了しました`,
+                taskId: task.id,
+                projectId: task.projectId,
+                actorId: auth.userId,
+              })),
+            })
+          }
         }
       } else {
         data.completedAt = null

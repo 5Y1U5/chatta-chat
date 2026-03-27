@@ -17,6 +17,7 @@ import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
 import { CreateProjectDialog } from "@/components/task/CreateProjectDialog"
 import { ProjectMembersDialog } from "@/components/task/ProjectMembersDialog"
 import { EmptyState } from "@/components/ui/empty-state"
+import { PullToRefresh } from "@/components/ui/PullToRefresh"
 import type { ProjectInfo } from "@/types/chat"
 
 type Props = {
@@ -34,6 +35,7 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
   const [manageMembersProjectId, setManageMembersProjectId] = useState<string | null>(null)
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null)
 
   const refreshProjects = useCallback(async () => {
     const res = await fetch("/api/internal/projects")
@@ -63,7 +65,7 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <PullToRefresh onRefresh={async () => { router.refresh() }} className="flex-1 p-4">
         {projects.length === 0 ? (
           <EmptyState
             icon={
@@ -117,6 +119,31 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
                       variant="ghost"
                       size="sm"
                       className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const res = await fetch("/api/internal/projects/invite", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ projectId: p.id }),
+                        })
+                        if (res.ok) {
+                          const { inviteCode } = await res.json()
+                          const url = `${window.location.origin}/p/${inviteCode}`
+                          await navigator.clipboard.writeText(url)
+                          setCopiedProjectId(p.id)
+                          setTimeout(() => setCopiedProjectId(null), 2000)
+                        }
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                      </svg>
+                      {copiedProjectId === p.id ? "コピー済み" : "招待"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation()
                         setCreateTaskProjectId(p.id)
@@ -149,7 +176,7 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
             ))}
           </div>
         )}
-      </div>
+      </PullToRefresh>
 
       {/* タスク作成ダイアログ */}
       <CreateTaskDialog

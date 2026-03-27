@@ -151,6 +151,7 @@ model Project {
   name        String
   description String?
   color       String?  // UI での識別色（例: "#3B82F6"）
+  inviteCode  String?  @unique // プロジェクト招待コード（12文字）
   archived    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -257,6 +258,7 @@ model Notification {
   projectId String?
   actorId   String   // アクションを起こしたユーザー
   read      Boolean  @default(false)
+  archived  Boolean  @default(false)
   createdAt DateTime @default(now())
 
   user  User @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)

@@ -24,6 +24,7 @@ export default async function InboxPage({
     <InboxView
       notifications={JSON.parse(JSON.stringify(notifications))}
       workspaceId={workspaceId}
+      currentUserId={auth.userId}
     />
   )
 }

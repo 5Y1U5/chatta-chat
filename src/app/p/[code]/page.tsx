@@ -1,0 +1,119 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import Link from "next/link"
+import { use } from "react"
+
+type PageProps = {
+  params: Promise<{ code: string }>
+}
+
+export default function ProjectInvitePage({ params }: PageProps) {
+  const { code } = use(params)
+  const [status, setStatus] = useState<"loading" | "ready" | "joining" | "done" | "error">("loading")
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [errorMsg, setErrorMsg] = useState("")
+  const router = useRouter()
+
+  useEffect(() => {
+    async function checkSession() {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsLoggedIn(!!session)
+      setStatus("ready")
+    }
+    checkSession()
+  }, [])
+
+  async function handleJoin() {
+    setStatus("joining")
+    try {
+      const res = await fetch("/api/internal/projects/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviteCode: code }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        setErrorMsg(data.error || "参加に失敗しました")
+        setStatus("error")
+        return
+      }
+
+      const { workspaceId, projectId } = await res.json()
+      setStatus("done")
+      router.push(`/${workspaceId}/tasks?projectId=${projectId}`)
+      router.refresh()
+    } catch {
+      setErrorMsg("参加に失敗しました")
+      setStatus("error")
+    }
+  }
+
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-dvh items-center justify-center overflow-auto bg-background">
+        <p className="text-muted-foreground">読み込み中...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-dvh items-center justify-center overflow-auto bg-background">
+      <div className="w-full max-w-md px-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">プロジェクトへの招待</CardTitle>
+            <CardDescription>
+              招待リンクからプロジェクトに参加します
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {status === "error" && (
+              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {errorMsg}
+              </div>
+            )}
+            {status === "done" && (
+              <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-700">
+                プロジェクトに参加しました。リダイレクトしています...
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            {isLoggedIn ? (
+              <Button
+                className="w-full"
+                onClick={handleJoin}
+                disabled={status === "joining" || status === "done"}
+              >
+                {status === "joining" ? "参加中..." : "プロジェクトに参加する"}
+              </Button>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground text-center">
+                  参加するにはログインが必要です
+                </p>
+                <Button asChild className="w-full">
+                  <Link href="/login">ログイン</Link>
+                </Button>
+              </>
+            )}
+          </CardFooter>
+        </Card>
+      </div>
+    </div>
+  )
+}

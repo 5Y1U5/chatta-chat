@@ -44,6 +44,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useRealtimeTasks } from "@/hooks/useRealtimeTasks"
+import { PullToRefresh } from "@/components/ui/PullToRefresh"
 import type { TaskInfo } from "@/types/chat"
 
 type Props = {
@@ -175,6 +177,14 @@ export function TaskListView({
       .then((data) => { if (data) setTasks(data) })
       .catch(() => {})
   }, [viewMode, currentUserId, projectId])
+
+  // タスクのリアルタイム購読（他メンバーの変更を即座に反映）
+  useRealtimeTasks({
+    workspaceId,
+    onTaskChange: useCallback(() => {
+      syncInBackground()
+    }, [syncInBackground]),
+  })
 
   // 楽観的ステータス変更
   const handleStatusChange = useCallback((taskId: string, status: string) => {
@@ -390,7 +400,7 @@ export function TaskListView({
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4">
+        <PullToRefresh onRefresh={async () => { syncInBackground() }} className="flex-1 px-5 py-2 space-y-4">
           {/* マイタスク / タスク */}
           <TaskSection
             label={viewMode === "my-tasks" ? "マイタスク" : "タスク"}
@@ -464,7 +474,7 @@ export function TaskListView({
               action={{ label: "最初のタスクを作成", onClick: () => setCreateOpen(true) }}
             />
           )}
-        </div>
+        </PullToRefresh>
       </div>
 
       {/* タスク詳細パネル */}
