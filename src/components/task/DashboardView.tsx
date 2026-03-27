@@ -54,19 +54,19 @@ function StatCard({
   return (
     <button
       className={cn(
-        "rounded-xl border text-left hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group overflow-hidden",
+        "rounded-xl border text-left hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group",
         mobile ? "p-3" : "p-4",
         bgColor
       )}
       onClick={onClick}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <span className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
           {icon}
         </span>
         <div className={cn("font-bold tabular-nums", mobile ? "text-2xl" : "text-2xl", color)}>{value}</div>
       </div>
-      <div className={cn("text-muted-foreground truncate", mobile ? "text-sm" : "text-xs")}>{label}</div>
+      <div className={cn("text-muted-foreground leading-tight", mobile ? "text-xs" : "text-xs")}>{label}</div>
     </button>
   )
 }
@@ -89,7 +89,7 @@ export function DashboardView({
         <h1 className="text-lg font-semibold">ダッシュボード</h1>
       </div>
 
-      <div className="p-4 space-y-6 max-w-full w-full">
+      <div className="p-4 space-y-6 min-w-0 overflow-hidden">
         {/* 統計カード */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
@@ -165,9 +165,9 @@ export function DashboardView({
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2 min-w-0">
           {/* 期限間近のタスク */}
-          <div>
+          <div className="min-w-0">
             <h2 className={cn("font-semibold mb-3 flex items-center gap-2", isMobile ? "text-base" : "text-sm")}>
               <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "18" : "14"} height={isMobile ? "18" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -219,7 +219,7 @@ export function DashboardView({
           </div>
 
           {/* チームの最近の完了タスク */}
-          <div>
+          <div className="min-w-0">
             <h2 className={cn("font-semibold mb-3 flex items-center gap-2", isMobile ? "text-base" : "text-sm")}>
               <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? "18" : "14"} height={isMobile ? "18" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
                 <polyline points="20 6 9 17 4 12" />
