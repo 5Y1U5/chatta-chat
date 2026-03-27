@@ -63,9 +63,10 @@ src/
 │   ├── ui/           # shadcn（Calendar, DatePicker, Popover, PullToRefresh 等）
 │   ├── auth/         # LoginForm, SignupForm, GoogleLoginButton
 │   ├── chat/         # WorkspaceSidebar, ChannelList, MessageView, MessageInput,
-│   │                 # SummarizeDialog, MinutesDialog, MemoryPanel, VoiceRecorder
+│   │                 # SummarizeDialog, MinutesDialog, MemoryPanel, VoiceRecorder,
+│   │                 # SidebarData, ChannelListData, MobileHeaderData, MobileBottomNavData（Suspense用Server Component）
 │   ├── task/         # TaskListView, TaskItem, TaskDetailPanel, CreateTaskDialog,
-│   │                 # InboxView, ProjectListView, DashboardView
+│   │                 # InboxView, ProjectListView, DashboardView, TaskNavData（Suspense用Server Component）
 │   └── pwa/          # InstallBanner, ServiceWorkerRegister
 ├── hooks/
 │   ├── useRealtimeMessages.ts    # メッセージのリアルタイム購読
