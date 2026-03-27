@@ -146,7 +146,7 @@ export function TaskNav({ workspaceId, projects }: Props) {
         onOpenChange={setCreateProjectOpen}
         onCreated={() => {
           setCreateProjectOpen(false)
-          router.refresh()
+          router.push(`/${workspaceId}/tasks`, { scroll: false })
         }}
       />
     </div>

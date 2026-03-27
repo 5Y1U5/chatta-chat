@@ -98,7 +98,6 @@ export function ChannelMembersDialog({ channelId, channelType, currentUserId }: 
       })
       if (res.ok) {
         await loadMembers()
-        router.refresh()
       }
     } finally {
       setActionLoading(null)
@@ -115,7 +114,6 @@ export function ChannelMembersDialog({ channelId, channelType, currentUserId }: 
       })
       if (res.ok) {
         await loadMembers()
-        router.refresh()
       }
     } finally {
       setActionLoading(null)

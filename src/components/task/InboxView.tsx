@@ -391,8 +391,7 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
         if (prev.some((n) => n.id === notification.id)) return prev
         return [notification, ...prev]
       })
-      router.refresh()
-    }, [router]),
+    }, []),
   })
 
   const handleMarkAllRead = async () => {
@@ -402,7 +401,6 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
       body: JSON.stringify({ markAllRead: true }),
     })
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-    router.refresh()
   }
 
   const handleArchive = useCallback((id: string) => {
@@ -412,8 +410,7 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
       body: JSON.stringify({ archiveId: id }),
     })
     setNotifications((prev) => prev.filter((n) => n.id !== id))
-    router.refresh()
-  }, [router])
+  }, [])
 
   const handleTap = useCallback((n: NotificationInfo) => {
     // 既読にする
@@ -454,7 +451,6 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
           const data = await res.json()
           setNotifications(data.notifications)
         }
-        router.refresh()
       }} className="flex-1">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground page-enter">

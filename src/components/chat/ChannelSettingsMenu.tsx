@@ -59,7 +59,6 @@ export function ChannelSettingsMenu({ channel, workspaceId }: Props) {
       }
 
       setRenameOpen(false)
-      router.refresh()
     } catch {
       setError("名称変更に失敗しました")
     } finally {

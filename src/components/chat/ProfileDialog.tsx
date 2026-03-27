@@ -57,7 +57,6 @@ export function ProfileDialog() {
 
       if (res.ok) {
         setSaved(true)
-        router.refresh()
         setTimeout(() => setOpen(false), 500)
       }
     } finally {
