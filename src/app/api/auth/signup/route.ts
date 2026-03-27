@@ -51,21 +51,20 @@ export async function POST(request: Request) {
           },
         })
 
-        // 全 public チャンネルに自動参加
-        const publicChannels = await prisma.channel.findMany({
-          where: { workspaceId: invitedWorkspace.id, type: "public" },
-          select: { id: true },
+        // 新メンバー用のマイチャットを作成（個人専用・非共有）
+        const myChat = await prisma.channel.create({
+          data: {
+            workspaceId: invitedWorkspace.id,
+            name: "マイチャット",
+            type: "public",
+          },
         })
-
-        if (publicChannels.length > 0) {
-          await prisma.channelMember.createMany({
-            data: publicChannels.map((ch) => ({
-              channelId: ch.id,
-              userId: user.id,
-            })),
-            skipDuplicates: true,
-          })
-        }
+        await prisma.channelMember.create({
+          data: {
+            channelId: myChat.id,
+            userId: user.id,
+          },
+        })
 
         return NextResponse.json({
           userId: user.id,

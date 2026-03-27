@@ -290,6 +290,7 @@ export function MessageView({
             <ChannelMembersDialog
               channelId={channel.id}
               channelType={channel.type}
+              channelName={channel.name}
               currentUserId={currentUserId}
             />
           </div>

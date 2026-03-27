@@ -54,19 +54,19 @@ function StatCard({
   return (
     <button
       className={cn(
-        "rounded-xl border text-left hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group",
-        mobile ? "p-4" : "p-4",
+        "rounded-xl border text-left hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group overflow-hidden",
+        mobile ? "p-3" : "p-4",
         bgColor
       )}
       onClick={onClick}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-muted-foreground group-hover:text-foreground transition-colors">
+        <span className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
           {icon}
         </span>
-        <div className={cn("font-bold tabular-nums", mobile ? "text-3xl" : "text-2xl", color)}>{value}</div>
+        <div className={cn("font-bold tabular-nums", mobile ? "text-2xl" : "text-2xl", color)}>{value}</div>
       </div>
-      <div className={cn("text-muted-foreground", mobile ? "text-sm" : "text-xs")}>{label}</div>
+      <div className={cn("text-muted-foreground truncate", mobile ? "text-sm" : "text-xs")}>{label}</div>
     </button>
   )
 }
@@ -150,10 +150,10 @@ export function DashboardView({
         {/* 今日の進捗バー */}
         {(stats.totalTasks > 0 || stats.completedTodayTasks > 0) && (
           <div className="rounded-xl border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className={cn("font-medium", isMobile ? "text-base" : "text-sm")}>今日の進捗</span>
-              <span className={cn("text-muted-foreground", isMobile ? "text-sm" : "text-sm")}>
-                {stats.completedTodayTasks} / {totalAll} タスク ({completionRate}%)
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <span className={cn("font-medium shrink-0", isMobile ? "text-sm" : "text-sm")}>今日の進捗</span>
+              <span className={cn("text-muted-foreground truncate", isMobile ? "text-xs" : "text-sm")}>
+                {stats.completedTodayTasks}/{totalAll} ({completionRate}%)
               </span>
             </div>
             <div className="h-2 rounded-full bg-muted overflow-hidden">
@@ -194,7 +194,7 @@ export function DashboardView({
                       <div className={cn("truncate", isMobile ? "text-[15px]" : "text-sm")}>{task.title}</div>
                       {task.project && (
                         <span
-                          className={cn("rounded-sm mt-0.5 inline-block", isMobile ? "text-xs px-2 py-0.5" : "text-[10px] px-1.5 py-0.5")}
+                          className={cn("rounded-sm mt-0.5 inline-block max-w-[120px] truncate align-bottom", isMobile ? "text-xs px-2 py-0.5" : "text-[10px] px-1.5 py-0.5")}
                           style={{
                             backgroundColor: task.project.color ? `${task.project.color}20` : undefined,
                             color: task.project.color || undefined,

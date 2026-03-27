@@ -83,6 +83,14 @@ export async function POST(request: Request) {
       )
     }
 
+    // マイチャットへのメンバー追加を拒否
+    if (channel.name === "マイチャット" || channel.name === "general") {
+      return NextResponse.json(
+        { error: "マイチャットにはメンバーを追加できません" },
+        { status: 400 }
+      )
+    }
+
     // 追加対象がワークスペースメンバーか確認
     const workspaceMember = await prisma.workspaceMember.findUnique({
       where: {

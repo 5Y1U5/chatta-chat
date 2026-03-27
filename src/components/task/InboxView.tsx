@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -82,11 +82,15 @@ function SwipeableNotificationRow({
   onArchive,
   onTap,
   index,
+  expanded,
+  onToggleExpand,
 }: {
   notification: NotificationInfo
   onArchive: (id: string) => void
   onTap: (n: NotificationInfo) => void
   index: number
+  expanded: boolean
+  onToggleExpand: (id: string) => void
 }) {
   const [offsetX, setOffsetX] = useState(0)
   const [removing, setRemoving] = useState(false)
@@ -227,15 +231,27 @@ function SwipeableNotificationRow({
           )}
         </div>
 
-        {/* 最低限の情報 */}
+        {/* 通知内容 */}
         <div className="flex-1 min-w-0">
-          <p className={cn("text-sm leading-snug truncate", !notification.read && "font-medium")}>
+          <p className={cn("text-sm leading-snug", !notification.read && "font-medium", expanded ? "" : "line-clamp-2")}>
             {notification.title}
           </p>
           {notification.body && (
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+            <p className={cn("text-xs text-muted-foreground mt-0.5 leading-relaxed whitespace-pre-wrap", expanded ? "" : "line-clamp-3")}>
               {notification.body}
             </p>
+          )}
+          {/* もっと見る / 折りたたむ */}
+          {notification.body && notification.body.length > 80 && (
+            <button
+              className="text-xs text-primary mt-1 touch-manipulation"
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleExpand(notification.id)
+              }}
+            >
+              {expanded ? "折りたたむ" : "もっと見る"}
+            </button>
           )}
           <div className="flex items-center gap-2 mt-0.5">
             <span className={cn("inline-flex items-center gap-1 rounded-full text-[10px] px-1.5 py-0.5 font-medium", config.color)}>
@@ -284,6 +300,30 @@ function NotificationDetailPanel({
 }) {
   const router = useRouter()
   const config = typeConfig[notification.type] || { label: notification.type, color: "bg-muted text-muted-foreground", icon: null }
+  const [replyText, setReplyText] = useState("")
+  const [replySending, setReplySending] = useState(false)
+  const [replySent, setReplySent] = useState(false)
+
+  const isCommentNotification = notification.type === "task_comment" && notification.taskId
+
+  const handleReply = async () => {
+    if (!replyText.trim() || !notification.taskId) return
+    setReplySending(true)
+    try {
+      const res = await fetch("/api/internal/tasks/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: notification.taskId, content: replyText.trim() }),
+      })
+      if (res.ok) {
+        setReplyText("")
+        setReplySent(true)
+        setTimeout(() => setReplySent(false), 2000)
+      }
+    } finally {
+      setReplySending(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
@@ -292,7 +332,7 @@ function NotificationDetailPanel({
 
       {/* パネル */}
       <div
-        className="relative w-full sm:max-w-md bg-background rounded-t-2xl sm:rounded-2xl p-6 animate-in slide-in-from-bottom-4 duration-200 safe-area-bottom"
+        className="relative w-full sm:max-w-md bg-background rounded-t-2xl sm:rounded-2xl p-6 animate-in slide-in-from-bottom-4 duration-200 safe-area-bottom max-h-[80vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ハンドル（モバイル） */}
@@ -334,6 +374,30 @@ function NotificationDetailPanel({
         {notification.body && (
           <div className="mt-2 rounded-md bg-muted/50 px-3 py-2">
             <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{notification.body}</p>
+          </div>
+        )}
+
+        {/* コメント返信フォーム */}
+        {isCommentNotification && (
+          <div className="mt-3">
+            {replySent ? (
+              <p className="text-sm text-primary">返信を送信しました</p>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleReply() }}
+                  placeholder="返信を入力..."
+                  className="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  disabled={replySending}
+                />
+                <Button size="sm" onClick={handleReply} disabled={!replyText.trim() || replySending}>
+                  {replySending ? "..." : "送信"}
+                </Button>
+              </div>
+            )}
           </div>
         )}
         <div className="mb-6" />
@@ -382,6 +446,12 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
   const router = useRouter()
   const [notifications, setNotifications] = useState(initial)
   const [selectedNotification, setSelectedNotification] = useState<NotificationInfo | null>(null)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  // Server Component から新しい initial が来たら同期（ページ再訪問時）
+  useEffect(() => {
+    setNotifications(initial)
+  }, [initial])
 
   // 通知のリアルタイム購読
   useRealtimeNotifications({
@@ -451,6 +521,8 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
           const data = await res.json()
           setNotifications(data.notifications)
         }
+        // ナビバッジの未読数を更新するために layout を再取得
+        router.refresh()
       }} className="flex-1">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground page-enter">
@@ -470,6 +542,13 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
                 onArchive={handleArchive}
                 onTap={handleTap}
                 index={i}
+                expanded={expandedIds.has(n.id)}
+                onToggleExpand={(id) => setExpandedIds((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(id)) next.delete(id)
+                  else next.add(id)
+                  return next
+                })}
               />
             ))}
           </div>

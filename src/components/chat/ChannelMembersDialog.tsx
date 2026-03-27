@@ -22,10 +22,12 @@ type Member = {
 type Props = {
   channelId: string
   channelType: string
+  channelName?: string | null
   currentUserId: string
 }
 
-export function ChannelMembersDialog({ channelId, channelType, currentUserId }: Props) {
+export function ChannelMembersDialog({ channelId, channelType, channelName, currentUserId }: Props) {
+  const isMyChat = channelName === "マイチャット" || channelName === "general"
   const [open, setOpen] = useState(false)
   const [channelMembers, setChannelMembers] = useState<Member[]>([])
   const [workspaceMembers, setWorkspaceMembers] = useState<Member[]>([])
@@ -120,8 +122,8 @@ export function ChannelMembersDialog({ channelId, channelType, currentUserId }: 
     }
   }
 
-  // DM チャンネルではメンバー管理を表示しない
-  if (channelType === "dm") return null
+  // DM / マイチャットではメンバー管理を表示しない
+  if (channelType === "dm" || isMyChat) return null
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
