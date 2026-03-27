@@ -14,86 +14,86 @@ export default async function DashboardPage({
   const now = new Date()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-  // 自分のタスク統計
-  const [totalTasks, overdueTasks, dueTodayTasks, completedTodayTasks] =
-    await Promise.all([
-      prisma.task.count({
-        where: {
-          workspaceId,
-          assigneeId: auth.userId,
-          status: { not: "done" },
-          parentTaskId: null,
-        },
-      }),
-      prisma.task.count({
-        where: {
-          workspaceId,
-          assigneeId: auth.userId,
-          status: { not: "done" },
-          parentTaskId: null,
-          dueDate: { lt: todayStart },
-        },
-      }),
-      prisma.task.count({
-        where: {
-          workspaceId,
-          assigneeId: auth.userId,
-          status: { not: "done" },
-          parentTaskId: null,
-          dueDate: {
-            gte: todayStart,
-            lt: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000),
-          },
-        },
-      }),
-      prisma.task.count({
-        where: {
-          workspaceId,
-          assigneeId: auth.userId,
-          completedAt: { gte: todayStart },
-          parentTaskId: null,
-        },
-      }),
-    ])
-
-  // 直近の完了タスク（チーム全体）
-  const recentCompletedTasks = await prisma.task.findMany({
-    where: {
-      workspaceId,
-      status: "done",
-      completedAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
-      parentTaskId: null,
-    },
-    include: {
-      assignee: { select: { id: true, displayName: true, avatarUrl: true } },
-    },
-    orderBy: { completedAt: "desc" },
-    take: 10,
-  })
-
-  // 期限間近のタスク
-  const upcomingTasks = await prisma.task.findMany({
-    where: {
-      workspaceId,
-      assigneeId: auth.userId,
-      status: { not: "done" },
-      parentTaskId: null,
-      dueDate: {
-        gte: todayStart,
-        lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+  // 全クエリを完全並列化（直列実行を排除）
+  const [
+    totalTasks, overdueTasks, dueTodayTasks, completedTodayTasks,
+    recentCompletedTasks, upcomingTasks, unreadCount,
+  ] = await Promise.all([
+    // 統計 4件
+    prisma.task.count({
+      where: {
+        workspaceId,
+        assigneeId: auth.userId,
+        status: { not: "done" },
+        parentTaskId: null,
       },
-    },
-    include: {
-      project: { select: { id: true, name: true, color: true } },
-    },
-    orderBy: { dueDate: "asc" },
-    take: 10,
-  })
-
-  // 未読通知数
-  const unreadCount = await prisma.notification.count({
-    where: { userId: auth.userId, read: false },
-  })
+    }),
+    prisma.task.count({
+      where: {
+        workspaceId,
+        assigneeId: auth.userId,
+        status: { not: "done" },
+        parentTaskId: null,
+        dueDate: { lt: todayStart },
+      },
+    }),
+    prisma.task.count({
+      where: {
+        workspaceId,
+        assigneeId: auth.userId,
+        status: { not: "done" },
+        parentTaskId: null,
+        dueDate: {
+          gte: todayStart,
+          lt: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000),
+        },
+      },
+    }),
+    prisma.task.count({
+      where: {
+        workspaceId,
+        assigneeId: auth.userId,
+        completedAt: { gte: todayStart },
+        parentTaskId: null,
+      },
+    }),
+    // 直近の完了タスク（チーム全体）
+    prisma.task.findMany({
+      where: {
+        workspaceId,
+        status: "done",
+        completedAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
+        parentTaskId: null,
+      },
+      include: {
+        assignee: { select: { id: true, displayName: true, avatarUrl: true } },
+      },
+      orderBy: { completedAt: "desc" },
+      take: 10,
+    }),
+    // 期限間近のタスク
+    prisma.task.findMany({
+      where: {
+        workspaceId,
+        assigneeId: auth.userId,
+        status: { not: "done" },
+        parentTaskId: null,
+        dueDate: {
+          gte: todayStart,
+          lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        },
+      },
+      include: {
+        project: { select: { id: true, name: true, color: true } },
+      },
+      orderBy: { dueDate: "asc" },
+      take: 10,
+    }),
+    // 未読通知数
+    prisma.notification.count({
+      where: { userId: auth.userId, read: false },
+    }),
+  ])
 
   return (
     <DashboardView

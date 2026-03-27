@@ -295,8 +295,7 @@ export function TaskListView({
     setDeleting(false)
     if (res.ok) {
       setDeleteDialogOpen(false)
-      window.history.pushState(null, "", `/${workspaceId}/tasks`)
-      router.refresh()
+      router.push(`/${workspaceId}/tasks`)
     }
   }, [projectId, workspaceId, router])
 

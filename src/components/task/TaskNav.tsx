@@ -43,7 +43,7 @@ export function TaskNav({ workspaceId, projects }: Props) {
       <div className="flex-1 overflow-y-auto py-2">
         {/* マイタスク */}
         <button
-          onClick={() => window.history.pushState(null, "", `/${workspaceId}/tasks`)}
+          onClick={() => router.push(`/${workspaceId}/tasks`, { scroll: false })}
           className={cn(
             "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-left",
             isMyTasks ? "bg-muted font-medium" : "hover:bg-muted/50"
@@ -86,7 +86,7 @@ export function TaskNav({ workspaceId, projects }: Props) {
             return (
               <button
                 key={project.id}
-                onClick={() => window.history.pushState(null, "", `/${workspaceId}/tasks?projectId=${project.id}`)}
+                onClick={() => router.push(`/${workspaceId}/tasks?projectId=${project.id}`, { scroll: false })}
                 className={cn(
                   "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-left w-[calc(100%-1rem)]",
                   isActive ? "bg-muted font-medium" : "hover:bg-muted/50"
