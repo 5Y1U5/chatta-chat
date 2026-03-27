@@ -89,7 +89,7 @@ export function DashboardView({
         <h1 className="text-lg font-semibold">ダッシュボード</h1>
       </div>
 
-      <div className="p-4 space-y-6 min-w-0 overflow-hidden">
+      <div className="p-4 space-y-6 min-w-0">
         {/* 統計カード */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
