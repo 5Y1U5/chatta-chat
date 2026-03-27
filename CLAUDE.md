@@ -40,6 +40,7 @@ src/
 │   │       └── dashboard/             # ダッシュボード（タスク統計）
 │   ├── invite/[code]/                 # ワークスペース招待ランディング
 │   ├── ch/[code]/                     # グループチャット招待ランディング
+│   ├── p/[code]/                      # プロジェクト招待ランディング
 │   ├── t/[token]/                     # ゲストタスク共有ページ（認証不要）
 │   └── api/
 │       ├── auth/signup, callback      # 認証 + 招待コード処理
@@ -52,14 +53,14 @@ src/
 │           ├── reactions/             # リアクション
 │           ├── upload/                # ファイルアップロード
 │           ├── workspaces/invite,join # ワークスペース招待
-│           ├── projects/              # プロジェクト CRUD
-│           ├── tasks/                 # タスク CRUD + ステータス更新 + comments + share
-│           ├── notifications/         # 通知一覧 + 既読更新
+│           ├── projects/              # プロジェクト CRUD + invite + join + members
+│           ├── tasks/                 # タスク CRUD + ステータス更新 + comments + share + members
+│           ├── notifications/         # 通知一覧 + 既読更新 + アーカイブ
 │           └── ai/suggest-reply       # AI 返信候補生成
 │       └── guest/                     # ゲスト用 API（認証不要、トークン検証）
 │           └── tasks/[token]/         # ゲストタスク閲覧 + コメント投稿
 ├── components/
-│   ├── ui/           # shadcn（Calendar, DatePicker, Popover 等）
+│   ├── ui/           # shadcn（Calendar, DatePicker, Popover, PullToRefresh 等）
 │   ├── auth/         # LoginForm, SignupForm, GoogleLoginButton
 │   ├── chat/         # WorkspaceSidebar, ChannelList, MessageView, MessageInput,
 │   │                 # SummarizeDialog, MinutesDialog, MemoryPanel, VoiceRecorder
@@ -68,6 +69,9 @@ src/
 │   └── pwa/          # InstallBanner, ServiceWorkerRegister
 ├── hooks/
 │   ├── useRealtimeMessages.ts    # メッセージのリアルタイム購読
+│   ├── useRealtimeTasks.ts       # タスクのリアルタイム購読（INSERT/UPDATE）
+│   ├── useRealtimeComments.ts    # タスクコメントのリアルタイム購読
+│   ├── useRealtimeNotifications.ts # 通知のリアルタイム購読
 │   ├── useUnreadCounts.ts        # 未読数管理
 │   └── useTypingIndicator.ts     # タイピングインジケータ（Presence）
 ├── lib/
@@ -98,12 +102,12 @@ public/
 - **ChannelMemory**: AI が自動検出した重要事項（decision/deadline/action/info）
 
 ### タスク管理系
-- **Project**: workspaceId, name, description, color, archived
+- **Project**: workspaceId, name, description, color, inviteCode (unique, プロジェクト招待用), archived
 - **Task**: workspaceId, projectId, parentTaskId（サブタスク）, title, description, status (todo/in_progress/done), priority (none/low/medium/high), assigneeId, creatorId, dueDate, recurrenceRule (RRULE文字列), nextOccurrence
 - **TaskComment**: taskId, userId, content
 - **TaskShareLink**: taskId, token (unique, 32文字hex), createdBy, active, expiresAt — ゲスト共有リンク
 - **GuestComment**: taskId, shareLinkId, guestName, content — 未登録ゲストのコメント
-- **Notification**: workspaceId, userId, actorId, type (task_assigned/task_completed/task_commented/guest_comment), title, taskId, projectId, read
+- **Notification**: userId, actorId, type (task_assigned/task_completed/task_comment/task_mentioned/task_collaborator/project_invited), title, body (コメント本文等), taskId, projectId, read, archived
 
 ## コマンド
 
@@ -130,13 +134,17 @@ ANTHROPIC_API_KEY=       # Claude API キー
 - **モバイル対応**: `h-dvh`（`h-screen` ではなく）、`shrink-0` でヘッダー固定、`min-h-0` で flex overflow 制御
 - **Prisma 出力先**: `src/generated/prisma`。`.gitignore` 対象のため、ビルド時に `prisma generate` 必須
 - **`useSearchParams()`**: 使用するコンポーネントは `<Suspense>` でラップ必須（Next.js 要件）
-- **招待フロー**: `inviteCode` 12文字（`crypto.randomUUID().replace(/-/g, "").slice(0, 12)`）
+- **招待フロー**: `inviteCode` 12文字（`crypto.randomUUID().replace(/-/g, "").slice(0, 12)`）。ワークスペース・チャンネル・プロジェクト共通パターン。再参加時は「既に参加済みです」表示
 - **ゲスト共有**: `TaskShareLink.token` 32文字hex（`crypto.randomBytes(16).toString("hex")`）。`/t/[token]` で認証不要アクセス。GuestComment は TaskComment と別テーブル（userId NOT NULL 制約を壊さない）
 - **AI チャット**: `@AI` メンション → `after()` でバックグラウンド応答生成 → Realtime で配信。失敗時はエラーメッセージをチャットに投稿
 - **AI 機能**: 返信候補生成、会話要約、議事録生成、重要事項自動検出（5メッセージごとにバッチ分析）
 - **繰り返しタスク**: RFC 5545 RRULE 形式。`rrule` ライブラリで処理。完了時に次回タスクを自動生成
 - **AIユーザー除外**: タスク担当者選択時に `ai@chatta-chat.local` をフィルタ
-- **Realtime**: `postgres_changes` で messages テーブル購読。Presence でタイピングインジケータ
+- **Realtime**: `postgres_changes` で Message, Task, TaskComment, Notification テーブルを購読。Presence でタイピングインジケータ
+- **プルトゥリフレッシュ**: `PullToRefresh` コンポーネントでタスク一覧・受信トレイ・プロジェクト一覧に適用
+- **受信トレイ**: スワイプでアーカイブ、タップで詳細パネル表示。コメント通知は本文プレビュー付き
+- **プロジェクト招待**: `inviteCode` 12文字。`/p/[code]` で招待ランディング。ワークスペースメンバーのみ参加可
+- **Google認証紐付け**: プロフィール設定で `linkIdentity()` により既存メールアカウントにGoogle連携
 - **サイドバー**: WorkspaceSidebar はトグルで展開/折りたたみ可能（展開時: アイコン+ラベル、折りたたみ時: アイコンのみ）
 - **ChannelList 表示条件**: チャットページ（ワークスペースルート or `/channel/`）のみ表示。タスク・受信トレイ・ダッシュボード等では非表示
 - **DatePicker**: `<input type="date">` ではなく `DatePicker` コンポーネント（ボタン+カレンダーポップオーバー）を使用。`date-fns` + `react-day-picker` ベース
