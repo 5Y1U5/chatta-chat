@@ -252,8 +252,9 @@ model TaskComment {
 model Notification {
   id        String   @id @default(uuid())
   userId    String   // 通知の宛先
-  type      String   // task_completed | task_comment | task_assigned
+  type      String   // task_completed | task_comment | task_assigned | project_invited
   title     String   // 表示テキスト
+  body      String?  // コメント本文等の補足情報
   taskId    String?
   projectId String?
   actorId   String   // アクションを起こしたユーザー

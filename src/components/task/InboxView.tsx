@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -55,12 +55,323 @@ const typeConfig: Record<string, { label: string; color: string; icon: React.Rea
       </svg>
     ),
   },
+  project_invited: {
+    label: "招待",
+    color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      </svg>
+    ),
+  },
+}
+
+// スワイプ可能な通知行
+function SwipeableNotificationRow({
+  notification,
+  onArchive,
+  onTap,
+  index,
+}: {
+  notification: NotificationInfo
+  onArchive: (id: string) => void
+  onTap: (n: NotificationInfo) => void
+  index: number
+}) {
+  const [offsetX, setOffsetX] = useState(0)
+  const [removing, setRemoving] = useState(false)
+  const startXRef = useRef(0)
+  const startYRef = useRef(0)
+  const swipingRef = useRef(false)
+  const lockedRef = useRef(false) // スワイプ方向確定済み
+  const rowRef = useRef<HTMLDivElement>(null)
+
+  const REVEAL_THRESHOLD = 80
+  const AUTO_ARCHIVE_THRESHOLD = 160
+
+  const config = typeConfig[notification.type] || { label: notification.type, color: "bg-muted text-muted-foreground", icon: null }
+
+  const handleStart = (clientX: number, clientY: number) => {
+    startXRef.current = clientX
+    startYRef.current = clientY
+    swipingRef.current = true
+    lockedRef.current = false
+  }
+
+  const handleMove = (clientX: number, clientY: number) => {
+    if (!swipingRef.current) return
+
+    const dx = clientX - startXRef.current
+    const dy = clientY - startYRef.current
+
+    // 方向がまだ確定していない場合、垂直スクロール優先判定
+    if (!lockedRef.current) {
+      if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
+        // 縦方向 → スワイプキャンセル（スクロールに任せる）
+        swipingRef.current = false
+        setOffsetX(0)
+        return
+      }
+      if (Math.abs(dx) > 8) {
+        lockedRef.current = true
+      } else {
+        return
+      }
+    }
+
+    // 左方向（マイナス）のみ許可
+    if (dx < 0) {
+      setOffsetX(Math.max(dx * 0.8, -200))
+    } else {
+      setOffsetX(0)
+    }
+  }
+
+  const handleEnd = () => {
+    if (!swipingRef.current) return
+    swipingRef.current = false
+
+    if (Math.abs(offsetX) >= AUTO_ARCHIVE_THRESHOLD) {
+      // 自動アーカイブ
+      setRemoving(true)
+      setTimeout(() => onArchive(notification.id), 200)
+    } else if (Math.abs(offsetX) >= REVEAL_THRESHOLD) {
+      // スナップしてボタン露出
+      setOffsetX(-REVEAL_THRESHOLD)
+    } else {
+      setOffsetX(0)
+    }
+  }
+
+  // PC用: マウスイベント
+  const handleMouseDown = (e: React.MouseEvent) => {
+    handleStart(e.clientX, e.clientY)
+    const onMouseMove = (ev: MouseEvent) => handleMove(ev.clientX, ev.clientY)
+    const onMouseUp = () => {
+      handleEnd()
+      document.removeEventListener("mousemove", onMouseMove)
+      document.removeEventListener("mouseup", onMouseUp)
+    }
+    document.addEventListener("mousemove", onMouseMove)
+    document.addEventListener("mouseup", onMouseUp)
+  }
+
+  return (
+    <div
+      ref={rowRef}
+      className={cn(
+        "relative overflow-hidden stagger-item",
+        removing && "transition-all duration-200 h-0 opacity-0"
+      )}
+      style={{ animationDelay: `${index * 30}ms` }}
+    >
+      {/* アーカイブ背景（右端に表示） */}
+      <div className="absolute inset-y-0 right-0 flex items-center bg-destructive text-destructive-foreground" style={{ width: Math.max(Math.abs(offsetX), 0) }}>
+        <div className="flex items-center gap-2 px-4 ml-auto">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+          {Math.abs(offsetX) >= AUTO_ARCHIVE_THRESHOLD && (
+            <span className="text-xs font-medium whitespace-nowrap">アーカイブ</span>
+          )}
+        </div>
+      </div>
+
+      {/* メインコンテンツ（スライドする行） */}
+      <div
+        className={cn(
+          "relative flex items-center gap-3 border-b bg-background cursor-pointer select-none",
+          "px-4 py-3",
+          !notification.read && "bg-primary/5",
+          offsetX === 0 && "transition-transform duration-200"
+        )}
+        style={{ transform: `translateX(${offsetX}px)` }}
+        onTouchStart={(e) => handleStart(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchMove={(e) => handleMove(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchEnd={handleEnd}
+        onMouseDown={handleMouseDown}
+        onClick={() => {
+          if (Math.abs(offsetX) > 5) {
+            // スワイプ中はクリック無効、元に戻す
+            setOffsetX(0)
+            return
+          }
+          onTap(notification)
+        }}
+      >
+        {/* 未読ドット */}
+        <div className="shrink-0">
+          {!notification.read ? (
+            <span className="block h-2 w-2 rounded-full bg-primary" />
+          ) : (
+            <span className="block h-2 w-2" />
+          )}
+        </div>
+
+        {/* アクターアバター */}
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+          {notification.actor.avatarUrl ? (
+            <img src={notification.actor.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+          ) : (
+            notification.actor.displayName?.charAt(0) || "?"
+          )}
+        </div>
+
+        {/* 最低限の情報 */}
+        <div className="flex-1 min-w-0">
+          <p className={cn("text-sm leading-snug truncate", !notification.read && "font-medium")}>
+            {notification.title}
+          </p>
+          {notification.body && (
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+              {notification.body}
+            </p>
+          )}
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={cn("inline-flex items-center gap-1 rounded-full text-[10px] px-1.5 py-0.5 font-medium", config.color)}>
+              {config.icon}
+              {config.label}
+            </span>
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {formatRelativeTime(notification.createdAt)}
+            </span>
+          </div>
+        </div>
+
+        {/* 右矢印（タップ可能のヒント） */}
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/30 shrink-0">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+// 相対時刻表示
+function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return "たった今"
+  if (min < 60) return `${min}分前`
+  const hours = Math.floor(min / 60)
+  if (hours < 24) return `${hours}時間前`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}日前`
+  return new Date(dateStr).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })
+}
+
+// 通知詳細パネル
+function NotificationDetailPanel({
+  notification,
+  workspaceId,
+  onClose,
+  onArchive,
+}: {
+  notification: NotificationInfo
+  workspaceId: string
+  onClose: () => void
+  onArchive: (id: string) => void
+}) {
+  const router = useRouter()
+  const config = typeConfig[notification.type] || { label: notification.type, color: "bg-muted text-muted-foreground", icon: null }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      {/* オーバーレイ */}
+      <div className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" />
+
+      {/* パネル */}
+      <div
+        className="relative w-full sm:max-w-md bg-background rounded-t-2xl sm:rounded-2xl p-6 animate-in slide-in-from-bottom-4 duration-200 safe-area-bottom"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* ハンドル（モバイル） */}
+        <div className="sm:hidden flex justify-center mb-4">
+          <div className="h-1 w-10 rounded-full bg-muted-foreground/20" />
+        </div>
+
+        {/* ヘッダー */}
+        <div className="flex items-start gap-3 mb-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">
+            {notification.actor.avatarUrl ? (
+              <img src={notification.actor.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+            ) : (
+              notification.actor.displayName?.charAt(0) || "?"
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">{notification.actor.displayName || "メンバー"}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={cn("inline-flex items-center gap-1 rounded-full text-[10px] px-1.5 py-0.5 font-medium", config.color)}>
+                {config.icon}
+                {config.label}
+              </span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                {new Date(notification.createdAt).toLocaleString("ja-JP", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 本文 */}
+        <p className="text-sm leading-relaxed">{notification.title}</p>
+        {notification.body && (
+          <div className="mt-2 rounded-md bg-muted/50 px-3 py-2">
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{notification.body}</p>
+          </div>
+        )}
+        <div className="mb-6" />
+
+        {/* アクションボタン */}
+        <div className="flex gap-2">
+          {notification.taskId ? (
+            <Button
+              className="flex-1"
+              onClick={() => {
+                onClose()
+                const params = new URLSearchParams({ taskId: notification.taskId! })
+                if (notification.projectId) params.set("projectId", notification.projectId)
+                router.push(`/${workspaceId}/tasks?${params}`)
+              }}
+            >
+              タスクを確認する
+            </Button>
+          ) : notification.projectId ? (
+            <Button
+              className="flex-1"
+              onClick={() => {
+                onClose()
+                router.push(`/${workspaceId}/tasks?projectId=${notification.projectId}`)
+              }}
+            >
+              プロジェクトを確認する
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            onClick={() => {
+              onArchive(notification.id)
+              onClose()
+            }}
+          >
+            アーカイブ
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function InboxView({ notifications: initial, workspaceId, currentUserId }: Props) {
   const router = useRouter()
-  const isMobile = useIsMobile()
   const [notifications, setNotifications] = useState(initial)
+  const [selectedNotification, setSelectedNotification] = useState<NotificationInfo | null>(null)
 
   // 通知のリアルタイム購読
   useRealtimeNotifications({
@@ -84,27 +395,30 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
     router.refresh()
   }
 
-  const handleClick = async (notification: NotificationInfo) => {
-    if (!notification.read) {
+  const handleArchive = useCallback((id: string) => {
+    fetch("/api/internal/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archiveId: id }),
+    })
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
+    router.refresh()
+  }, [router])
+
+  const handleTap = useCallback((n: NotificationInfo) => {
+    // 既読にする
+    if (!n.read) {
       fetch("/api/internal/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notificationId: notification.id }),
+        body: JSON.stringify({ notificationId: n.id }),
       })
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
+        prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
       )
     }
-
-    // タスクページに遷移（projectId があればプロジェクトビューで開く）
-    if (notification.taskId) {
-      const params = new URLSearchParams({ taskId: notification.taskId })
-      if (notification.projectId) {
-        params.set("projectId", notification.projectId)
-      }
-      router.push(`/${workspaceId}/tasks?${params}`)
-    }
-  }
+    setSelectedNotification(n)
+  }, [])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
@@ -142,93 +456,29 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
             <p className="text-xs mt-1 text-muted-foreground/60">タスクの割当やコメントがあると通知されます</p>
           </div>
         ) : (
-          <div className="divide-y">
-            {notifications.map((n, i) => {
-              const config = typeConfig[n.type] || { label: n.type, color: "bg-muted text-muted-foreground", icon: null }
-              return (
-                <div
-                  key={n.id}
-                  className={cn(
-                    "group flex w-full items-start gap-3 text-left hover:bg-muted/50 transition-all duration-200 stagger-item",
-                    isMobile ? "px-4 py-4" : "px-4 py-3",
-                    !n.read && "bg-primary/5"
-                  )}
-                  style={{ animationDelay: `${i * 30}ms` }}
-                >
-                  <button className="flex flex-1 items-start gap-3 text-left" onClick={() => handleClick(n)}>
-                  {/* 未読ドット */}
-                  <div className="mt-2 shrink-0">
-                    {!n.read ? (
-                      <span className={cn("block rounded-full bg-primary animate-pulse", isMobile ? "h-2.5 w-2.5" : "h-2 w-2")} />
-                    ) : (
-                      <span className={cn("block", isMobile ? "h-2.5 w-2.5" : "h-2 w-2")} />
-                    )}
-                  </div>
-
-                  {/* アクターアバター */}
-                  <div className={cn(
-                    "flex shrink-0 items-center justify-center rounded-full bg-muted font-medium",
-                    isMobile ? "h-11 w-11 text-sm" : "h-9 w-9 text-xs"
-                  )}>
-                    {n.actor.avatarUrl ? (
-                      <img src={n.actor.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
-                    ) : (
-                      n.actor.displayName?.charAt(0) || "?"
-                    )}
-                  </div>
-
-                  {/* 内容 */}
-                  <div className="flex-1 min-w-0">
-                    <p className={cn("leading-snug", isMobile ? "text-[15px]" : "text-sm", !n.read && "font-medium")}>{n.title}</p>
-                    <div className={cn("flex items-center gap-2", isMobile ? "mt-1.5" : "mt-1")}>
-                      <span className={cn(
-                        "inline-flex items-center gap-1 rounded-full font-medium",
-                        isMobile ? "text-xs px-2 py-0.5" : "text-[10px] px-1.5 py-0.5",
-                        config.color
-                      )}>
-                        {config.icon}
-                        {config.label}
-                      </span>
-                      <span className={cn("text-muted-foreground tabular-nums", isMobile ? "text-xs" : "text-[11px]")}>
-                        {new Date(n.createdAt).toLocaleString("ja-JP", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                  </button>
-
-                  {/* アーカイブボタン */}
-                  <button
-                    className={cn(
-                      "mt-2 shrink-0 rounded-md p-1.5 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors",
-                      isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      fetch("/api/internal/notifications", {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ archiveId: n.id }),
-                      })
-                      setNotifications((prev) => prev.filter((item) => item.id !== n.id))
-                      router.refresh()
-                    }}
-                    title="アーカイブ"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                </div>
-              )
-            })}
+          <div>
+            {notifications.map((n, i) => (
+              <SwipeableNotificationRow
+                key={n.id}
+                notification={n}
+                onArchive={handleArchive}
+                onTap={handleTap}
+                index={i}
+              />
+            ))}
           </div>
         )}
       </PullToRefresh>
+
+      {/* 通知詳細パネル */}
+      {selectedNotification && (
+        <NotificationDetailPanel
+          notification={selectedNotification}
+          workspaceId={workspaceId}
+          onClose={() => setSelectedNotification(null)}
+          onArchive={handleArchive}
+        />
+      )}
     </div>
   )
 }

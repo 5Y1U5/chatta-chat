@@ -12,7 +12,7 @@ export default async function InboxPage({
   const prisma = getPrisma()
 
   const notifications = await prisma.notification.findMany({
-    where: { userId: auth.userId },
+    where: { userId: auth.userId, archived: false },
     include: {
       actor: { select: { id: true, displayName: true, avatarUrl: true } },
     },

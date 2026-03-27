@@ -38,6 +38,7 @@ export function useRealtimeNotifications({ userId, onNewNotification }: Options)
             id: row.id as string,
             type: row.type as string,
             title: row.title as string,
+            body: (row.body as string) || null,
             taskId: (row.taskId as string) || null,
             projectId: (row.projectId as string) || null,
             read: false,

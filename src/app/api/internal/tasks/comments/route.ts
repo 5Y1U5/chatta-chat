@@ -143,10 +143,14 @@ export async function POST(request: Request) {
       select: { displayName: true },
     })
 
+    // コメント本文のプレビュー（100文字まで）
+    const bodyPreview = content.length > 100 ? content.slice(0, 100) + "…" : content
+
     const notifications: Array<{
       userId: string
       type: string
       title: string
+      body: string | null
       taskId: string
       projectId: string | null
       actorId: string
@@ -159,6 +163,7 @@ export async function POST(request: Request) {
           userId,
           type: "task_comment",
           title: `${actor?.displayName || "メンバー"}がタスク「${task.title}」にコメントしました`,
+          body: bodyPreview,
           taskId: task.id,
           projectId: task.projectId,
           actorId: auth.userId,
@@ -172,6 +177,7 @@ export async function POST(request: Request) {
         userId,
         type: "task_mentioned",
         title: `${actor?.displayName || "メンバー"}がタスク「${task.title}」であなたをメンションしました`,
+        body: bodyPreview,
         taskId: task.id,
         projectId: task.projectId,
         actorId: auth.userId,

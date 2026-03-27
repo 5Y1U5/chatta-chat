@@ -92,8 +92,8 @@ export async function POST(request: Request) {
       await prisma.notification.create({
         data: {
           userId,
-          type: "task_assigned",
-          title: `${actor?.displayName || "メンバー"}がプロジェクト「${project.name}」に招待しました`,
+          type: "project_invited",
+          title: `${actor?.displayName || "メンバー"}があなたをプロジェクト「${project.name}」に招待しました`,
           projectId,
           actorId: auth.userId,
         },

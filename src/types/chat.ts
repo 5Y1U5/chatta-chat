@@ -145,6 +145,7 @@ export type NotificationInfo = {
   id: string
   type: string
   title: string
+  body: string | null
   taskId: string | null
   projectId: string | null
   read: boolean
