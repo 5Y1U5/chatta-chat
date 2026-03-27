@@ -21,8 +21,10 @@ type ProjectInfo = {
   id: string
   name: string
   color: string | null
-  totalTasks: number
-  completedTasks: number
+  totalParentTasks: number
+  completedParentTasks: number
+  totalSubTasks: number
+  completedSubTasks: number
 }
 
 type Props = {

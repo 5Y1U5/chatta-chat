@@ -10,8 +10,10 @@ type ProjectInfo = {
   id: string
   name: string
   color: string | null
-  totalTasks: number
-  completedTasks: number
+  totalParentTasks: number
+  completedParentTasks: number
+  totalSubTasks: number
+  completedSubTasks: number
 }
 
 type Props = {
@@ -79,8 +81,10 @@ export function TaskNav({ workspaceId, projects }: Props) {
 
           {projects.map((project) => {
             const isActive = currentProjectId === project.id
-            const progress = project.totalTasks > 0
-              ? Math.round((project.completedTasks / project.totalTasks) * 100)
+            const totalAll = project.totalParentTasks + project.totalSubTasks
+            const completedAll = project.completedParentTasks + project.completedSubTasks
+            const progress = totalAll > 0
+              ? Math.round((completedAll / totalAll) * 100)
               : 0
 
             return (
@@ -98,21 +102,26 @@ export function TaskNav({ workspaceId, projects }: Props) {
                 />
                 <div className="flex-1 min-w-0">
                   <span className="truncate block text-sm">{project.name}</span>
-                  {project.totalTasks > 0 && (
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${progress}%`,
-                            backgroundColor: project.color || "#6B7280",
-                          }}
-                        />
+                  {totalAll > 0 && (
+                    <>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${progress}%`,
+                              backgroundColor: project.color || "#6B7280",
+                            }}
+                          />
+                        </div>
                       </div>
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {project.completedTasks}/{project.totalTasks}
-                      </span>
-                    </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+                        <span>タスク {project.completedParentTasks}/{project.totalParentTasks}</span>
+                        {project.totalSubTasks > 0 && (
+                          <span>サブ {project.completedSubTasks}/{project.totalSubTasks}</span>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               </button>

@@ -50,10 +50,8 @@ export async function MobileHeaderData({ workspaceId, userId }: Props) {
         members: { some: { userId } },
       },
       include: {
-        _count: { select: { tasks: true } },
         tasks: {
-          where: { status: "done" },
-          select: { id: true },
+          select: { id: true, status: true, parentTaskId: true },
         },
       },
       orderBy: { name: "asc" },
@@ -118,13 +116,19 @@ export async function MobileHeaderData({ workspaceId, userId }: Props) {
     members,
   }))
 
-  const projects = projectsRaw.map((p) => ({
-    id: p.id,
-    name: p.name,
-    color: p.color,
-    totalTasks: p._count.tasks,
-    completedTasks: p.tasks.length,
-  }))
+  const projects = projectsRaw.map((p) => {
+    const parentTasks = p.tasks.filter((t) => !t.parentTaskId)
+    const subTasks = p.tasks.filter((t) => t.parentTaskId)
+    return {
+      id: p.id,
+      name: p.name,
+      color: p.color,
+      totalParentTasks: parentTasks.length,
+      completedParentTasks: parentTasks.filter((t) => t.status === "done").length,
+      totalSubTasks: subTasks.length,
+      completedSubTasks: subTasks.filter((t) => t.status === "done").length,
+    }
+  })
 
   return (
     <MobileHeaderSwitch

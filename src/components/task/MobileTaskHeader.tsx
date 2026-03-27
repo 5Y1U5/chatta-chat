@@ -9,8 +9,10 @@ type ProjectInfo = {
   id: string
   name: string
   color: string | null
-  totalTasks: number
-  completedTasks: number
+  totalParentTasks: number
+  completedParentTasks: number
+  totalSubTasks: number
+  completedSubTasks: number
 }
 
 type Props = {
@@ -131,9 +133,10 @@ export function MobileTaskHeader({ workspaceId, projects }: Props) {
                       style={{ backgroundColor: project.color || "#6B7280" }}
                     />
                     <span className="truncate">{project.name}</span>
-                    {project.totalTasks > 0 && (
-                      <span className="text-xs text-muted-foreground ml-auto shrink-0">
-                        {project.completedTasks}/{project.totalTasks}
+                    {(project.totalParentTasks > 0 || project.totalSubTasks > 0) && (
+                      <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
+                        {project.completedParentTasks}/{project.totalParentTasks}
+                        {project.totalSubTasks > 0 && ` +${project.completedSubTasks}/${project.totalSubTasks}`}
                       </span>
                     )}
                   </button>
