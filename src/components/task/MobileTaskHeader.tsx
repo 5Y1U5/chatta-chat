@@ -70,10 +70,10 @@ export function MobileTaskHeader({ workspaceId, projects }: Props) {
     <>
       <button
         onClick={() => setSheetOpen(true)}
-        className="flex flex-1 items-center gap-1 touch-manipulation"
+        className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 touch-manipulation active:bg-muted/70 transition-colors"
       >
         <span className="font-semibold text-sm truncate">マイタスク</span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
