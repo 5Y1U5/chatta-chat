@@ -45,7 +45,12 @@ export default async function ChatLayout({
         <InstallBanner />
         {/* モバイルヘッダー */}
         <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
-          <Suspense fallback={<div className="h-5 w-32 rounded bg-muted animate-pulse" />}>
+          <Suspense fallback={
+            <div className="flex items-center gap-2 flex-1">
+              <div className="h-8 w-8 rounded-md bg-muted animate-pulse" />
+              <div className="h-5 w-32 rounded bg-muted animate-pulse" />
+            </div>
+          }>
             <MobileHeaderData workspaceId={activeWorkspaceId} userId={auth.userId} />
           </Suspense>
         </div>
