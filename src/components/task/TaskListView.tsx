@@ -112,6 +112,7 @@ export function TaskListView({
   const [deleting, setDeleting] = useState(false)
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const pendingTempIdRef = useRef<string | null>(null)
 
   // 日付変更時にセクション分類を再計算するためのstate
   const [now, setNow] = useState(() => new Date())
@@ -197,6 +198,20 @@ export function TaskListView({
     }, [syncInBackground]),
   })
 
+  // タブ/ウィンドウが再度アクティブになったときに同期（別端末対応）
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") syncInBackground()
+    }
+    const handleFocus = () => syncInBackground()
+    document.addEventListener("visibilitychange", handleVisibility)
+    window.addEventListener("focus", handleFocus)
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility)
+      window.removeEventListener("focus", handleFocus)
+    }
+  }, [syncInBackground])
+
   // 楽観的ステータス変更
   const handleStatusChange = useCallback((taskId: string, status: string) => {
     // 即座にローカル state を更新
@@ -231,9 +246,20 @@ export function TaskListView({
     })
   }, [])
 
-  // ダイアログからのタスク作成（APIレスポンスを受け取って即座に追加）
+  // 楽観的タスク追加: ダイアログが即座に閉じてリストに仮追加
+  const handleOptimisticTaskCreated = useCallback((tempTask: TaskInfo) => {
+    pendingTempIdRef.current = tempTask.id
+    setTasks((prev) => [...prev, tempTask])
+    setCreateOpen(false)
+  }, [])
+
+  // APIレスポンス受信: 仮タスクを実データで置換
   const handleTaskCreated = useCallback((task?: TaskInfo) => {
-    if (task) {
+    if (task && pendingTempIdRef.current) {
+      const tempId = pendingTempIdRef.current
+      pendingTempIdRef.current = null
+      setTasks((prev) => prev.map((t) => t.id === tempId ? task : t))
+    } else if (task) {
       setTasks((prev) => [...prev, task])
     } else {
       syncInBackground()
@@ -543,6 +569,7 @@ export function TaskListView({
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={handleTaskCreated}
+        onOptimisticCreate={handleOptimisticTaskCreated}
         projects={projects}
         members={members}
         defaultProjectId={projectId}

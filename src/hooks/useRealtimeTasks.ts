@@ -35,9 +35,10 @@ export function useRealtimeTasks({ workspaceId, onTaskChange }: Options) {
           event: "INSERT",
           schema: "public",
           table: "Task",
-          filter: `workspaceId=eq.${workspaceId}`,
+          // DB側フィルタはカラム名の大文字小文字で動作しない場合があるためJS側でフィルタ
         },
         (payload) => {
+          if (payload.new.workspaceId !== workspaceId) return
           callbackRef.current({
             event: "INSERT",
             id: payload.new.id as string,
@@ -51,9 +52,9 @@ export function useRealtimeTasks({ workspaceId, onTaskChange }: Options) {
           event: "UPDATE",
           schema: "public",
           table: "Task",
-          filter: `workspaceId=eq.${workspaceId}`,
         },
         (payload) => {
+          if (payload.new.workspaceId !== workspaceId) return
           callbackRef.current({
             event: "UPDATE",
             id: payload.new.id as string,

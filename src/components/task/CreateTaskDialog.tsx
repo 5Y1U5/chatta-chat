@@ -16,6 +16,8 @@ type Props = {
   open: boolean
   onClose: () => void
   onCreated: (task?: TaskInfo) => void
+  /** 提供された場合、ダイアログを即座に閉じて楽観的にタスクを追加する */
+  onOptimisticCreate?: (task: TaskInfo) => void
   projects: { id: string; name: string; color: string | null }[]
   members: { id: string; displayName: string | null; avatarUrl: string | null }[]
   defaultProjectId?: string
@@ -27,9 +29,11 @@ export function CreateTaskDialog({
   open,
   onClose,
   onCreated,
+  onOptimisticCreate,
   projects,
   members,
   defaultProjectId,
+  workspaceId,
   currentUserId,
 }: Props) {
   const isMobile = useIsMobile()
@@ -79,8 +83,93 @@ export function CreateTaskDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim()) return
+    if (!title.trim() || submitting) return
 
+    const resolvedAssigneeId = effectiveAssigneeId || null
+    const resolvedProjectId = projectId || null
+    const dueDateStr = dueDate
+      ? `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}-${String(dueDate.getDate()).padStart(2, "0")}`
+      : null
+
+    // 楽観的フロー: onOptimisticCreate が提供されている場合は即座に閉じる
+    if (onOptimisticCreate) {
+      const tempId = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const optimisticTask: TaskInfo = {
+        id: tempId,
+        workspaceId,
+        projectId: resolvedProjectId,
+        parentTaskId: null,
+        title: title.trim(),
+        description: isMobile ? null : (description.trim() || null),
+        status: "todo",
+        priority: isMobile ? "medium" : priority,
+        assigneeId: resolvedAssigneeId,
+        creatorId: currentUserId ?? "",
+        dueDate: dueDateStr,
+        completedAt: null,
+        recurrenceRule: recurrenceRule,
+        sortOrder: 9999,
+        fileUrl: file?.url ?? null,
+        fileName: file?.name ?? null,
+        fileType: file?.type ?? null,
+        createdAt: now,
+        updatedAt: now,
+        assignee: resolvedAssigneeId
+          ? (members.find((m) => m.id === resolvedAssigneeId) ?? null)
+          : null,
+        creator: members.find((m) => m.id === currentUserId) ?? {
+          id: currentUserId ?? "",
+          displayName: null,
+          avatarUrl: null,
+        },
+        project: resolvedProjectId
+          ? (projects.find((p) => p.id === resolvedProjectId) ?? null)
+          : null,
+        _count: { subTasks: 0, comments: 0 },
+      }
+
+      // 即座にダイアログを閉じてリストに追加
+      onOptimisticCreate(optimisticTask)
+      resetForm()
+      onClose()
+
+      // バックグラウンドでAPI呼び出し
+      const res = await fetch("/api/internal/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: optimisticTask.title,
+          description: optimisticTask.description,
+          projectId: resolvedProjectId,
+          assigneeId: resolvedAssigneeId,
+          priority: optimisticTask.priority,
+          dueDate: dueDateStr,
+          recurrenceRule: recurrenceRule,
+          fileUrl: file?.url || null,
+          fileName: file?.name || null,
+          fileType: file?.type || null,
+        }),
+      })
+      if (res.ok) {
+        const task = await res.json()
+        if (collaboratorIds.length > 0) {
+          Promise.all(
+            collaboratorIds.map((userId) =>
+              fetch("/api/internal/tasks/members", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ taskId: task.id, userId }),
+              })
+            )
+          )
+        }
+        onCreated(task)
+      }
+      return
+    }
+
+    // 通常フロー（onOptimisticCreate なし）
     setSubmitting(true)
     const res = await fetch("/api/internal/tasks", {
       method: "POST",
@@ -88,10 +177,10 @@ export function CreateTaskDialog({
       body: JSON.stringify({
         title: title.trim(),
         description: isMobile ? null : (description.trim() || null),
-        projectId: projectId || null,
-        assigneeId: effectiveAssigneeId || null,
+        projectId: resolvedProjectId,
+        assigneeId: resolvedAssigneeId,
         priority: isMobile ? "medium" : priority,
-        dueDate: dueDate ? `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}-${String(dueDate.getDate()).padStart(2, "0")}` : null,
+        dueDate: dueDateStr,
         recurrenceRule: recurrenceRule,
         fileUrl: file?.url || null,
         fileName: file?.name || null,
@@ -101,7 +190,6 @@ export function CreateTaskDialog({
 
     if (res.ok) {
       const task = await res.json()
-      // コラボレーターを追加（バックグラウンド）
       if (collaboratorIds.length > 0) {
         Promise.all(
           collaboratorIds.map((userId) =>
