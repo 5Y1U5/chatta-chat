@@ -81,6 +81,21 @@ function sortByPriority(tasks: TaskInfo[]): TaskInfo[] {
   })
 }
 
+// 期日の昇順でソート（古い期限が上）
+function sortByDueDate(tasks: TaskInfo[]): TaskInfo[] {
+  return [...tasks].sort((a, b) => {
+    const da = a.dueDate ? parseDueDateStatic(a.dueDate).getTime() : 0
+    const db = b.dueDate ? parseDueDateStatic(b.dueDate).getTime() : 0
+    return da - db
+  })
+}
+
+// parseDueDateのスタティック版（コンポーネント外で使用）
+function parseDueDateStatic(dueDate: string): Date {
+  const p = dueDate.slice(0, 10).split("-")
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
+}
+
 // ステータスドットの色
 const statusDotColors: Record<string, string> = {
   todo: "bg-gray-400",
@@ -140,37 +155,34 @@ export function TaskListView({
   const incompleteTasks = filteredTasks.filter((t) => t.status !== "done")
   const doneTasks = sortByPriority(filteredTasks.filter((t) => t.status === "done"))
 
-  // 期日をパースするヘルパー
-  const parseDueDate = (dueDate: string): Date => {
-    const p = dueDate.slice(0, 10).split("-")
-    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
-  }
-
-  // マイタスク（タスク）: 期日なし or 期日が今日以前
-  const myTasks = sortByPriority(incompleteTasks.filter((t) => {
-    if (!t.dueDate) return true
-    const due = parseDueDate(t.dueDate)
-    return due.getTime() < tomorrowStart.getTime()
+  // 期限切れ: 期日が昨日以前（期日の古い順で固定）
+  const overdueTasks = sortByDueDate(incompleteTasks.filter((t) => {
+    if (!t.dueDate) return false
+    const due = parseDueDateStatic(t.dueDate)
+    return due.getTime() < todayStart
   }))
 
-  // 明日以降のタスク: 期日が明日以降
-  const futureTasks = sortByPriority(incompleteTasks.filter((t) => {
+  // 今日: 期日が今日（ドラッグで並び替え可）
+  const todayDueTasks = sortByPriority(incompleteTasks.filter((t) => {
     if (!t.dueDate) return false
-    const due = parseDueDate(t.dueDate)
+    const due = parseDueDateStatic(t.dueDate)
+    return due.getTime() >= todayStart && due.getTime() < tomorrowStart.getTime()
+  }))
+
+  // 今後: 期日が明日以降（期日の近い順で固定）
+  const futureTasks = sortByDueDate(incompleteTasks.filter((t) => {
+    if (!t.dueDate) return false
+    const due = parseDueDateStatic(t.dueDate)
     return due.getTime() >= tomorrowStart.getTime()
   }))
+
+  // 期限なし: 期日未設定（ドラッグで並び替え可）
+  const noDueDateTasks = sortByPriority(incompleteTasks.filter((t) => !t.dueDate))
 
   // 今日完了したタスク
   const completedTodayTasks = doneTasks.filter((t) => {
     if (!t.completedAt) return false
     return new Date(t.completedAt).getTime() >= todayStart
-  })
-
-  // 本日期限タスク数
-  const todayDueTasks = incompleteTasks.filter((t) => {
-    if (!t.dueDate) return false
-    const due = parseDueDate(t.dueDate)
-    return due.getTime() === todayStart
   })
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null
@@ -427,9 +439,14 @@ export function TaskListView({
           {incompleteTasks.length > 0 && (
             <p className="text-sm text-muted-foreground mt-1">
               未完了 {incompleteTasks.length}件
+              {overdueTasks.length > 0 && (
+                <span className="ml-1">
+                  ・ 期限切れ <span className="text-red-500 font-medium">{overdueTasks.length}件</span>
+                </span>
+              )}
               {todayDueTasks.length > 0 && (
                 <span className="ml-1">
-                  ・ 本日期限 <span className="text-red-500 font-medium">{todayDueTasks.length}件</span>
+                  ・ 本日期限 <span className="text-orange-500 font-medium">{todayDueTasks.length}件</span>
                 </span>
               )}
             </p>
@@ -459,11 +476,61 @@ export function TaskListView({
         </div>
 
         <PullToRefresh onRefresh={async () => { syncInBackground() }} className="flex-1 px-5 py-2 space-y-4">
-          {/* マイタスク / タスク */}
+          {/* 期限切れ（期日順固定・ドラッグ不可） */}
+          {overdueTasks.length > 0 && (
+            <TaskSection
+              label="期限切れ"
+              sectionStatus="todo"
+              tasks={overdueTasks}
+              allTasks={tasks}
+              setTasks={setTasks}
+              onSelect={setSelectedTaskId}
+              selectedId={selectedTaskId}
+              onStatusChange={handleStatusChange}
+              onReorder={handleReorder}
+              isMobile={isMobile}
+              sortable={false}
+            />
+          )}
+
+          {/* 今日（ドラッグで並び替え可） */}
+          {todayDueTasks.length > 0 && (
+            <TaskSection
+              label="今日"
+              sectionStatus="todo"
+              tasks={todayDueTasks}
+              allTasks={tasks}
+              setTasks={setTasks}
+              onSelect={setSelectedTaskId}
+              selectedId={selectedTaskId}
+              onStatusChange={handleStatusChange}
+              onReorder={handleReorder}
+              isMobile={isMobile}
+            />
+          )}
+
+          {/* 今後（期日順固定・ドラッグ不可） */}
+          {futureTasks.length > 0 && (
+            <TaskSection
+              label="今後"
+              sectionStatus="in_progress"
+              tasks={futureTasks}
+              allTasks={tasks}
+              setTasks={setTasks}
+              onSelect={setSelectedTaskId}
+              selectedId={selectedTaskId}
+              onStatusChange={handleStatusChange}
+              onReorder={handleReorder}
+              isMobile={isMobile}
+              sortable={false}
+            />
+          )}
+
+          {/* 期限なし（ドラッグで並び替え可） */}
           <TaskSection
-            label={viewMode === "my-tasks" ? "マイタスク" : "タスク"}
+            label="期限なし"
             sectionStatus="todo"
-            tasks={myTasks}
+            tasks={noDueDateTasks}
             allTasks={tasks}
             setTasks={setTasks}
             onSelect={setSelectedTaskId}
@@ -471,20 +538,6 @@ export function TaskListView({
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
             onInlineCreate={!isMobile ? handleInlineCreate : undefined}
-            isMobile={isMobile}
-          />
-
-          {/* 明日以降のタスク */}
-          <TaskSection
-            label="明日以降のタスク"
-            sectionStatus="in_progress"
-            tasks={futureTasks}
-            allTasks={tasks}
-            setTasks={setTasks}
-            onSelect={setSelectedTaskId}
-            selectedId={selectedTaskId}
-            onStatusChange={handleStatusChange}
-            onReorder={handleReorder}
             isMobile={isMobile}
           />
 
@@ -773,6 +826,7 @@ function TaskSection({
   onInlineCreate,
   defaultCollapsed = false,
   isMobile = false,
+  sortable = true,
 }: {
   label: string
   sectionStatus: string
@@ -786,6 +840,7 @@ function TaskSection({
   onInlineCreate?: (title: string, status: string) => Promise<void>
   defaultCollapsed?: boolean
   isMobile?: boolean
+  sortable?: boolean
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -870,52 +925,66 @@ function TaskSection({
       </button>
       {!collapsed && (
         <>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
-            autoScroll={{ threshold: { x: 0, y: 0.2 }, interval: 5 }}
-          >
-            <SortableContext
-              items={tasks.map((t) => t.id)}
-              strategy={verticalListSortingStrategy}
+          {sortable ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+              autoScroll={{ threshold: { x: 0, y: 0.2 }, interval: 5 }}
             >
-              <div className={isMobile ? "" : "pl-2"}>
-                {tasks.map((task) => (
-                  <SortableTaskItem
-                    key={task.id}
-                    task={task}
-                    isSelected={selectedId === task.id}
-                    onSelect={() => onSelect(task.id)}
-                    onStatusChange={onStatusChange}
-                    isMobile={isMobile}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-            <DragOverlay dropAnimation={null}>
-              {activeTask && (
-                <div
-                  style={{
-                    transform: "scale(1.03)",
-                    boxShadow: "0 12px 28px rgba(0,0,0,0.2)",
-                    borderRadius: "8px",
-                    background: "var(--color-card, white)",
-                    opacity: 0.95,
-                  }}
-                >
-                  <TaskItem
-                    task={activeTask}
-                    isSelected={false}
-                    onSelect={() => {}}
-                    onStatusChange={() => {}}
-                  />
+              <SortableContext
+                items={tasks.map((t) => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className={isMobile ? "" : "pl-2"}>
+                  {tasks.map((task) => (
+                    <SortableTaskItem
+                      key={task.id}
+                      task={task}
+                      isSelected={selectedId === task.id}
+                      onSelect={() => onSelect(task.id)}
+                      onStatusChange={onStatusChange}
+                      isMobile={isMobile}
+                    />
+                  ))}
                 </div>
-              )}
-            </DragOverlay>
-          </DndContext>
+              </SortableContext>
+              <DragOverlay dropAnimation={null}>
+                {activeTask && (
+                  <div
+                    style={{
+                      transform: "scale(1.03)",
+                      boxShadow: "0 12px 28px rgba(0,0,0,0.2)",
+                      borderRadius: "8px",
+                      background: "var(--color-card, white)",
+                      opacity: 0.95,
+                    }}
+                  >
+                    <TaskItem
+                      task={activeTask}
+                      isSelected={false}
+                      onSelect={() => {}}
+                      onStatusChange={() => {}}
+                    />
+                  </div>
+                )}
+              </DragOverlay>
+            </DndContext>
+          ) : (
+            <div className={isMobile ? "" : "pl-2"}>
+              {tasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  isSelected={selectedId === task.id}
+                  onSelect={() => onSelect(task.id)}
+                  onStatusChange={onStatusChange}
+                />
+              ))}
+            </div>
+          )}
           {/* インラインタスク追加 */}
           {onInlineCreate && (
             <div className="pl-2">
