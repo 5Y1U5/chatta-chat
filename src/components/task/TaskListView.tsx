@@ -111,6 +111,7 @@ export function TaskListView({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   // 日付変更時にセクション分類を再計算するためのstate
   const [now, setNow] = useState(() => new Date())
@@ -125,8 +126,18 @@ export function TaskListView({
   const tomorrowStart = new Date(todayEnd.getTime() + 86400000)
   const todayStart = todayEnd.getTime()
 
-  const incompleteTasks = tasks.filter((t) => t.status !== "done")
-  const doneTasks = sortByPriority(tasks.filter((t) => t.status === "done"))
+  const filteredTasks = useMemo(() => {
+    if (!searchQuery.trim()) return tasks
+    const q = searchQuery.trim().toLowerCase()
+    return tasks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) ||
+        (t.description && t.description.toLowerCase().includes(q))
+    )
+  }, [tasks, searchQuery])
+
+  const incompleteTasks = filteredTasks.filter((t) => t.status !== "done")
+  const doneTasks = sortByPriority(filteredTasks.filter((t) => t.status === "done"))
 
   // 期日をパースするヘルパー
   const parseDueDate = (dueDate: string): Date => {
@@ -397,6 +408,28 @@ export function TaskListView({
               )}
             </p>
           )}
+          <div className="relative mt-3">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            >
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="タスクを検索..."
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
         </div>
 
         <PullToRefresh onRefresh={async () => { syncInBackground() }} className="flex-1 px-5 py-2 space-y-4">
