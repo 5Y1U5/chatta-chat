@@ -140,6 +140,7 @@ ANTHROPIC_API_KEY=       # Claude API キー
 - **ゲスト共有**: `TaskShareLink.token` 32文字hex（`crypto.randomBytes(16).toString("hex")`）。`/t/[token]` で認証不要アクセス。GuestComment は TaskComment と別テーブル（userId NOT NULL 制約を壊さない）
 - **AI チャット**: `@AI` メンション → `after()` でバックグラウンド応答生成 → Realtime で配信。失敗時はエラーメッセージをチャットに投稿
 - **AI 機能**: 返信候補生成、会話要約、議事録生成、重要事項自動検出（5メッセージごとにバッチ分析）、チャット会話からのタスク自動抽出・登録（`@AI タスクに登録して` で親タスク+サブタスクを一括作成）
+- **タスク一覧セクション構成**: 期限切れ（期日古い順・固定）→ 今日（ドラッグ並び替え可）→ 今後（期日近い順・固定）→ 期限なし（ドラッグ並び替え可）→ 今日完了 → 完了。期限切れ・今日・今後は該当タスクがある時のみ表示
 - **繰り返しタスク**: RFC 5545 RRULE 形式。`rrule` ライブラリで処理。完了時に次回タスクを自動生成
 - **AIユーザー除外**: タスク担当者選択時に `ai@chatta-chat.local` をフィルタ
 - **Realtime**: `postgres_changes` で Message, Task, TaskComment, Notification テーブルを購読。Presence でタイピングインジケータ
