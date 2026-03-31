@@ -38,8 +38,8 @@ function formatDueDate(dueDate: string | null, mobile: boolean): { text: string;
   const sz = mobile ? "text-xs px-2.5 py-1 rounded-md font-medium" : "text-[11px] px-1.5 py-0.5 rounded font-medium"
 
   if (diffDays < 0) return { text: mobile ? "昨日" : "期限切れ", className: `bg-red-500/20 text-red-400 ${sz}`, isCritical: true }
-  if (diffDays === 0) return { text: "今日", className: `bg-red-500/20 text-red-400 ${sz}`, isCritical: true }
-  if (diffDays === 1) return { text: "明日", className: `bg-orange-500/20 text-orange-400 ${sz}`, isCritical: false }
+  if (diffDays === 0) return { text: "今日", className: `bg-blue-500/20 text-blue-500 ${sz}`, isCritical: true }
+  if (diffDays === 1) return { text: "明日", className: `text-muted-foreground ${sz} bg-muted`, isCritical: false }
   if (diffDays <= 7) return { text: `${diffDays}日後`, className: `text-muted-foreground ${mobile ? "text-xs" : "text-[11px]"}`, isCritical: false }
 
   return {
