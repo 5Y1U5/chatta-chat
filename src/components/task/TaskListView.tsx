@@ -280,7 +280,7 @@ export function TaskListView({
   }, [syncInBackground])
 
   // インラインタスク追加（楽観的）
-  const handleInlineCreate = useCallback(async (title: string, status: string) => {
+  const handleInlineCreate = useCallback(async (title: string, status: string, dueDate?: string) => {
     const tempId = crypto.randomUUID()
     const tempTask: TaskInfo = {
       id: tempId,
@@ -293,7 +293,7 @@ export function TaskListView({
       priority: "medium",
       assigneeId: viewMode === "my-tasks" ? currentUserId : null,
       creatorId: currentUserId,
-      dueDate: null,
+      dueDate: dueDate || null,
       completedAt: null,
       recurrenceRule: null,
       sortOrder: 9999,
@@ -323,6 +323,7 @@ export function TaskListView({
         workspaceId,
         assigneeId: viewMode === "my-tasks" ? currentUserId : undefined,
         projectId: projectId || undefined,
+        dueDate: dueDate || undefined,
       }),
     })
     if (res.ok) {
@@ -494,37 +495,37 @@ export function TaskListView({
           )}
 
           {/* 今日（ドラッグで並び替え可） */}
-          {todayDueTasks.length > 0 && (
-            <TaskSection
-              label="今日"
-              sectionStatus="todo"
-              tasks={todayDueTasks}
-              allTasks={tasks}
-              setTasks={setTasks}
-              onSelect={setSelectedTaskId}
-              selectedId={selectedTaskId}
-              onStatusChange={handleStatusChange}
-              onReorder={handleReorder}
-              isMobile={isMobile}
-            />
-          )}
+          <TaskSection
+            label="今日"
+            sectionStatus="todo"
+            tasks={todayDueTasks}
+            allTasks={tasks}
+            setTasks={setTasks}
+            onSelect={setSelectedTaskId}
+            selectedId={selectedTaskId}
+            onStatusChange={handleStatusChange}
+            onReorder={handleReorder}
+            onInlineCreate={!isMobile ? handleInlineCreate : undefined}
+            defaultDueDate={new Date(todayStart).toISOString().slice(0, 10)}
+            isMobile={isMobile}
+          />
 
           {/* 今後（期日順固定・ドラッグ不可） */}
-          {futureTasks.length > 0 && (
-            <TaskSection
-              label="今後"
-              sectionStatus="in_progress"
-              tasks={futureTasks}
-              allTasks={tasks}
-              setTasks={setTasks}
-              onSelect={setSelectedTaskId}
-              selectedId={selectedTaskId}
-              onStatusChange={handleStatusChange}
-              onReorder={handleReorder}
-              isMobile={isMobile}
-              sortable={false}
-            />
-          )}
+          <TaskSection
+            label="今後"
+            sectionStatus="in_progress"
+            tasks={futureTasks}
+            allTasks={tasks}
+            setTasks={setTasks}
+            onSelect={setSelectedTaskId}
+            selectedId={selectedTaskId}
+            onStatusChange={handleStatusChange}
+            onReorder={handleReorder}
+            onInlineCreate={!isMobile ? handleInlineCreate : undefined}
+            defaultDueDate={tomorrowStart.toISOString().slice(0, 10)}
+            isMobile={isMobile}
+            sortable={false}
+          />
 
           {/* 期限なし（ドラッグで並び替え可） */}
           <TaskSection
@@ -754,10 +755,12 @@ const SortableTaskItem = memo(function SortableTaskItem({
 // インラインタスク追加コンポーネント
 function InlineAddTask({
   sectionStatus,
+  defaultDueDate,
   onSubmit,
 }: {
   sectionStatus: string
-  onSubmit: (title: string, status: string) => Promise<void>
+  defaultDueDate?: string
+  onSubmit: (title: string, status: string, dueDate?: string) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState("")
@@ -768,7 +771,7 @@ function InlineAddTask({
     setTitle("")
     setEditing(false)
     // 非同期だがUIは既にリセット済み
-    onSubmit(t, sectionStatus)
+    onSubmit(t, sectionStatus, defaultDueDate)
   }
 
   if (!editing) {
@@ -824,6 +827,7 @@ function TaskSection({
   onStatusChange,
   onReorder,
   onInlineCreate,
+  defaultDueDate,
   defaultCollapsed = false,
   isMobile = false,
   sortable = true,
@@ -837,7 +841,8 @@ function TaskSection({
   selectedId: string | null
   onStatusChange: (taskId: string, status: string) => void
   onReorder: (tasks: TaskInfo[]) => void
-  onInlineCreate?: (title: string, status: string) => Promise<void>
+  onInlineCreate?: (title: string, status: string, dueDate?: string) => Promise<void>
+  defaultDueDate?: string
   defaultCollapsed?: boolean
   isMobile?: boolean
   sortable?: boolean
@@ -988,7 +993,7 @@ function TaskSection({
           {/* インラインタスク追加 */}
           {onInlineCreate && (
             <div className="pl-2">
-              <InlineAddTask sectionStatus={sectionStatus} onSubmit={onInlineCreate} />
+              <InlineAddTask sectionStatus={sectionStatus} defaultDueDate={defaultDueDate} onSubmit={onInlineCreate} />
             </div>
           )}
         </>
