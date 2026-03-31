@@ -96,12 +96,14 @@ function parseDueDateStatic(dueDate: string): Date {
   return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
 }
 
-// ステータスドットの色
-const statusDotColors: Record<string, string> = {
-  todo: "bg-gray-400",
-  in_progress: "bg-blue-500",
-  done: "bg-primary",
-  completed_today: "bg-primary",
+// セクションテーマカラー（ドット・ラベル・カウンターの色）
+const sectionThemes: Record<string, { dot: string; text: string; count: string }> = {
+  overdue:  { dot: "bg-red-500",     text: "text-red-500",            count: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
+  today:    { dot: "bg-blue-500",    text: "text-blue-600 dark:text-blue-400", count: "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
+  future:   { dot: "bg-gray-400",    text: "text-muted-foreground",   count: "bg-muted" },
+  noDue:    { dot: "bg-gray-400",    text: "text-muted-foreground",   count: "bg-muted" },
+  doneToday:{ dot: "bg-gray-400",    text: "text-muted-foreground",   count: "bg-muted" },
+  done:     { dot: "bg-gray-400",    text: "text-muted-foreground",   count: "bg-muted" },
 }
 
 export function TaskListView({
@@ -481,7 +483,7 @@ export function TaskListView({
           {overdueTasks.length > 0 && (
             <TaskSection
               label="期限切れ"
-              sectionStatus="todo"
+              sectionTheme="overdue"
               tasks={overdueTasks}
               allTasks={tasks}
               setTasks={setTasks}
@@ -497,7 +499,7 @@ export function TaskListView({
           {/* 今日（ドラッグで並び替え可） */}
           <TaskSection
             label="今日"
-            sectionStatus="todo"
+            sectionTheme="today"
             tasks={todayDueTasks}
             allTasks={tasks}
             setTasks={setTasks}
@@ -513,7 +515,7 @@ export function TaskListView({
           {/* 今後（期日順固定・ドラッグ不可） */}
           <TaskSection
             label="今後"
-            sectionStatus="in_progress"
+            sectionTheme="future"
             tasks={futureTasks}
             allTasks={tasks}
             setTasks={setTasks}
@@ -530,7 +532,7 @@ export function TaskListView({
           {/* 期限なし（ドラッグで並び替え可） */}
           <TaskSection
             label="期限なし"
-            sectionStatus="todo"
+            sectionTheme="noDue"
             tasks={noDueDateTasks}
             allTasks={tasks}
             setTasks={setTasks}
@@ -546,7 +548,7 @@ export function TaskListView({
           {completedTodayTasks.length > 0 && (
             <TaskSection
               label="今日完了"
-              sectionStatus="done"
+              sectionTheme="doneToday"
               tasks={completedTodayTasks}
               allTasks={tasks}
               setTasks={setTasks}
@@ -561,7 +563,7 @@ export function TaskListView({
           {/* 完了 */}
           <TaskSection
             label="完了"
-            sectionStatus="done"
+            sectionTheme="done"
             tasks={doneTasks}
             allTasks={tasks}
             setTasks={setTasks}
@@ -818,7 +820,7 @@ function InlineAddTask({
 
 function TaskSection({
   label,
-  sectionStatus,
+  sectionTheme: themeKey,
   tasks,
   allTasks,
   setTasks,
@@ -828,12 +830,13 @@ function TaskSection({
   onReorder,
   onInlineCreate,
   defaultDueDate,
+  defaultInlineStatus = "todo",
   defaultCollapsed = false,
   isMobile = false,
   sortable = true,
 }: {
   label: string
-  sectionStatus: string
+  sectionTheme: string
   tasks: TaskInfo[]
   allTasks: TaskInfo[]
   setTasks: React.Dispatch<React.SetStateAction<TaskInfo[]>>
@@ -843,6 +846,7 @@ function TaskSection({
   onReorder: (tasks: TaskInfo[]) => void
   onInlineCreate?: (title: string, status: string, dueDate?: string) => Promise<void>
   defaultDueDate?: string
+  defaultInlineStatus?: string
   defaultCollapsed?: boolean
   isMobile?: boolean
   sortable?: boolean
@@ -901,12 +905,12 @@ function TaskSection({
 
   if (tasks.length === 0 && defaultCollapsed) return null
 
-  const dotColor = statusDotColors[sectionStatus] || "bg-gray-400"
+  const theme = sectionThemes[themeKey] || sectionThemes.done
 
   return (
     <div>
       <button
-        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground mb-1 py-1"
+        className={cn("flex items-center gap-2 text-sm font-medium mb-1 py-1", theme.text)}
         onClick={() => setCollapsed(!collapsed)}
       >
         <svg
@@ -923,10 +927,10 @@ function TaskSection({
         >
           <polyline points="9 18 15 12 9 6" />
         </svg>
-        {/* ステータスドット */}
-        <span className={cn("h-2 w-2 rounded-full shrink-0", dotColor)} />
+        {/* セクションドット */}
+        <span className={cn("h-2 w-2 rounded-full shrink-0", theme.dot)} />
         {label}
-        <span className="bg-muted rounded-full px-2 py-0.5 text-xs">{tasks.length}</span>
+        <span className={cn("rounded-full px-2 py-0.5 text-xs", theme.count)}>{tasks.length}</span>
       </button>
       {!collapsed && (
         <>
@@ -993,7 +997,7 @@ function TaskSection({
           {/* インラインタスク追加 */}
           {onInlineCreate && (
             <div className="pl-2">
-              <InlineAddTask sectionStatus={sectionStatus} defaultDueDate={defaultDueDate} onSubmit={onInlineCreate} />
+              <InlineAddTask sectionStatus={defaultInlineStatus} defaultDueDate={defaultDueDate} onSubmit={onInlineCreate} />
             </div>
           )}
         </>
