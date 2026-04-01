@@ -96,6 +96,14 @@ function parseDueDateStatic(dueDate: string): Date {
   return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
 }
 
+// ローカルタイムゾーンで YYYY-MM-DD を返す（toISOString はUTCなのでJSTで日付がずれる）
+function formatLocalDate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
 // セクションテーマカラー（ドット・ラベル・カウンターの色）
 const sectionThemes: Record<string, { dot: string; text: string; count: string }> = {
   overdue:  { dot: "bg-red-500",     text: "text-red-500",            count: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400" },
@@ -508,7 +516,7 @@ export function TaskListView({
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
-            defaultDueDate={new Date(todayStart).toISOString().slice(0, 10)}
+            defaultDueDate={formatLocalDate(todayEnd)}
             isMobile={isMobile}
           />
 
@@ -524,7 +532,7 @@ export function TaskListView({
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
-            defaultDueDate={tomorrowStart.toISOString().slice(0, 10)}
+            defaultDueDate={formatLocalDate(tomorrowStart)}
             isMobile={isMobile}
             sortable={false}
           />
