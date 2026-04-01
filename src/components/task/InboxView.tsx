@@ -471,6 +471,7 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
       body: JSON.stringify({ markAllRead: true }),
     })
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    router.refresh()
   }
 
   const handleArchive = useCallback((id: string) => {
@@ -478,9 +479,9 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ archiveId: id }),
-    })
+    }).then(() => router.refresh())
     setNotifications((prev) => prev.filter((n) => n.id !== id))
-  }, [])
+  }, [router])
 
   const handleTap = useCallback((n: NotificationInfo) => {
     // 既読にする
@@ -489,13 +490,13 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notificationId: n.id }),
-      })
+      }).then(() => router.refresh())
       setNotifications((prev) =>
         prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
       )
     }
     setSelectedNotification(n)
-  }, [])
+  }, [router])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
