@@ -133,18 +133,18 @@ ANTHROPIC_API_KEY=       # Claude API キー
 ## 主要な実装パターン
 
 - **layout.tsx Suspense 分離**: DBクエリは SidebarData, ChannelListData, TaskNavData 等の Server Component に委譲し Suspense でラップ。children はクエリ完了を待たず即座にレンダリング開始。`router.refresh()` は layout 全体を再実行するため、ローカル state 更新で済む箇所では使わない
-- **モバイル対応**: `h-dvh`（`h-screen` ではなく）、`shrink-0` でヘッダー固定、`min-h-0` で flex overflow 制御
+- **モバイル対応**: `h-dvh`（`h-screen` ではなく）、`shrink-0` でヘッダー固定、`min-h-0` で flex overflow 制御。モバイルではTaskListViewのh1タイトルを非表示（MobileTaskHeaderと重複するため）。MobileBottomNavの「タスク」タブは`/tasks`と`/projects`の両方でアクティブ
 - **Prisma 出力先**: `src/generated/prisma`。`.gitignore` 対象のため、ビルド時に `prisma generate` 必須
 - **`useSearchParams()`**: 使用するコンポーネントは `<Suspense>` でラップ必須（Next.js 要件）
 - **招待フロー**: `inviteCode` 12文字（`crypto.randomUUID().replace(/-/g, "").slice(0, 12)`）。ワークスペース・チャンネル・プロジェクト共通パターン。再参加時は「既に参加済みです」表示。**ワークスペース参加時はマイチャットのみ自動作成、他チャンネルは手動招待制**（Chatwork方式）
 - **ゲスト共有**: `TaskShareLink.token` 32文字hex（`crypto.randomBytes(16).toString("hex")`）。`/t/[token]` で認証不要アクセス。GuestComment は TaskComment と別テーブル（userId NOT NULL 制約を壊さない）
 - **AI チャット**: `@AI` メンション → `after()` でバックグラウンド応答生成 → Realtime で配信。失敗時はエラーメッセージをチャットに投稿
 - **AI 機能**: 返信候補生成、会話要約、議事録生成、重要事項自動検出（5メッセージごとにバッチ分析）、チャット会話からのタスク自動抽出・登録（`@AI タスクに登録して` で親タスク+サブタスクを一括作成）
-- **タスク一覧セクション構成**: 期限切れ（期日古い順・固定）→ 今日（ドラッグ並び替え可）→ 今後（期日近い順・固定）→ 期限なし（ドラッグ並び替え可）→ 今日完了 → 完了。期限切れ・今日・今後は該当タスクがある時のみ表示
+- **タスク一覧セクション構成**: 期限切れ（期日古い順・固定）→ 今日（ドラッグ並び替え可）→ 今後（期日近い順・固定）→ 期限なし（ドラッグ並び替え可）→ 今日完了 → 完了。期限切れ・今日・今後は該当タスクがある時のみ表示。今日・今後・期限なしセクションにインライン追加ボタンあり（モバイル・デスクトップ共通）。セクションに応じた期日が自動設定される（今日→今日、今後→明日、期限なし→なし）
 - **繰り返しタスク**: RFC 5545 RRULE 形式。`rrule` ライブラリで処理。完了時に次回タスクを自動生成
 - **AIユーザー除外**: タスク担当者選択時に `ai@chatta-chat.local` をフィルタ
 - **Realtime**: `postgres_changes` で Message, Task, TaskComment, Notification テーブルを購読。Presence でタイピングインジケータ
-- **プルトゥリフレッシュ**: `PullToRefresh` コンポーネントでタスク一覧・受信トレイ・プロジェクト一覧に適用
+- **プルトゥリフレッシュ**: `PullToRefresh` コンポーネントでタスク一覧・受信トレイ・プロジェクト一覧に適用。ネイティブイベントリスナー（`passive: false`）で `preventDefault()` を使い、ブラウザ標準のプルリフレッシュとの干渉を防止
 - **受信トレイ**: スワイプでアーカイブ、タップで詳細パネル表示。一覧でtitle 2行+body 3行プレビュー、「もっと見る」で展開/折りたたみ。コメント通知から直接返信可能。`isMyChat()` 判定（`name === "マイチャット" || name === "general"`）でマイチャットのメンバー追加をAPI・UIで拒否
 - **プロジェクト招待**: `inviteCode` 12文字。`/p/[code]` で招待ランディング。ワークスペースメンバーのみ参加可
 - **Google認証紐付け**: プロフィール設定で `linkIdentity()` により既存メールアカウントにGoogle連携
