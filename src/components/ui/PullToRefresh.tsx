@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, type ReactNode } from "react"
+import { useState, useRef, useEffect, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 type Props = {
@@ -16,44 +16,70 @@ export function PullToRefresh({ onRefresh, children, className }: Props) {
   const [refreshing, setRefreshing] = useState(false)
   const startYRef = useRef(0)
   const pullingRef = useRef(false)
+  const refreshingRef = useRef(false)
+  const pullDistanceRef = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const onRefreshRef = useRef(onRefresh)
+  onRefreshRef.current = onRefresh
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  useEffect(() => {
     const container = containerRef.current
-    if (!container || container.scrollTop > 0) return
-    startYRef.current = e.touches[0].clientY
-    pullingRef.current = true
-  }, [])
+    if (!container) return
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!pullingRef.current || refreshing) return
-    const container = containerRef.current
-    if (!container || container.scrollTop > 0) {
-      pullingRef.current = false
-      setPullDistance(0)
-      return
+    const handleTouchStart = (e: TouchEvent) => {
+      if (container.scrollTop > 0 || refreshingRef.current) return
+      startYRef.current = e.touches[0].clientY
+      pullingRef.current = true
     }
-    const diff = e.touches[0].clientY - startYRef.current
-    if (diff > 0) {
-      // 減衰効果
-      setPullDistance(Math.min(diff * 0.4, 100))
-    }
-  }, [refreshing])
 
-  const handleTouchEnd = useCallback(async () => {
-    if (!pullingRef.current) return
-    pullingRef.current = false
-
-    if (pullDistance >= THRESHOLD) {
-      setRefreshing(true)
-      try {
-        await onRefresh()
-      } finally {
-        setRefreshing(false)
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!pullingRef.current || refreshingRef.current) return
+      if (container.scrollTop > 0) {
+        pullingRef.current = false
+        pullDistanceRef.current = 0
+        setPullDistance(0)
+        return
+      }
+      const diff = e.touches[0].clientY - startYRef.current
+      if (diff > 0) {
+        e.preventDefault()
+        const distance = Math.min(diff * 0.4, 100)
+        pullDistanceRef.current = distance
+        setPullDistance(distance)
       }
     }
-    setPullDistance(0)
-  }, [pullDistance, onRefresh])
+
+    const handleTouchEnd = async () => {
+      if (!pullingRef.current) return
+      pullingRef.current = false
+
+      if (pullDistanceRef.current >= THRESHOLD) {
+        refreshingRef.current = true
+        setRefreshing(true)
+        pullDistanceRef.current = 0
+        setPullDistance(0)
+        try {
+          await onRefreshRef.current()
+        } finally {
+          refreshingRef.current = false
+          setRefreshing(false)
+        }
+      } else {
+        pullDistanceRef.current = 0
+        setPullDistance(0)
+      }
+    }
+
+    container.addEventListener("touchstart", handleTouchStart, { passive: true })
+    container.addEventListener("touchmove", handleTouchMove, { passive: false })
+    container.addEventListener("touchend", handleTouchEnd)
+
+    return () => {
+      container.removeEventListener("touchstart", handleTouchStart)
+      container.removeEventListener("touchmove", handleTouchMove)
+      container.removeEventListener("touchend", handleTouchEnd)
+    }
+  }, [])
 
   const showIndicator = pullDistance > 10 || refreshing
 
@@ -61,9 +87,7 @@ export function PullToRefresh({ onRefresh, children, className }: Props) {
     <div
       ref={containerRef}
       className={cn("relative overflow-y-auto", className)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      style={{ overscrollBehaviorY: "contain", WebkitOverflowScrolling: "touch" }}
     >
       {showIndicator && (
         <div

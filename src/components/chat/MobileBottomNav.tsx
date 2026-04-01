@@ -13,7 +13,7 @@ export function MobileBottomNav({ workspaceId, unreadNotificationCount = 0 }: Pr
   const pathname = usePathname()
 
   const isChatActive = pathname === `/${workspaceId}` || pathname.includes("/channel/")
-  const isTasksActive = pathname.includes("/tasks")
+  const isTasksActive = pathname.includes("/tasks") || pathname.includes("/projects")
   const isInboxActive = pathname.includes("/inbox")
   const isDashboardActive = pathname.includes("/dashboard")
 

@@ -359,7 +359,7 @@ export function TaskListView({
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* ヘッダー */}
         <div className="shrink-0 border-b py-4 px-5">
-          <div className="flex items-center justify-between">
+          <div className={cn("flex items-center justify-between", isMobile && "hidden")}>
             <div className="flex items-center gap-2 min-w-0">
               {viewMode === "project" && projectColor && (
                 <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: projectColor }} />
@@ -507,7 +507,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
-            onInlineCreate={!isMobile ? handleInlineCreate : undefined}
+            onInlineCreate={handleInlineCreate}
             defaultDueDate={new Date(todayStart).toISOString().slice(0, 10)}
             isMobile={isMobile}
           />
@@ -523,7 +523,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
-            onInlineCreate={!isMobile ? handleInlineCreate : undefined}
+            onInlineCreate={handleInlineCreate}
             defaultDueDate={tomorrowStart.toISOString().slice(0, 10)}
             isMobile={isMobile}
             sortable={false}
@@ -540,7 +540,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onReorder={handleReorder}
-            onInlineCreate={!isMobile ? handleInlineCreate : undefined}
+            onInlineCreate={handleInlineCreate}
             isMobile={isMobile}
           />
 
@@ -996,7 +996,7 @@ function TaskSection({
           )}
           {/* インラインタスク追加 */}
           {onInlineCreate && (
-            <div className="pl-2">
+            <div className={isMobile ? "" : "pl-2"}>
               <InlineAddTask sectionStatus={defaultInlineStatus} defaultDueDate={defaultDueDate} onSubmit={onInlineCreate} />
             </div>
           )}
