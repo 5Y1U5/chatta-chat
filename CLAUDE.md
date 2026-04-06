@@ -133,6 +133,7 @@ ANTHROPIC_API_KEY=       # Claude API キー
 ## 主要な実装パターン
 
 - **layout.tsx Suspense 分離**: DBクエリは SidebarData, ChannelListData, TaskNavData 等の Server Component に委譲し Suspense でラップ。children はクエリ完了を待たず即座にレンダリング開始。`router.refresh()` は layout 全体を再実行するため、ローカル state 更新で済む箇所では使わない
+- **ページ遷移最適化**: TaskNav のリンクは `<Link prefetch={true}>` で hover 時に prefetch。TaskNavData はタスク数を `groupBy` 集計クエリで取得（全行ロードしない）。全ページに loading.tsx（スケルトン UI）を設置
 - **モバイル対応**: `h-dvh`（`h-screen` ではなく）、`shrink-0` でヘッダー固定、`min-h-0` で flex overflow 制御。モバイルではTaskListViewのh1タイトルを非表示（MobileTaskHeaderと重複するため）。MobileBottomNavの「タスク」タブは`/tasks`と`/projects`の両方でアクティブ
 - **Prisma 出力先**: `src/generated/prisma`。`.gitignore` 対象のため、ビルド時に `prisma generate` 必須
 - **`useSearchParams()`**: 使用するコンポーネントは `<Suspense>` でラップ必須（Next.js 要件）

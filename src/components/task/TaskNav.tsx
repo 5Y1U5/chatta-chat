@@ -44,8 +44,10 @@ export function TaskNav({ workspaceId, projects }: Props) {
 
       <div className="flex-1 overflow-y-auto py-2">
         {/* マイタスク */}
-        <button
-          onClick={() => router.push(`/${workspaceId}/tasks`, { scroll: false })}
+        <Link
+          href={`/${workspaceId}/tasks`}
+          scroll={false}
+          prefetch={true}
           className={cn(
             "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-left",
             isMyTasks ? "bg-muted font-medium" : "hover:bg-muted/50"
@@ -56,7 +58,7 @@ export function TaskNav({ workspaceId, projects }: Props) {
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
           </svg>
           マイタスク
-        </button>
+        </Link>
 
         {/* セパレータ */}
         <div className="mx-4 my-2 border-t" />
@@ -88,9 +90,11 @@ export function TaskNav({ workspaceId, projects }: Props) {
               : 0
 
             return (
-              <button
+              <Link
                 key={project.id}
-                onClick={() => router.push(`/${workspaceId}/tasks?projectId=${project.id}`, { scroll: false })}
+                href={`/${workspaceId}/tasks?projectId=${project.id}`}
+                scroll={false}
+                prefetch={true}
                 className={cn(
                   "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-left w-[calc(100%-1rem)]",
                   isActive ? "bg-muted font-medium" : "hover:bg-muted/50"
@@ -124,7 +128,7 @@ export function TaskNav({ workspaceId, projects }: Props) {
                     </>
                   )}
                 </div>
-              </button>
+              </Link>
             )
           })}
 
