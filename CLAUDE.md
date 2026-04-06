@@ -143,7 +143,8 @@ ANTHROPIC_API_KEY=       # Claude API キー
 - **タスク一覧セクション構成**: 期限切れ（期日古い順・固定）→ 今日（ドラッグ並び替え可）→ 今後（期日近い順・固定）→ 期限なし（ドラッグ並び替え可）→ 今日完了 → 完了。期限切れ・今日・今後は該当タスクがある時のみ表示。今日・今後・期限なしセクションにインライン追加ボタンあり（モバイル・デスクトップ共通）。セクションに応じた期日が自動設定される（今日→今日、今後→明日、期限なし→なし）
 - **繰り返しタスク**: RFC 5545 RRULE 形式。`rrule` ライブラリで処理。完了時に次回タスクを自動生成
 - **AIユーザー除外**: タスク担当者選択時に `ai@chatta-chat.local` をフィルタ
-- **Realtime**: `postgres_changes` で Message, Task, TaskComment, Notification テーブルを購読。Presence でタイピングインジケータ
+- **Realtime**: `postgres_changes` で Message, Task（INSERT/UPDATE/DELETE）, TaskComment, GuestComment, Notification テーブルを購読。Presence でタイピングインジケータ。Realtime ペイロードのユーザー情報（displayName, avatarUrl）は呼び出し元の members リストから補完する。`router.refresh()` は認証フロー以外では使わず、楽観的更新 + ローカル state 管理で即座に UI に反映する
+- **REPLICA IDENTITY**: Task テーブルは `REPLICA IDENTITY FULL` に設定済み（DELETE イベントで old レコードを受信するため）。設定 SQL: `supabase/enable-replica-identity.sql`
 - **プルトゥリフレッシュ**: `PullToRefresh` コンポーネントでタスク一覧・受信トレイ・プロジェクト一覧に適用。ネイティブイベントリスナー（`passive: false`）で `preventDefault()` を使い、ブラウザ標準のプルリフレッシュとの干渉を防止
 - **受信トレイ**: スワイプでアーカイブ、タップで詳細パネル表示。一覧でtitle 2行+body 3行プレビュー、「もっと見る」で展開/折りたたみ。コメント通知から直接返信可能。`isMyChat()` 判定（`name === "マイチャット" || name === "general"`）でマイチャットのメンバー追加をAPI・UIで拒否
 - **プロジェクト招待**: `inviteCode` 12文字。`/p/[code]` で招待ランディング。ワークスペースメンバーのみ参加可
@@ -165,8 +166,11 @@ ANTHROPIC_API_KEY=       # Claude API キー
 
 - **RLS（Row Level Security）**: 全テーブルで有効化済み。ポリシーは未設定（= anon/authenticated からの直接アクセスを完全遮断）
 - **データアクセス**: 全て Next.js API + Prisma 経由。Supabase REST API は認証確認のみに使用
-- **認可**: アプリケーションレベルで `requireAuth()` + メンバーシップ確認
+- **認可**: アプリケーションレベルで `requireAuth()` + メンバーシップ確認。メッセージ/リアクション API は `channel.workspaceId` でワークスペース境界チェックを実施
+- **ファイルアップロード**: Content-Type ホワイトリストで許可形式を制限（SVG/HTML 等 XSS リスクのある形式を除外）
+- **セキュリティヘッダー**: `next.config.ts` で X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy を設定
 - **RLS 設定 SQL**: `supabase/enable-rls.sql`（テーブル追加時は更新すること）
+- **REPLICA IDENTITY SQL**: `supabase/enable-replica-identity.sql`（Realtime DELETE 対応）
 
 ## 事業開始チェックリスト
 
