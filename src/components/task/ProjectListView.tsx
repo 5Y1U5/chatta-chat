@@ -65,7 +65,7 @@ export function ProjectListView({ projects: initial, members, workspaceId, curre
         </Button>
       </div>
 
-      <PullToRefresh onRefresh={async () => { router.refresh() }} className="flex-1 p-4">
+      <PullToRefresh onRefresh={refreshProjects} className="flex-1 p-4">
         {projects.length === 0 ? (
           <EmptyState
             icon={

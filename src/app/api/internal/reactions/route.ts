@@ -17,12 +17,13 @@ export async function POST(request: Request) {
 
     const prisma = getPrisma()
 
-    // メッセージの存在確認
+    // メッセージの存在確認 + ワークスペース境界チェック
     const message = await prisma.message.findUnique({
       where: { id: messageId },
+      include: { channel: { select: { workspaceId: true } } },
     })
 
-    if (!message || message.deletedAt) {
+    if (!message || message.deletedAt || message.channel.workspaceId !== auth.workspaceId) {
       return NextResponse.json(
         { error: "メッセージが見つかりません" },
         { status: 404 }

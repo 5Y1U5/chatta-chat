@@ -62,6 +62,24 @@ export function useRealtimeTasks({ workspaceId, onTaskChange }: Options) {
           })
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "Task",
+        },
+        (payload) => {
+          // DELETE イベントは old レコードのみ含む
+          const old = payload.old as Record<string, unknown>
+          if (old.workspaceId !== workspaceId) return
+          callbackRef.current({
+            event: "DELETE",
+            id: old.id as string,
+            row: old,
+          })
+        }
+      )
       .subscribe()
 
     return () => {

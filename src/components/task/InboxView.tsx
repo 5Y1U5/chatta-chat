@@ -443,19 +443,28 @@ function NotificationDetailPanel({
 }
 
 export function InboxView({ notifications: initial, workspaceId, currentUserId }: Props) {
-  const router = useRouter()
   const [notifications, setNotifications] = useState(initial)
   const [selectedNotification, setSelectedNotification] = useState<NotificationInfo | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [members, setMembers] = useState<{ id: string; displayName: string | null; avatarUrl: string | null }[]>([])
 
-  // Server Component から新しい initial が来たら同期（ページ再訪問時）
+  // Server Component から新��い initial が来たら同期（ページ再訪問時）
   useEffect(() => {
     setNotifications(initial)
   }, [initial])
 
+  // メンバー���ストを1回取得（actor 情報補完用）
+  useEffect(() => {
+    fetch("/api/internal/members?includeSelf=true")
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setMembers(data))
+      .catch(() => {})
+  }, [])
+
   // 通知のリアルタイム購読
   useRealtimeNotifications({
     userId: currentUserId,
+    members,
     onNewNotification: useCallback((notification: NotificationInfo) => {
       setNotifications((prev) => {
         if (prev.some((n) => n.id === notification.id)) return prev
@@ -465,38 +474,39 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
   })
 
   const handleMarkAllRead = async () => {
+    // 楽観的更新: ローカル state のみ更新（router.refresh() は state リセットを引き起こすため使わない）
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
     await fetch("/api/internal/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ markAllRead: true }),
     })
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-    router.refresh()
   }
 
   const handleArchive = useCallback((id: string) => {
+    // 楽観的更新: 即座にローカルから除去
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
     fetch("/api/internal/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ archiveId: id }),
-    }).then(() => router.refresh())
-    setNotifications((prev) => prev.filter((n) => n.id !== id))
-  }, [router])
+    })
+  }, [])
 
   const handleTap = useCallback((n: NotificationInfo) => {
-    // 既読にする
+    // 楽観的更新: 即座に既読表示
     if (!n.read) {
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
+      )
       fetch("/api/internal/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notificationId: n.id }),
-      }).then(() => router.refresh())
-      setNotifications((prev) =>
-        prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
-      )
+      })
     }
     setSelectedNotification(n)
-  }, [router])
+  }, [])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
@@ -522,8 +532,6 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
           const data = await res.json()
           setNotifications(data.notifications)
         }
-        // ナビバッジの未読数を更新するために layout を再取得
-        router.refresh()
       }} className="flex-1">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground page-enter">

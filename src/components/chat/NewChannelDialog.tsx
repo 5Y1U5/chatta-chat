@@ -50,7 +50,6 @@ export function NewChannelDialog({ workspaceId }: Props) {
       setOpen(false)
       setName("")
       router.push(`/${workspaceId}/channel/${id}`)
-      router.refresh()
     } catch {
       setError("グループチャット作成に失敗しました")
     } finally {

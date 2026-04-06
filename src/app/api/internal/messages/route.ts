@@ -274,9 +274,10 @@ export async function PATCH(request: Request) {
 
     const message = await prisma.message.findUnique({
       where: { id: messageId },
+      include: { channel: { select: { workspaceId: true } } },
     })
 
-    if (!message || message.deletedAt) {
+    if (!message || message.deletedAt || message.channel.workspaceId !== auth.workspaceId) {
       return NextResponse.json(
         { error: "メッセージが見つかりません" },
         { status: 404 }
@@ -324,16 +325,17 @@ export async function DELETE(request: Request) {
 
     const message = await prisma.message.findUnique({
       where: { id: messageId },
+      include: { channel: { select: { workspaceId: true } } },
     })
 
-    if (!message || message.deletedAt) {
+    if (!message || message.deletedAt || message.channel.workspaceId !== auth.workspaceId) {
       return NextResponse.json(
         { error: "メッセージが見つかりません" },
         { status: 404 }
       )
     }
 
-    // 本人 or admin のみ削除可能
+    // 本人 or 同一ワークスペースの admin のみ削除可能
     if (message.userId !== auth.userId && auth.role !== "admin") {
       return NextResponse.json(
         { error: "削除権限がありません" },

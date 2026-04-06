@@ -209,27 +209,64 @@ export function MessageView({
     }
   }
 
-  // メッセージ編集
+  // メッセージ編集（楽観的更新 + ロールバック）
   async function handleEdit(messageId: string, newContent: string) {
+    // ロールバック用に元の状態を保存
+    const backup = messages.find((m) => m.id === messageId)
+
+    // 楽観的更新: 即座に UI に反映
+    const now = new Date().toISOString()
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, content: newContent, updatedAt: now }
+          : m
+      )
+    )
+
     try {
-      await fetch("/api/internal/messages", {
+      const res = await fetch("/api/internal/messages", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messageId, content: newContent }),
       })
+      if (!res.ok) throw new Error("編集失敗")
     } catch (error) {
       console.error("メッセージ編集エラー:", error)
+      // ロールバック: 元の内容に復元
+      if (backup) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? backup : m))
+        )
+      }
     }
   }
 
-  // メッセージ削除
+  // メッセージ削除（楽観的更新 + ロールバック）
   async function handleDelete(messageId: string) {
+    // 楽観的更新: 即座に「削除されました」表示
+    const backup = messages.find((m) => m.id === messageId)
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, deletedAt: new Date().toISOString(), content: "このメッセージは削除されました" }
+          : m
+      )
+    )
+
     try {
-      await fetch(`/api/internal/messages?messageId=${messageId}`, {
+      const res = await fetch(`/api/internal/messages?messageId=${messageId}`, {
         method: "DELETE",
       })
+      if (!res.ok) throw new Error("削除失敗")
     } catch (error) {
       console.error("メッセージ削除エラー:", error)
+      // ロールバック: 元の状態に復元
+      if (backup) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? backup : m))
+        )
+      }
     }
   }
 

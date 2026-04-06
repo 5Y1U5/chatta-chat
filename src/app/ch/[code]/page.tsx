@@ -59,7 +59,6 @@ export default function ChannelInvitePage({ params }: PageProps) {
       setStatus("done")
       setTimeout(() => {
         router.push(`/${data.workspaceId}/channel/${data.channelId}`)
-        router.refresh()
       }, 1500)
     } catch {
       setErrorMsg("参加に失敗しました")

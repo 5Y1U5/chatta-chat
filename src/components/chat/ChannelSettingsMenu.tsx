@@ -84,7 +84,6 @@ export function ChannelSettingsMenu({ channel, workspaceId }: Props) {
 
       setDeleteOpen(false)
       router.push(`/${workspaceId}`)
-      router.refresh()
     } catch {
       setError("削除に失敗しました")
     } finally {

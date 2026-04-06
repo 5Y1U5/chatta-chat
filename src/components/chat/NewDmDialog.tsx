@@ -55,7 +55,6 @@ export function NewDmDialog({ workspaceId }: Props) {
       const { id } = await res.json()
       setOpen(false)
       router.push(`/${workspaceId}/channel/${id}`)
-      router.refresh()
     } finally {
       setCreating(false)
     }

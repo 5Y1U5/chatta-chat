@@ -215,8 +215,13 @@ export function TaskListView({
   // タスクのリアルタイム購読（他メンバーの変更を即座に反映）
   useRealtimeTasks({
     workspaceId,
-    onTaskChange: useCallback(() => {
-      syncInBackground()
+    onTaskChange: useCallback((change) => {
+      if (change.event === "DELETE") {
+        // 削除は即座にローカルから除去
+        setTasks((prev) => prev.filter((t) => t.id !== change.id))
+      } else {
+        syncInBackground()
+      }
     }, [syncInBackground]),
   })
 

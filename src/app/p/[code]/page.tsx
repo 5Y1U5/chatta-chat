@@ -58,7 +58,6 @@ export default function ProjectInvitePage({ params }: PageProps) {
       setStatus("done")
       setTimeout(() => {
         router.push(`/${data.workspaceId}/tasks?projectId=${data.projectId}`)
-        router.refresh()
       }, 1500)
     } catch {
       setErrorMsg("参加に失敗しました")
