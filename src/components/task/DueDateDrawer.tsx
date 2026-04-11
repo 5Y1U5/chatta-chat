@@ -112,7 +112,8 @@ export function DueDateDrawer({ open, onOpenChange, value, recurrenceRule, onCon
               selected={selected}
               onSelect={setSelected}
               locale={ja}
-              className="mx-auto"
+              className="w-full"
+              classNames={{ root: "w-full" }}
             />
 
             {/* その他のポップオーバー */}
