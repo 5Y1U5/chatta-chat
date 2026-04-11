@@ -377,7 +377,55 @@ export function TaskListView({
               {viewMode === "project" && projectColor && (
                 <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: projectColor }} />
               )}
-              <h1 className="text-xl font-bold truncate">{title}</h1>
+              {/* タイトル + ビュー切り替えドロップダウン */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-1.5 text-xl font-bold truncate hover:text-muted-foreground transition-colors">
+                    {title}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-muted-foreground">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[200px]">
+                  {/* マイタスク */}
+                  <DropdownMenuItem
+                    className={cn(viewMode === "my-tasks" && "bg-muted font-medium")}
+                    onClick={() => {
+                      if (viewMode !== "my-tasks") {
+                        router.push(`/${workspaceId}/tasks`, { scroll: false })
+                      }
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-muted-foreground">
+                      <path d="M9 11l3 3L22 4" />
+                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                    </svg>
+                    マイタスク
+                  </DropdownMenuItem>
+                  {/* プロジェクト一覧 */}
+                  {projects.length > 0 && (
+                    <div className="mx-2 my-1 border-t" />
+                  )}
+                  {projects.map((p) => (
+                    <DropdownMenuItem
+                      key={p.id}
+                      className={cn(viewMode === "project" && projectId === p.id && "bg-muted font-medium")}
+                      onClick={() => {
+                        if (projectId !== p.id) {
+                          router.push(`/${workspaceId}/tasks?projectId=${p.id}`, { scroll: false })
+                        }
+                      }}
+                    >
+                      <span
+                        className="mr-2 h-2.5 w-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: p.color || "#6B7280" }}
+                      />
+                      <span className="truncate">{p.name}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               {viewMode === "project" && projectId && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
