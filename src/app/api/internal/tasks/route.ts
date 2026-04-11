@@ -307,6 +307,8 @@ export async function PATCH(request: Request) {
     if (updates.assigneeId !== undefined)
       data.assigneeId = updates.assigneeId || null
     if (updates.priority !== undefined) data.priority = updates.priority
+    if (updates.startDate !== undefined)
+      data.startDate = updates.startDate ? new Date(updates.startDate) : null
     if (updates.dueDate !== undefined)
       data.dueDate = updates.dueDate ? new Date(updates.dueDate) : null
     if (updates.recurrenceRule !== undefined)

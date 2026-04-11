@@ -106,6 +106,7 @@ export function CreateTaskDialog({
         priority: isMobile ? "medium" : priority,
         assigneeId: resolvedAssigneeId,
         creatorId: currentUserId ?? "",
+        startDate: null,
         dueDate: dueDateStr,
         completedAt: null,
         recurrenceRule: recurrenceRule,

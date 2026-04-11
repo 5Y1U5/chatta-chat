@@ -16,6 +16,7 @@ type Props = {
   onSelect: () => void
   onStatusChange: (taskId: string, status: string) => void
   onDueDateChange?: (taskId: string, dueDate: string | null) => void
+  onStartDateChange?: (taskId: string, startDate: string | null) => void
   onRecurrenceChange?: (taskId: string, recurrenceRule: string | null) => void
 }
 
@@ -55,9 +56,30 @@ function formatDueDate(dueDate: string | null, mobile: boolean): { text: string;
   }
 }
 
-export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onStatusChange, onDueDateChange, onRecurrenceChange }: Props) {
+function formatDateRange(startDate: string, dueDate: string, mobile: boolean): { text: string; className: string; isCritical: boolean } {
+  const parseParts = (d: string) => {
+    const p = d.slice(0, 10).split("-")
+    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
+  }
+  const start = parseParts(startDate)
+  const end = parseParts(dueDate)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const endDiff = Math.floor((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+  const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`
+  const sz = mobile ? "text-xs px-2.5 py-1 rounded-md font-medium" : "text-[11px] px-1.5 py-0.5 rounded font-medium"
+
+  if (endDiff < 0) return { text: `${fmt(start)}→${fmt(end)}`, className: `bg-red-500/20 text-red-400 ${sz}`, isCritical: true }
+  if (endDiff === 0) return { text: `${fmt(start)}→今日`, className: `bg-blue-500/20 text-blue-500 ${sz}`, isCritical: true }
+  return { text: `${fmt(start)}→${fmt(end)}`, className: `text-muted-foreground ${sz} bg-muted`, isCritical: false }
+}
+
+export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onStatusChange, onDueDateChange, onStartDateChange, onRecurrenceChange }: Props) {
   const isMobile = useIsMobile()
-  const dueInfo = formatDueDate(task.dueDate, isMobile)
+  const dueInfo = task.startDate && task.dueDate
+    ? formatDateRange(task.startDate, task.dueDate, isMobile)
+    : formatDueDate(task.dueDate, isMobile)
   const isDone = task.status === "done"
   const [celebrating, setCelebrating] = useState(false)
   const [dueDateOpen, setDueDateOpen] = useState(false)
@@ -167,21 +189,29 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
                 const parts = task.dueDate!.slice(0, 10).split("-")
                 return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
               })() : undefined}
+              startDate={task.startDate ? (() => {
+                const parts = task.startDate!.slice(0, 10).split("-")
+                return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+              })() : undefined}
               recurrenceRule={task.recurrenceRule}
-              onConfirm={(date, recurrenceRule) => {
+              onConfirm={(date, opts) => {
+                const dateToStr = (d: Date) => {
+                  const yyyy = d.getFullYear()
+                  const mm = String(d.getMonth() + 1).padStart(2, "0")
+                  const dd = String(d.getDate()).padStart(2, "0")
+                  return `${yyyy}-${mm}-${dd}T00:00:00.000Z`
+                }
                 if (onDueDateChange) {
-                  if (date) {
-                    const yyyy = date.getFullYear()
-                    const mm = String(date.getMonth() + 1).padStart(2, "0")
-                    const dd = String(date.getDate()).padStart(2, "0")
-                    onDueDateChange(task.id, `${yyyy}-${mm}-${dd}T00:00:00.000Z`)
-                  } else {
-                    onDueDateChange(task.id, null)
+                  onDueDateChange(task.id, date ? dateToStr(date) : null)
+                }
+                if (onStartDateChange && opts) {
+                  const newStart = opts.startDate ? dateToStr(opts.startDate) : null
+                  if (newStart !== (task.startDate || null)) {
+                    onStartDateChange(task.id, newStart)
                   }
                 }
-                // 繰り返しルールが変更された場合のみ更新
-                if (onRecurrenceChange && recurrenceRule !== (task.recurrenceRule || null)) {
-                  onRecurrenceChange(task.id, recurrenceRule ?? null)
+                if (onRecurrenceChange && opts && opts.recurrenceRule !== (task.recurrenceRule || null)) {
+                  onRecurrenceChange(task.id, opts.recurrenceRule ?? null)
                 }
               }}
             />

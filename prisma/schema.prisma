@@ -190,7 +190,8 @@ model Task {
   priority       String    @default("medium") // high | medium | low
   assigneeId     String?   // 担当者
   creatorId      String    // 作成者
-  dueDate        DateTime? // 期日
+  startDate      DateTime? // 開始日（期間タスク用）
+  dueDate        DateTime? // 期日（終了日）
   completedAt    DateTime? // 完了日時
   recurrenceRule String?   // RFC 5545 RRULE 形式（例: "FREQ=WEEKLY;BYDAY=MO"）
   nextOccurrence DateTime? // 次回繰り返し発生日

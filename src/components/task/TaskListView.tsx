@@ -279,6 +279,19 @@ export function TaskListView({
     })
   }, [])
 
+  const handleStartDateChange = useCallback((taskId: string, startDate: string | null) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, startDate } : t
+      )
+    )
+    fetch("/api/internal/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId, startDate }),
+    })
+  }, [])
+
   const handleRecurrenceChange = useCallback((taskId: string, recurrenceRule: string | null) => {
     setTasks((prev) =>
       prev.map((t) =>
@@ -336,6 +349,7 @@ export function TaskListView({
       priority: "medium",
       assigneeId: viewMode === "my-tasks" ? currentUserId : null,
       creatorId: currentUserId,
+      startDate: null,
       dueDate: dueDate || null,
       completedAt: null,
       recurrenceRule: null,
@@ -614,6 +628,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onDueDateChange={handleDueDateChange}
+            onStartDateChange={handleStartDateChange}
             onRecurrenceChange={handleRecurrenceChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
@@ -632,6 +647,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onDueDateChange={handleDueDateChange}
+            onStartDateChange={handleStartDateChange}
             onRecurrenceChange={handleRecurrenceChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
@@ -651,6 +667,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onDueDateChange={handleDueDateChange}
+            onStartDateChange={handleStartDateChange}
             onRecurrenceChange={handleRecurrenceChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
@@ -685,6 +702,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onDueDateChange={handleDueDateChange}
+            onStartDateChange={handleStartDateChange}
             onRecurrenceChange={handleRecurrenceChange}
             onReorder={handleReorder}
             defaultCollapsed
@@ -803,6 +821,7 @@ const SortableTaskItem = memo(function SortableTaskItem({
   onSelect,
   onStatusChange,
   onDueDateChange,
+  onStartDateChange,
   onRecurrenceChange,
   isMobile,
 }: {
@@ -811,6 +830,7 @@ const SortableTaskItem = memo(function SortableTaskItem({
   onSelect: () => void
   onStatusChange: (taskId: string, status: string) => void
   onDueDateChange?: (taskId: string, dueDate: string | null) => void
+  onStartDateChange?: (taskId: string, startDate: string | null) => void
   onRecurrenceChange?: (taskId: string, recurrenceRule: string | null) => void
   isMobile: boolean
 }) {
@@ -879,6 +899,7 @@ const SortableTaskItem = memo(function SortableTaskItem({
         onSelect={handleSelect}
         onStatusChange={onStatusChange}
         onDueDateChange={onDueDateChange}
+        onStartDateChange={onStartDateChange}
         onRecurrenceChange={onRecurrenceChange}
       />
     </div>
@@ -959,6 +980,7 @@ function TaskSection({
   selectedId,
   onStatusChange,
   onDueDateChange,
+  onStartDateChange,
   onRecurrenceChange,
   onReorder,
   onInlineCreate,
@@ -977,6 +999,7 @@ function TaskSection({
   selectedId: string | null
   onStatusChange: (taskId: string, status: string) => void
   onDueDateChange?: (taskId: string, dueDate: string | null) => void
+  onStartDateChange?: (taskId: string, startDate: string | null) => void
   onRecurrenceChange?: (taskId: string, recurrenceRule: string | null) => void
   onReorder: (tasks: TaskInfo[]) => void
   onInlineCreate?: (title: string, status: string, dueDate?: string) => Promise<void>
@@ -1091,6 +1114,7 @@ function TaskSection({
                       onSelect={() => onSelect(task.id)}
                       onStatusChange={onStatusChange}
                       onDueDateChange={onDueDateChange}
+                      onStartDateChange={onStartDateChange}
                       onRecurrenceChange={onRecurrenceChange}
                       isMobile={isMobile}
                     />
@@ -1128,6 +1152,7 @@ function TaskSection({
                   onSelect={() => onSelect(task.id)}
                   onStatusChange={onStatusChange}
                   onDueDateChange={onDueDateChange}
+                  onStartDateChange={onStartDateChange}
                   onRecurrenceChange={onRecurrenceChange}
                 />
               ))}

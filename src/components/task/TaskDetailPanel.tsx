@@ -315,6 +315,7 @@ export function TaskDetailPanel({
       priority: "medium",
       assigneeId: currentTask.assigneeId,
       creatorId: currentUserId,
+      startDate: null,
       dueDate: null,
       completedAt: null,
       recurrenceRule: null,

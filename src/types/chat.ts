@@ -70,6 +70,7 @@ export type TaskInfo = {
   priority: string
   assigneeId: string | null
   creatorId: string
+  startDate: string | null
   dueDate: string | null
   completedAt: string | null
   recurrenceRule: string | null
