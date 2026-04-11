@@ -266,6 +266,19 @@ export function TaskListView({
       })
   }, [])
 
+  const handleDueDateChange = useCallback((taskId: string, dueDate: string | null) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, dueDate } : t
+      )
+    )
+    fetch("/api/internal/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId, dueDate }),
+    })
+  }, [])
+
   const handleReorder = useCallback((reorderedTasks: TaskInfo[]) => {
     const taskIds = reorderedTasks.map((t) => t.id)
     fetch("/api/internal/tasks/reorder", {
@@ -570,6 +583,7 @@ export function TaskListView({
               onSelect={setSelectedTaskId}
               selectedId={selectedTaskId}
               onStatusChange={handleStatusChange}
+            onDueDateChange={handleDueDateChange}
               onReorder={handleReorder}
               isMobile={isMobile}
               sortable={false}
@@ -586,6 +600,7 @@ export function TaskListView({
             onSelect={setSelectedTaskId}
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
+            onDueDateChange={handleDueDateChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
             defaultDueDate={formatLocalDate(todayEnd)}
@@ -602,6 +617,7 @@ export function TaskListView({
             onSelect={setSelectedTaskId}
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
+            onDueDateChange={handleDueDateChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
             defaultDueDate={formatLocalDate(tomorrowStart)}
@@ -619,6 +635,7 @@ export function TaskListView({
             onSelect={setSelectedTaskId}
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
+            onDueDateChange={handleDueDateChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
             isMobile={isMobile}
@@ -635,6 +652,7 @@ export function TaskListView({
               onSelect={setSelectedTaskId}
               selectedId={selectedTaskId}
               onStatusChange={handleStatusChange}
+            onDueDateChange={handleDueDateChange}
               onReorder={handleReorder}
               isMobile={isMobile}
             />
@@ -650,6 +668,7 @@ export function TaskListView({
             onSelect={setSelectedTaskId}
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
+            onDueDateChange={handleDueDateChange}
             onReorder={handleReorder}
             defaultCollapsed
             isMobile={isMobile}
@@ -766,12 +785,14 @@ const SortableTaskItem = memo(function SortableTaskItem({
   isSelected,
   onSelect,
   onStatusChange,
+  onDueDateChange,
   isMobile,
 }: {
   task: TaskInfo
   isSelected: boolean
   onSelect: () => void
   onStatusChange: (taskId: string, status: string) => void
+  onDueDateChange?: (taskId: string, dueDate: string | null) => void
   isMobile: boolean
 }) {
   const {
@@ -838,6 +859,7 @@ const SortableTaskItem = memo(function SortableTaskItem({
         isSelected={isSelected}
         onSelect={handleSelect}
         onStatusChange={onStatusChange}
+        onDueDateChange={onDueDateChange}
       />
     </div>
   )
@@ -916,6 +938,7 @@ function TaskSection({
   onSelect,
   selectedId,
   onStatusChange,
+  onDueDateChange,
   onReorder,
   onInlineCreate,
   defaultDueDate,
@@ -932,6 +955,7 @@ function TaskSection({
   onSelect: (id: string) => void
   selectedId: string | null
   onStatusChange: (taskId: string, status: string) => void
+  onDueDateChange?: (taskId: string, dueDate: string | null) => void
   onReorder: (tasks: TaskInfo[]) => void
   onInlineCreate?: (title: string, status: string, dueDate?: string) => Promise<void>
   defaultDueDate?: string
@@ -1044,6 +1068,7 @@ function TaskSection({
                       isSelected={selectedId === task.id}
                       onSelect={() => onSelect(task.id)}
                       onStatusChange={onStatusChange}
+                      onDueDateChange={onDueDateChange}
                       isMobile={isMobile}
                     />
                   ))}
@@ -1079,6 +1104,7 @@ function TaskSection({
                   isSelected={selectedId === task.id}
                   onSelect={() => onSelect(task.id)}
                   onStatusChange={onStatusChange}
+                  onDueDateChange={onDueDateChange}
                 />
               ))}
             </div>

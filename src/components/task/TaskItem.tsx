@@ -4,6 +4,9 @@ import { useState, memo } from "react"
 import { cn } from "@/lib/utils"
 import { rruleToText } from "@/lib/recurrence"
 import { useIsMobile } from "@/hooks/useIsMobile"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { ja } from "date-fns/locale"
 import type { TaskInfo } from "@/types/chat"
 
 type Props = {
@@ -11,6 +14,7 @@ type Props = {
   isSelected: boolean
   onSelect: () => void
   onStatusChange: (taskId: string, status: string) => void
+  onDueDateChange?: (taskId: string, dueDate: string | null) => void
 }
 
 const priorityBarColors: Record<string, string> = {
@@ -49,11 +53,12 @@ function formatDueDate(dueDate: string | null, mobile: boolean): { text: string;
   }
 }
 
-export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onStatusChange }: Props) {
+export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onStatusChange, onDueDateChange }: Props) {
   const isMobile = useIsMobile()
   const dueInfo = formatDueDate(task.dueDate, isMobile)
   const isDone = task.status === "done"
   const [celebrating, setCelebrating] = useState(false)
+  const [dueDateOpen, setDueDateOpen] = useState(false)
 
   const handleCheck = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -129,11 +134,56 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
           </span>
         )}
 
-        {/* 期日バッジ（右端に大きく） */}
-        {dueInfo && !isDone && (
-          <span className={cn("shrink-0", dueInfo.className)}>
-            {dueInfo.text}
-          </span>
+        {/* 期日バッジ（タップでカレンダー表示） */}
+        {!isDone && (
+          <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+            <PopoverTrigger asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDueDateOpen(true)
+                }}
+                className={cn(
+                  "shrink-0",
+                  dueInfo
+                    ? dueInfo.className
+                    : "text-xs px-2.5 py-1 rounded-md text-muted-foreground/50"
+                )}
+              >
+                {dueInfo ? dueInfo.text : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={task.dueDate ? (() => {
+                  const parts = task.dueDate!.slice(0, 10).split("-")
+                  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+                })() : undefined}
+                onSelect={(date) => {
+                  if (onDueDateChange) {
+                    if (date) {
+                      const yyyy = date.getFullYear()
+                      const mm = String(date.getMonth() + 1).padStart(2, "0")
+                      const dd = String(date.getDate()).padStart(2, "0")
+                      onDueDateChange(task.id, `${yyyy}-${mm}-${dd}T00:00:00.000Z`)
+                    } else {
+                      onDueDateChange(task.id, null)
+                    }
+                  }
+                  setDueDateOpen(false)
+                }}
+                locale={ja}
+              />
+            </PopoverContent>
+          </Popover>
         )}
       </div>
     )
