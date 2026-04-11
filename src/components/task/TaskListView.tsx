@@ -370,6 +370,10 @@ export function TaskListView({
     <div className="flex h-full page-enter">
       {/* タスクリスト */}
       <div className="flex flex-1 flex-col overflow-hidden">
+        {/* プロジェクトカラーアクセント */}
+        {viewMode === "project" && projectColor && (
+          <div className="h-1 shrink-0" style={{ backgroundColor: projectColor }} />
+        )}
         {/* ヘッダー */}
         <div className="shrink-0 border-b py-4 px-5">
           <div className={cn("flex items-center justify-between", isMobile && "hidden")}>
