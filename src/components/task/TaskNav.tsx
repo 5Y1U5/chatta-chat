@@ -36,15 +36,8 @@ export function TaskNav({ workspaceId, projects }: Props) {
   const isMyTasks = pathname.includes("/tasks") && !currentProjectId
   const isProjectsPage = pathname.includes("/projects")
 
-  // マイタスク選択時はデフォルト折りたたみ、プロジェクト選択時は展開
-  const [projectsExpanded, setProjectsExpanded] = useState(!isMyTasks)
-
-  // ページ遷移に応じて折りたたみ状態を同期
-  useEffect(() => {
-    if (isMyTasks) {
-      setProjectsExpanded(false)
-    }
-  }, [isMyTasks])
+  // プロジェクト一覧の展開/折りたたみ（プロジェクト選択時はデフォルト折りたたみ）
+  const [projectsExpanded, setProjectsExpanded] = useState(false)
 
   // プロジェクト切り替えドロップダウンの外側クリックで閉じる
   useEffect(() => {
@@ -58,7 +51,8 @@ export function TaskNav({ workspaceId, projects }: Props) {
     return () => document.removeEventListener("mousedown", handleClick)
   }, [projectDropdownOpen])
 
-  if (!isTaskPage) return null
+  // マイタスク選択時は TaskNav 自体を非表示（タスク一覧の表示領域を最大化）
+  if (!isTaskPage || isMyTasks) return null
 
   const selectedProject = currentProjectId
     ? projects.find((p) => p.id === currentProjectId)
@@ -83,15 +77,12 @@ export function TaskNav({ workspaceId, projects }: Props) {
       </div>
 
       <div className="flex-1 overflow-y-auto py-2">
-        {/* マイタスク */}
+        {/* マイタスクへ戻る */}
         <Link
           href={`/${workspaceId}/tasks`}
           scroll={false}
           prefetch={true}
-          className={cn(
-            "mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-left",
-            isMyTasks ? "bg-muted font-medium" : "hover:bg-muted/50"
-          )}
+          className="mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-left hover:bg-muted/50"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
             <path d="M9 11l3 3L22 4" />
