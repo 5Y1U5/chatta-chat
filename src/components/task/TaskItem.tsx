@@ -6,6 +6,7 @@ import { rruleToText } from "@/lib/recurrence"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
+import { DueDateDrawer } from "@/components/task/DueDateDrawer"
 import { ja } from "date-fns/locale"
 import type { TaskInfo } from "@/types/chat"
 
@@ -134,56 +135,51 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
           </span>
         )}
 
-        {/* 期日バッジ（タップでカレンダー表示） */}
+        {/* 期日バッジ（タップでボトムシート表示） */}
         {!isDone && (
-          <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
-            <PopoverTrigger asChild>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setDueDateOpen(true)
-                }}
-                className={cn(
-                  "shrink-0",
-                  dueInfo
-                    ? dueInfo.className
-                    : "text-xs px-2.5 py-1 rounded-md text-muted-foreground/50"
-                )}
-              >
-                {dueInfo ? dueInfo.text : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                )}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={task.dueDate ? (() => {
-                  const parts = task.dueDate!.slice(0, 10).split("-")
-                  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
-                })() : undefined}
-                onSelect={(date) => {
-                  if (onDueDateChange) {
-                    if (date) {
-                      const yyyy = date.getFullYear()
-                      const mm = String(date.getMonth() + 1).padStart(2, "0")
-                      const dd = String(date.getDate()).padStart(2, "0")
-                      onDueDateChange(task.id, `${yyyy}-${mm}-${dd}T00:00:00.000Z`)
-                    } else {
-                      onDueDateChange(task.id, null)
-                    }
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setDueDateOpen(true)
+              }}
+              className={cn(
+                "shrink-0",
+                dueInfo
+                  ? dueInfo.className
+                  : "text-xs px-2.5 py-1 rounded-md text-muted-foreground/50"
+              )}
+            >
+              {dueInfo ? dueInfo.text : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              )}
+            </button>
+            <DueDateDrawer
+              open={dueDateOpen}
+              onOpenChange={setDueDateOpen}
+              value={task.dueDate ? (() => {
+                const parts = task.dueDate!.slice(0, 10).split("-")
+                return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+              })() : undefined}
+              onConfirm={(date) => {
+                if (onDueDateChange) {
+                  if (date) {
+                    const yyyy = date.getFullYear()
+                    const mm = String(date.getMonth() + 1).padStart(2, "0")
+                    const dd = String(date.getDate()).padStart(2, "0")
+                    onDueDateChange(task.id, `${yyyy}-${mm}-${dd}T00:00:00.000Z`)
+                  } else {
+                    onDueDateChange(task.id, null)
                   }
-                  setDueDateOpen(false)
-                }}
-                locale={ja}
-              />
-            </PopoverContent>
-          </Popover>
+                }
+              }}
+            />
+          </>
         )}
       </div>
     )
