@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useNotificationBadge } from "@/hooks/useNotificationBadge"
 
 type Props = {
   workspaceId: string
@@ -10,6 +11,7 @@ type Props = {
 }
 
 export function MobileBottomNav({ workspaceId, unreadNotificationCount = 0 }: Props) {
+  const notificationBadge = useNotificationBadge(unreadNotificationCount)
   const pathname = usePathname()
 
   const isChatActive = pathname === `/${workspaceId}` || pathname.includes("/channel/")
@@ -43,7 +45,7 @@ export function MobileBottomNav({ workspaceId, unreadNotificationCount = 0 }: Pr
       label: "受信トレイ",
       href: `/${workspaceId}/inbox`,
       active: isInboxActive,
-      badge: unreadNotificationCount,
+      badge: notificationBadge,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />

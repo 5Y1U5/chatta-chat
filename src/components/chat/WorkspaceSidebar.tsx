@@ -12,6 +12,7 @@ import { ProfileDialog } from "@/components/chat/ProfileDialog"
 import { WorkspaceMembersDialog } from "@/components/chat/WorkspaceMembersDialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { useNotificationBadge } from "@/hooks/useNotificationBadge"
 
 type Props = {
   workspace: {
@@ -25,6 +26,7 @@ type Props = {
 }
 
 export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCount = 0, memberCount = 0 }: Props) {
+  const notificationBadge = useNotificationBadge(unreadNotificationCount)
   const [expanded, setExpanded] = useState(true)
   const [membersOpen, setMembersOpen] = useState(false)
   const router = useRouter()
@@ -75,7 +77,7 @@ export function WorkspaceSidebar({ workspace, workspaceId, unreadNotificationCou
       label: "受信トレイ",
       active: isInboxActive,
       href: `/${workspaceId}/inbox`,
-      badge: unreadNotificationCount,
+      badge: notificationBadge,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />

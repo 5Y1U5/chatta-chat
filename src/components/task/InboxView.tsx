@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications"
+import { decrementBadge, clearBadge, incrementBadge } from "@/hooks/useNotificationBadge"
 import { PullToRefresh } from "@/components/ui/PullToRefresh"
 import type { NotificationInfo } from "@/types/chat"
 
@@ -179,14 +180,14 @@ function SwipeableNotificationRow({
       )}
       style={{ animationDelay: `${index * 30}ms` }}
     >
-      {/* アーカイブ背景（右端に表示） */}
-      <div className="absolute inset-y-0 right-0 flex items-center bg-destructive text-destructive-foreground" style={{ width: Math.max(Math.abs(offsetX), 0) }}>
+      {/* スワイプ消去の背景（右端に表示） */}
+      <div className="absolute inset-y-0 right-0 flex items-center bg-green-600 text-white" style={{ width: Math.max(Math.abs(offsetX), 0) }}>
         <div className="flex items-center gap-2 px-4 ml-auto">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <polyline points="20 6 9 17 4 12" />
           </svg>
           {Math.abs(offsetX) >= AUTO_ARCHIVE_THRESHOLD && (
-            <span className="text-xs font-medium whitespace-nowrap">アーカイブ</span>
+            <span className="text-xs font-medium whitespace-nowrap">消去</span>
           )}
         </div>
       </div>
@@ -434,7 +435,7 @@ function NotificationDetailPanel({
               onClose()
             }}
           >
-            アーカイブ
+            消去
           </Button>
         </div>
       </div>
@@ -468,6 +469,7 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
     onNewNotification: useCallback((notification: NotificationInfo) => {
       setNotifications((prev) => {
         if (prev.some((n) => n.id === notification.id)) return prev
+        incrementBadge()
         return [notification, ...prev]
       })
     }, []),
@@ -476,6 +478,7 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
   const handleMarkAllRead = async () => {
     // 楽観的更新: ローカル state のみ更新（router.refresh() は state リセットを引き起こすため使わない）
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    clearBadge()
     await fetch("/api/internal/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -484,6 +487,11 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
   }
 
   const handleArchive = useCallback((id: string) => {
+    // 未読の通知をアーカイブした場合はバッジも減らす
+    const target = notifications.find((n) => n.id === id)
+    if (target && !target.read) {
+      decrementBadge()
+    }
     // 楽観的更新: 即座にローカルから除去
     setNotifications((prev) => prev.filter((n) => n.id !== id))
     fetch("/api/internal/notifications", {
@@ -491,7 +499,7 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ archiveId: id }),
     })
-  }, [])
+  }, [notifications])
 
   const handleTap = useCallback((n: NotificationInfo) => {
     // 楽観的更新: 即座に既読表示
@@ -499,6 +507,7 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
       setNotifications((prev) =>
         prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
       )
+      decrementBadge()
       fetch("/api/internal/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
