@@ -279,6 +279,19 @@ export function TaskListView({
     })
   }, [])
 
+  const handleRecurrenceChange = useCallback((taskId: string, recurrenceRule: string | null) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, recurrenceRule } : t
+      )
+    )
+    fetch("/api/internal/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId, recurrenceRule }),
+    })
+  }, [])
+
   const handleReorder = useCallback((reorderedTasks: TaskInfo[]) => {
     const taskIds = reorderedTasks.map((t) => t.id)
     fetch("/api/internal/tasks/reorder", {
@@ -601,6 +614,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onDueDateChange={handleDueDateChange}
+            onRecurrenceChange={handleRecurrenceChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
             defaultDueDate={formatLocalDate(todayEnd)}
@@ -618,6 +632,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onDueDateChange={handleDueDateChange}
+            onRecurrenceChange={handleRecurrenceChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
             defaultDueDate={formatLocalDate(tomorrowStart)}
@@ -636,6 +651,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onDueDateChange={handleDueDateChange}
+            onRecurrenceChange={handleRecurrenceChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
             isMobile={isMobile}
@@ -669,6 +685,7 @@ export function TaskListView({
             selectedId={selectedTaskId}
             onStatusChange={handleStatusChange}
             onDueDateChange={handleDueDateChange}
+            onRecurrenceChange={handleRecurrenceChange}
             onReorder={handleReorder}
             defaultCollapsed
             isMobile={isMobile}
@@ -786,6 +803,7 @@ const SortableTaskItem = memo(function SortableTaskItem({
   onSelect,
   onStatusChange,
   onDueDateChange,
+  onRecurrenceChange,
   isMobile,
 }: {
   task: TaskInfo
@@ -793,6 +811,7 @@ const SortableTaskItem = memo(function SortableTaskItem({
   onSelect: () => void
   onStatusChange: (taskId: string, status: string) => void
   onDueDateChange?: (taskId: string, dueDate: string | null) => void
+  onRecurrenceChange?: (taskId: string, recurrenceRule: string | null) => void
   isMobile: boolean
 }) {
   const {
@@ -860,6 +879,7 @@ const SortableTaskItem = memo(function SortableTaskItem({
         onSelect={handleSelect}
         onStatusChange={onStatusChange}
         onDueDateChange={onDueDateChange}
+        onRecurrenceChange={onRecurrenceChange}
       />
     </div>
   )
@@ -939,6 +959,7 @@ function TaskSection({
   selectedId,
   onStatusChange,
   onDueDateChange,
+  onRecurrenceChange,
   onReorder,
   onInlineCreate,
   defaultDueDate,
@@ -956,6 +977,7 @@ function TaskSection({
   selectedId: string | null
   onStatusChange: (taskId: string, status: string) => void
   onDueDateChange?: (taskId: string, dueDate: string | null) => void
+  onRecurrenceChange?: (taskId: string, recurrenceRule: string | null) => void
   onReorder: (tasks: TaskInfo[]) => void
   onInlineCreate?: (title: string, status: string, dueDate?: string) => Promise<void>
   defaultDueDate?: string
@@ -1069,6 +1091,7 @@ function TaskSection({
                       onSelect={() => onSelect(task.id)}
                       onStatusChange={onStatusChange}
                       onDueDateChange={onDueDateChange}
+                      onRecurrenceChange={onRecurrenceChange}
                       isMobile={isMobile}
                     />
                   ))}
@@ -1105,6 +1128,7 @@ function TaskSection({
                   onSelect={() => onSelect(task.id)}
                   onStatusChange={onStatusChange}
                   onDueDateChange={onDueDateChange}
+                  onRecurrenceChange={onRecurrenceChange}
                 />
               ))}
             </div>

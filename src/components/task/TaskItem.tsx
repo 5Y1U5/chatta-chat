@@ -16,6 +16,7 @@ type Props = {
   onSelect: () => void
   onStatusChange: (taskId: string, status: string) => void
   onDueDateChange?: (taskId: string, dueDate: string | null) => void
+  onRecurrenceChange?: (taskId: string, recurrenceRule: string | null) => void
 }
 
 const priorityBarColors: Record<string, string> = {
@@ -54,7 +55,7 @@ function formatDueDate(dueDate: string | null, mobile: boolean): { text: string;
   }
 }
 
-export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onStatusChange, onDueDateChange }: Props) {
+export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onStatusChange, onDueDateChange, onRecurrenceChange }: Props) {
   const isMobile = useIsMobile()
   const dueInfo = formatDueDate(task.dueDate, isMobile)
   const isDone = task.status === "done"
@@ -166,7 +167,8 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
                 const parts = task.dueDate!.slice(0, 10).split("-")
                 return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
               })() : undefined}
-              onConfirm={(date) => {
+              recurrenceRule={task.recurrenceRule}
+              onConfirm={(date, recurrenceRule) => {
                 if (onDueDateChange) {
                   if (date) {
                     const yyyy = date.getFullYear()
@@ -176,6 +178,10 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
                   } else {
                     onDueDateChange(task.id, null)
                   }
+                }
+                // 繰り返しルールが変更された場合のみ更新
+                if (onRecurrenceChange && recurrenceRule !== (task.recurrenceRule || null)) {
+                  onRecurrenceChange(task.id, recurrenceRule ?? null)
                 }
               }}
             />
