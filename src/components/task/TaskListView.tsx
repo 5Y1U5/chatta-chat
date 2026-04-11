@@ -26,6 +26,7 @@ import { TaskItem } from "@/components/task/TaskItem"
 import { TaskDetailPanel } from "@/components/task/TaskDetailPanel"
 import { CreateTaskDialog } from "@/components/task/CreateTaskDialog"
 import { ProjectMembersDialog } from "@/components/task/ProjectMembersDialog"
+import { CreateProjectDialog } from "@/components/task/CreateProjectDialog"
 import { EmptyState } from "@/components/ui/empty-state"
 import {
   AlertDialog,
@@ -133,6 +134,7 @@ export function TaskListView({
   const [tasks, setTasks] = useState(initialTasks)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId || null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)
@@ -428,6 +430,19 @@ export function TaskListView({
                       <span className="truncate">{p.name}</span>
                     </DropdownMenuItem>
                   ))}
+                  <div className="mx-2 my-1 border-t" />
+                  <DropdownMenuItem onClick={() => setCreateProjectOpen(true)}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-muted-foreground">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    プロジェクトを作成
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push(`/${workspaceId}/projects`, { scroll: false })}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-muted-foreground">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                    すべて表示
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               {viewMode === "project" && projectId && (
@@ -696,6 +711,15 @@ export function TaskListView({
         defaultProjectId={projectId}
         workspaceId={workspaceId}
         currentUserId={currentUserId}
+      />
+
+      <CreateProjectDialog
+        open={createProjectOpen}
+        onOpenChange={setCreateProjectOpen}
+        onCreated={() => {
+          setCreateProjectOpen(false)
+          router.push(`/${workspaceId}/projects`, { scroll: false })
+        }}
       />
 
       {/* プロジェクトメンバー管理ダイアログ */}

@@ -2,7 +2,7 @@ import { Suspense } from "react"
 import { requireAuth } from "@/lib/auth"
 import { SidebarData } from "@/components/chat/SidebarData"
 import { ChannelListData } from "@/components/chat/ChannelListData"
-import { TaskNavData } from "@/components/task/TaskNavData"
+
 import { MobileHeaderData } from "@/components/chat/MobileHeaderData"
 import { MobileBottomNavData } from "@/components/chat/MobileBottomNavData"
 import { MobileBottomNav } from "@/components/chat/MobileBottomNav"
@@ -34,11 +34,6 @@ export default async function ChatLayout({
       {/* PC第2カラム: チャット時は ChannelList */}
       <Suspense fallback={null}>
         <ChannelListData workspaceId={activeWorkspaceId} userId={auth.userId} />
-      </Suspense>
-
-      {/* PC第2カラム: タスク時は TaskNav */}
-      <Suspense fallback={<div className="hidden md:block w-60 shrink-0 border-r" />}>
-        <TaskNavData workspaceId={activeWorkspaceId} userId={auth.userId} />
       </Suspense>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
