@@ -28,7 +28,8 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { RecurrenceSelect } from "@/components/task/RecurrenceSelect"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import { useRealtimeComments } from "@/hooks/useRealtimeComments"
-import type { TaskInfo, TaskCommentInfo } from "@/types/chat"
+import { TaskAttachmentZone } from "@/components/task/TaskAttachmentZone"
+import type { TaskInfo, TaskCommentInfo, TaskAttachmentInfo } from "@/types/chat"
 
 type MemberInfo = { id: string; userId: string; displayName: string | null; avatarUrl: string | null }
 
@@ -36,6 +37,7 @@ type TaskDetailsCache = {
   subTasks: TaskInfo[]
   comments: TaskCommentInfo[]
   members: MemberInfo[]
+  attachments: TaskAttachmentInfo[]
   fetchedAt: number
 }
 
@@ -123,6 +125,7 @@ export function TaskDetailPanel({
   const [subTasks, setSubTasks] = useState<TaskInfo[]>([])
   const [comments, setComments] = useState<TaskCommentInfo[]>([])
   const [taskMembers, setTaskMembers] = useState<MemberInfo[]>([])
+  const [attachments, setAttachments] = useState<TaskAttachmentInfo[]>([])
   const [newComment, setNewComment] = useState("")
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
   const [detailsLoaded, setDetailsLoaded] = useState(false)
@@ -162,17 +165,20 @@ export function TaskDetailPanel({
       setSubTasks(cached.subTasks)
       setComments(cached.comments)
       setTaskMembers(cached.members)
+      setAttachments(cached.attachments)
       setDetailsLoaded(true)
     } else if (currentTask.subTasks && currentTask.subTasks.length > 0) {
       // 初期データにサブタスクが含まれていれば即座に表示
       setSubTasks(currentTask.subTasks)
       setComments([])
       setTaskMembers([])
+      setAttachments([])
       setDetailsLoaded(true)
     } else {
       setSubTasks([])
       setComments([])
       setTaskMembers([])
+      setAttachments([])
       setDetailsLoaded(currentTask._count?.subTasks === 0)
     }
     // 意図的に currentTask.id のみに依存（編集中の state 上書きを防ぐ）
@@ -190,10 +196,10 @@ export function TaskDetailPanel({
     }
   }, [currentTask.title, currentTask.description, editingTitle, descriptionDirty])
 
-  // 詳細データの一括取得（サブタスク + コメント + メンバー + 共有リンク）
+  // 詳細データの一括取得（サブタスク + コメント + メンバー + 共有リンク + 添付）
   const fetchDetails = useCallback(async (taskId: string) => {
     const res = await fetch(`/api/internal/tasks/details?taskId=${taskId}`)
-    if (!res.ok) return { subTasks: [], comments: [], members: [], shareToken: null }
+    if (!res.ok) return { subTasks: [], comments: [], members: [], shareToken: null, attachments: [] }
     const data = await res.json()
 
     // キャッシュに保存
@@ -201,10 +207,11 @@ export function TaskDetailPanel({
       subTasks: data.subTasks,
       comments: data.comments,
       members: data.members,
+      attachments: data.attachments || [],
       fetchedAt: Date.now(),
     }
 
-    return data as { subTasks: TaskInfo[]; comments: TaskCommentInfo[]; members: MemberInfo[]; shareToken: string | null }
+    return data as { subTasks: TaskInfo[]; comments: TaskCommentInfo[]; members: MemberInfo[]; shareToken: string | null; attachments: TaskAttachmentInfo[] }
   }, [])
 
   useEffect(() => {
@@ -216,6 +223,7 @@ export function TaskDetailPanel({
       setSubTasks(data.subTasks)
       setComments(data.comments)
       setTaskMembers(data.members)
+      setAttachments(data.attachments || [])
       setShareToken(data.shareToken)
       setDetailsLoaded(true)
     })
@@ -312,6 +320,15 @@ export function TaskDetailPanel({
     handleUpdate("description", description)
     setDescriptionDirty(false)
   }
+
+  // 添付ファイル更新時、state とキャッシュを同期
+  const handleAttachmentsChange = useCallback((next: TaskAttachmentInfo[]) => {
+    setAttachments(next)
+    const cache = detailsCacheRef.current[currentTask.id]
+    if (cache) {
+      detailsCacheRef.current[currentTask.id] = { ...cache, attachments: next }
+    }
+  }, [currentTask.id])
 
   // 楽観的サブタスク追加
   const handleAddSubTask = () => {
@@ -1106,6 +1123,20 @@ export function TaskDetailPanel({
               保存
             </Button>
           )}
+        </div>
+
+        <div className="border-t mx-4" />
+
+        {/* 添付ファイル */}
+        <div className="px-4 py-3">
+          <SectionLabel mobile={isMobile}>添付ファイル</SectionLabel>
+          <TaskAttachmentZone
+            taskId={currentTask.id}
+            attachments={attachments}
+            currentUserId={currentUserId}
+            taskCreatorId={currentTask.creatorId}
+            onChange={handleAttachmentsChange}
+          />
         </div>
 
         <div className="border-t mx-4" />

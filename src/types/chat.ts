@@ -100,6 +100,23 @@ export type TaskInfo = {
   shareToken?: string | null
 }
 
+// タスク添付ファイル情報
+export type TaskAttachmentInfo = {
+  id: string
+  taskId: string
+  fileUrl: string
+  fileName: string
+  fileType: string
+  fileSize: number
+  uploaderId: string
+  createdAt: string
+  uploader: {
+    id: string
+    displayName: string | null
+    avatarUrl: string | null
+  }
+}
+
 // タスクコメント情報
 export type TaskCommentInfo = {
   id: string
