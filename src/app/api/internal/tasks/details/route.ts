@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 全データを並列取得（1リクエスト = 1回の認証チェック + 並列DBクエリ）
-    const [subTasks, comments, guestComments, members, shareLink] = await Promise.all([
+    const [subTasks, comments, guestComments, members, shareLink, attachments] = await Promise.all([
       // サブタスク
       prisma.task.findMany({
         where: { parentTaskId: taskId, workspaceId: auth.workspaceId },
@@ -58,6 +58,12 @@ export async function GET(request: NextRequest) {
       prisma.taskShareLink.findFirst({
         where: { taskId, active: true },
         select: { token: true },
+      }),
+      // 添付ファイル
+      prisma.taskAttachment.findMany({
+        where: { taskId },
+        include: { uploader: { select: userSelect } },
+        orderBy: { createdAt: "asc" },
       }),
     ])
 
@@ -93,6 +99,7 @@ export async function GET(request: NextRequest) {
       comments: mergedComments,
       members: formattedMembers,
       shareToken: shareLink?.token || null,
+      attachments,
     })
   } catch (error) {
     if (error instanceof Error && error.message === "認証が必要です") {

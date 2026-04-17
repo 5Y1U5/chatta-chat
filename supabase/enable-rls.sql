@@ -34,6 +34,7 @@ ALTER TABLE IF EXISTS "TaskComment" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS "Notification" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS "TaskShareLink" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS "GuestComment" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS "TaskAttachment" ENABLE ROW LEVEL SECURITY;
 
 -- RLS が有効でポリシーがないテーブルは、テーブルオーナー（postgres）以外の
 -- ロール（anon, authenticated）からのアクセスが全て拒否される。

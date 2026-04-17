@@ -36,3 +36,26 @@
 - `prisma db push` 実行時、出力の `database "xxx"` 部分を必ず確認する。`postgres\n` のように余計な文字がないか注意。
 - `prisma.config.ts` で URL に `.trim()` を適用する。
 - スキーマ変更後は SQL で新テーブルの存在を実際に確認する。
+
+## 2026-04-17: Realtime UPDATE で全置換 GET は楽観的更新を破壊する
+
+**問題**: タスク完了をクリックすると楽観的に done になるが、直後に todo に戻る事象。リロードすると done になっている。
+
+**原因**: `useRealtimeTasks` の UPDATE ハンドラが `syncInBackground()` → `GET /api/internal/tasks` → `setTasks(data)` で state を全置換していた。ユーザーの PATCH 確定前に別タスクの Realtime UPDATE が走ると、GET が古いデータを返して楽観的更新がロールバックされる（`TaskListView.tsx`）。
+
+**ルール**:
+- Realtime UPDATE イベントは `payload.new` を直接ローカル state にマージする（全置換 GET しない）。
+- join データ（assignee/project 等）は members/projects 配列から再解決する。
+- INSERT のみは join データ取得のため GET で補完してよい。
+- REPLICA IDENTITY FULL を設定したテーブル（Task 等）は `payload.new` に全カラムが含まれるので直接マージ可能。
+
+## 2026-04-17: useEffect の依存配列に controlled input の value を入れない
+
+**問題**: タスク詳細の説明欄に入力した文字が、打ち終わる前に消える。外枠クリック（onBlur）すると保存される。
+
+**原因**: `TaskDetailPanel.tsx` の useEffect 依存配列に `currentTask.description` が含まれており、Realtime で props が変わるたびに `setDescription(currentTask.description || "")` が発火してローカル state を上書きしていた。
+
+**ルール**:
+- controlled input のローカル state を `props.value` から毎回リセットする useEffect を書かない。
+- タスク切り替え等のライフサイクルで初期化したいなら、依存を id（識別子）に絞る。
+- 他ユーザーの編集を取り込む場合は、**自分が編集中（dirty フラグ）でないときだけ** 取り込む補助 effect を分離する。

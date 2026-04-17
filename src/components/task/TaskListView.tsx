@@ -215,16 +215,62 @@ export function TaskListView({
   }, [viewMode, currentUserId, projectId])
 
   // タスクのリアルタイム購読（他メンバーの変更を即座に反映）
+  // UPDATE は payload.new を直接マージする（全置換しない）。
+  // 全置換にすると、楽観的更新の直後に別タスクの Realtime UPDATE が届いた際、
+  // GET が PATCH 確定前の古いデータを返してしまい、楽観的更新がロールバックされる。
   useRealtimeTasks({
     workspaceId,
     onTaskChange: useCallback((change) => {
       if (change.event === "DELETE") {
-        // 削除は即座にローカルから除去
         setTasks((prev) => prev.filter((t) => t.id !== change.id))
-      } else {
-        syncInBackground()
+        return
       }
-    }, [syncInBackground]),
+      if (change.event === "UPDATE") {
+        const raw = change.row as Record<string, unknown>
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.id !== change.id) return t
+            const nextAssigneeId = (raw.assigneeId as string | null) ?? null
+            const nextProjectId = (raw.projectId as string | null) ?? null
+            return {
+              ...t,
+              title: raw.title as string,
+              description: (raw.description as string | null) ?? null,
+              status: raw.status as string,
+              priority: raw.priority as string,
+              assigneeId: nextAssigneeId,
+              projectId: nextProjectId,
+              parentTaskId: (raw.parentTaskId as string | null) ?? null,
+              startDate: (raw.startDate as string | null) ?? null,
+              dueDate: (raw.dueDate as string | null) ?? null,
+              completedAt: (raw.completedAt as string | null) ?? null,
+              recurrenceRule: (raw.recurrenceRule as string | null) ?? null,
+              sortOrder: (raw.sortOrder as number) ?? t.sortOrder,
+              fileUrl: (raw.fileUrl as string | null) ?? null,
+              fileName: (raw.fileName as string | null) ?? null,
+              fileType: (raw.fileType as string | null) ?? null,
+              updatedAt: (raw.updatedAt as string) ?? t.updatedAt,
+              // 担当者・プロジェクトが変わったときのみローカルの members/projects から再解決
+              assignee:
+                nextAssigneeId === t.assigneeId
+                  ? t.assignee
+                  : nextAssigneeId
+                    ? (members.find((m) => m.id === nextAssigneeId) ?? null)
+                    : null,
+              project:
+                nextProjectId === t.projectId
+                  ? t.project
+                  : nextProjectId
+                    ? (projects.find((p) => p.id === nextProjectId) ?? null)
+                    : null,
+            }
+          })
+        )
+        return
+      }
+      // INSERT は join データ（assignee/project/creator/_count）が必要なので API GET
+      syncInBackground()
+    }, [syncInBackground, members, projects]),
   })
 
   // タブ/ウィンドウが再度アクティブになったときに同期（別端末対応）

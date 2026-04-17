@@ -30,6 +30,7 @@ model User {
   notifications    Notification[]  @relation("NotificationRecipient")
   actedNotifications Notification[] @relation("NotificationActor")
   taskShareLinks   TaskShareLink[] @relation("TaskShareLinkCreator")
+  uploadedAttachments TaskAttachment[] @relation("TaskAttachmentUploader")
 }
 
 // === ワークスペース（組織/チーム単位）===
@@ -212,10 +213,28 @@ model Task {
   members       TaskMember[]
   shareLinks    TaskShareLink[]
   guestComments GuestComment[]
+  attachments   TaskAttachment[]
 
   @@index([workspaceId, assigneeId, status])
   @@index([projectId, status])
   @@index([parentTaskId])
+}
+
+// === タスク添付ファイル（複数対応）===
+model TaskAttachment {
+  id         String   @id @default(uuid())
+  taskId     String
+  fileUrl    String
+  fileName   String
+  fileType   String
+  fileSize   Int      // バイト数
+  uploaderId String
+  createdAt  DateTime @default(now())
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader User @relation("TaskAttachmentUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
 }
 
 // === タスクメンバー（招待されたコラボレーター）===
