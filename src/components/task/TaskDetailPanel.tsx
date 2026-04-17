@@ -145,7 +145,9 @@ export function TaskDetailPanel({
     detailsCacheRef.current = {}
   }, [task.id])
 
-  // currentTask が変わったときに state を同期
+  // currentTask.id が切り替わったときのみ state を再初期化する。
+  // 同一タスクに対する props の更新（Realtime などによる title/description 変更）
+  // では再初期化しない — 編集中の入力が勝手に消える不具合を防ぐため。
   useEffect(() => {
     setTitle(currentTask.title)
     setEditingTitle(false)
@@ -173,7 +175,20 @@ export function TaskDetailPanel({
       setTaskMembers([])
       setDetailsLoaded(currentTask._count?.subTasks === 0)
     }
-  }, [currentTask.id, currentTask.title, currentTask.description])
+    // 意図的に currentTask.id のみに依存（編集中の state 上書きを防ぐ）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTask.id])
+
+  // 他ユーザーが title/description を更新した場合のみ取り込む。
+  // 編集中（editingTitle / descriptionDirty）は props の値で上書きしない。
+  useEffect(() => {
+    if (!editingTitle) {
+      setTitle(currentTask.title)
+    }
+    if (!descriptionDirty) {
+      setDescription(currentTask.description || "")
+    }
+  }, [currentTask.title, currentTask.description, editingTitle, descriptionDirty])
 
   // 詳細データの一括取得（サブタスク + コメント + メンバー + 共有リンク）
   const fetchDetails = useCallback(async (taskId: string) => {
