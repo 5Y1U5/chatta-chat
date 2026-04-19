@@ -682,7 +682,7 @@ export function TaskListView({
             isMobile={isMobile}
           />
 
-          {/* 今後（期日順固定・ドラッグ不可） */}
+          {/* 今後（期日順固定・ドラッグ不可・デフォルト折りたたみ） */}
           <TaskSection
             label="今後"
             sectionTheme="future"
@@ -698,11 +698,12 @@ export function TaskListView({
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
             defaultDueDate={formatLocalDate(tomorrowStart)}
+            defaultCollapsed
             isMobile={isMobile}
             sortable={false}
           />
 
-          {/* 期限なし（ドラッグで並び替え可） */}
+          {/* 期限なし（ドラッグで並び替え可・デフォルト折りたたみ） */}
           <TaskSection
             label="期限なし"
             sectionTheme="noDue"
@@ -717,6 +718,7 @@ export function TaskListView({
             onRecurrenceChange={handleRecurrenceChange}
             onReorder={handleReorder}
             onInlineCreate={handleInlineCreate}
+            defaultCollapsed
             isMobile={isMobile}
           />
 
@@ -1107,7 +1109,8 @@ function TaskSection({
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null
 
-  if (tasks.length === 0 && defaultCollapsed) return null
+  // 完了セクションのような「タスクがなければ非表示」は inline 追加のないセクションのみ
+  if (tasks.length === 0 && defaultCollapsed && !onInlineCreate) return null
 
   const theme = sectionThemes[themeKey] || sectionThemes.done
 
