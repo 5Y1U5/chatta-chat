@@ -27,6 +27,9 @@ export function useRealtimeTasks({ workspaceId, onTaskChange }: Options) {
 
     const supabase = createClient()
 
+    // RLS 有効テーブルでは postgres_changes に明示的フィルタが必要。
+    // フィルタ無しだと Realtime から配信されない（Supabase 仕様）。
+    // 念のため JS 側のフィルタも残しておく（保険）。
     const subscription = supabase
       .channel(`tasks:${workspaceId}`)
       .on(
@@ -35,7 +38,7 @@ export function useRealtimeTasks({ workspaceId, onTaskChange }: Options) {
           event: "INSERT",
           schema: "public",
           table: "Task",
-          // DB側フィルタはカラム名の大文字小文字で動作しない場合があるためJS側でフィルタ
+          filter: `workspaceId=eq.${workspaceId}`,
         },
         (payload) => {
           if (payload.new.workspaceId !== workspaceId) return
@@ -52,6 +55,7 @@ export function useRealtimeTasks({ workspaceId, onTaskChange }: Options) {
           event: "UPDATE",
           schema: "public",
           table: "Task",
+          filter: `workspaceId=eq.${workspaceId}`,
         },
         (payload) => {
           if (payload.new.workspaceId !== workspaceId) return
@@ -68,9 +72,11 @@ export function useRealtimeTasks({ workspaceId, onTaskChange }: Options) {
           event: "DELETE",
           schema: "public",
           table: "Task",
+          filter: `workspaceId=eq.${workspaceId}`,
         },
         (payload) => {
           // DELETE イベントは old レコードのみ含む
+          // REPLICA IDENTITY FULL のため old に全カラム入っている
           const old = payload.old as Record<string, unknown>
           if (old.workspaceId !== workspaceId) return
           callbackRef.current({
