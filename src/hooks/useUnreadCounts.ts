@@ -43,11 +43,12 @@ export function useUnreadCounts(
   }, [activeChannelId])
 
   // Realtime: 新メッセージ受信で未読数をインクリメント
+  // 注: Prisma 標準では DB カラム名は camelCase。payload.new も camelCase でアクセスする。
   const handleInsert = useCallback(
     (payload: { new: Record<string, unknown> }) => {
       const row = payload.new
-      const channelId = row.channel_id as string
-      const parentId = row.parent_id as string | null
+      const channelId = row.channelId as string
+      const parentId = (row.parentId as string | null) ?? null
 
       // ルートメッセージのみカウント
       if (parentId) return

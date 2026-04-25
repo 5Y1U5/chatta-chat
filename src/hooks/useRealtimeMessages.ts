@@ -46,11 +46,13 @@ export function useRealtimeMessages({
   }, [])
 
   // 新メッセージ追加（INSERT）
+  // 注: Prisma 標準では DB カラム名は camelCase (例: "channelId", "createdAt")。
+  //     payload.new のキーも camelCase。snake_case でアクセスすると undefined になる。
   const handleInsert = useCallback(
     (payload: { new: Record<string, unknown> }) => {
       const row = payload.new
       const id = row.id as string
-      const msgParentId = (row.parent_id as string) || null
+      const msgParentId = (row.parentId as string) || null
 
       // 重複排除
       if (messageIdsRef.current.has(id)) return
@@ -75,19 +77,23 @@ export function useRealtimeMessages({
 
       messageIdsRef.current.add(id)
 
-      const userId = row.user_id as string
+      const userId = row.userId as string
       const userInfo = userMap.get(userId)
 
       const newMessage: MessageWithUser = {
         id,
         content: row.content as string,
-        createdAt: row.created_at as string,
-        updatedAt: row.updated_at as string,
+        createdAt: row.createdAt as string,
+        updatedAt: row.updatedAt as string,
         userId,
         parentId: msgParentId,
-        aiGenerated: (row.ai_generated as boolean) || false,
+        aiGenerated: (row.aiGenerated as boolean) || false,
         deletedAt: null,
         replyCount: 0,
+        fileUrl: (row.fileUrl as string | null) ?? null,
+        fileName: (row.fileName as string | null) ?? null,
+        fileType: (row.fileType as string | null) ?? null,
+        reactions: [],
         user: {
           id: userId,
           displayName: userInfo?.displayName || "不明",
@@ -97,15 +103,15 @@ export function useRealtimeMessages({
 
       setMessages((prev) => [...prev, newMessage])
     },
-    [userMap, parentId]
+    [userMap, parentId, setMessages]
   )
 
-  // メッセージ更新（UPDATE — 編集）
+  // メッセージ更新（UPDATE — 編集 / ソフトデリート）
   const handleUpdate = useCallback(
     (payload: { new: Record<string, unknown> }) => {
       const row = payload.new
       const id = row.id as string
-      const deletedAt = row.deleted_at as string | null
+      const deletedAt = (row.deletedAt as string | null) ?? null
 
       setMessages((prev) =>
         prev.map((m) => {
@@ -118,12 +124,12 @@ export function useRealtimeMessages({
           return {
             ...m,
             content: row.content as string,
-            updatedAt: row.updated_at as string,
+            updatedAt: row.updatedAt as string,
           }
         })
       )
     },
-    []
+    [setMessages]
   )
 
   useEffect(() => {

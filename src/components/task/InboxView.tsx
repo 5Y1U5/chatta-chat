@@ -462,7 +462,7 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
       .catch(() => {})
   }, [])
 
-  // 通知のリアルタイム購読
+  // 通知のリアルタイム購読（INSERT + UPDATE）
   useRealtimeNotifications({
     userId: currentUserId,
     members,
@@ -473,32 +473,75 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
         return [notification, ...prev]
       })
     }, []),
+    // 別端末・別タブで既読化・アーカイブされたときに反映
+    onNotificationUpdate: useCallback(
+      (id: string, change: { read?: boolean; archived?: boolean }) => {
+        setNotifications((prev) => {
+          const target = prev.find((n) => n.id === id)
+          if (!target) return prev
+
+          // アーカイブされた → ローカルから除去（未読だったらバッジも減らす）
+          if (change.archived === true) {
+            if (!target.read) decrementBadge()
+            return prev.filter((n) => n.id !== id)
+          }
+
+          // 既読化された → read フラグを更新（未読→既読の遷移時のみバッジを減らす）
+          if (change.read === true && !target.read) {
+            decrementBadge()
+            return prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+          }
+
+          return prev
+        })
+      },
+      []
+    ),
   })
 
   const handleMarkAllRead = async () => {
-    // 楽観的更新: ローカル state のみ更新（router.refresh() は state リセットを引き起こすため使わない）
+    // 楽観的更新（ロールバック用に元状態を保持）
+    const backup = notifications
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
     clearBadge()
-    await fetch("/api/internal/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markAllRead: true }),
-    })
+    try {
+      const res = await fetch("/api/internal/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markAllRead: true }),
+      })
+      if (!res.ok) throw new Error("一括既読化失敗")
+    } catch (error) {
+      console.error("通知一括既読エラー:", error)
+      setNotifications(backup)
+      // バッジは多少のズレは許容（次回マウントで初期化される）
+    }
   }
 
   const handleArchive = useCallback((id: string) => {
-    // 未読の通知をアーカイブした場合はバッジも減らす
     const target = notifications.find((n) => n.id === id)
-    if (target && !target.read) {
-      decrementBadge()
-    }
+    if (!target) return
+
     // 楽観的更新: 即座にローカルから除去
+    if (!target.read) decrementBadge()
     setNotifications((prev) => prev.filter((n) => n.id !== id))
+
     fetch("/api/internal/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ archiveId: id }),
     })
+      .then((res) => {
+        if (!res.ok) throw new Error("アーカイブ失敗")
+      })
+      .catch((error) => {
+        console.error("通知アーカイブエラー:", error)
+        // ロールバック: 復元 + バッジ復元
+        setNotifications((prev) =>
+          prev.some((n) => n.id === id) ? prev : [target, ...prev]
+        )
+        if (!target.read) incrementBadge()
+      })
   }, [notifications])
 
   const handleTap = useCallback((n: NotificationInfo) => {
@@ -513,6 +556,17 @@ export function InboxView({ notifications: initial, workspaceId, currentUserId }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notificationId: n.id }),
       })
+        .then((res) => {
+          if (!res.ok) throw new Error("既読化失敗")
+        })
+        .catch((error) => {
+          console.error("通知既読化エラー:", error)
+          // ロールバック
+          setNotifications((prev) =>
+            prev.map((item) => (item.id === n.id ? { ...item, read: false } : item))
+          )
+          incrementBadge()
+        })
     }
     setSelectedNotification(n)
   }, [])
