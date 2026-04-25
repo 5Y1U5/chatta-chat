@@ -173,13 +173,14 @@ export function MessageView({
 
       if (data.id) {
         // 楽観的更新: Realtime を待たずに即座にメッセージを表示
+        // createdAt/updatedAt はサーバー値を採用（ローカル時計のズレで並び順が崩れないように）
         const currentUser = members.find((m) => m.id === currentUserId)
-        const now = new Date().toISOString()
+        const fallbackNow = new Date().toISOString()
         const optimisticMessage: MessageWithUser = {
           id: data.id,
           content: content || (file ? `[ファイル] ${file.fileName}` : ""),
-          createdAt: now,
-          updatedAt: now,
+          createdAt: data.createdAt ?? fallbackNow,
+          updatedAt: data.updatedAt ?? data.createdAt ?? fallbackNow,
           userId: currentUserId,
           parentId: null,
           aiGenerated: false,

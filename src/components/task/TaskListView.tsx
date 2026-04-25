@@ -288,69 +288,109 @@ export function TaskListView({
   }, [syncInBackground])
 
   // 楽観的ステータス変更
+  // PATCH 失敗時はロールバックし、ユーザーに状態が戻った旨を伝える
   const handleStatusChange = useCallback((taskId: string, status: string) => {
-    // 即座にローカル state を更新
-    setTasks((prev) =>
-      prev.map((t) =>
+    // ロールバック用に元の値を保持
+    let backup: TaskInfo | undefined
+    setTasks((prev) => {
+      backup = prev.find((t) => t.id === taskId)
+      return prev.map((t) =>
         t.id === taskId
           ? { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null }
           : t
       )
-    )
-    // API をバックグラウンドで呼ぶ
+    })
+
     fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId, status }),
     })
-      .then((res) => res.ok ? res.json() : null)
+      .then((res) => {
+        if (!res.ok) throw new Error("ステータス更新失敗")
+        return res.json()
+      })
       .then((data) => {
         // 繰り返しタスクの場合、サーバーが生成した次回タスクを即座に追加
         if (data?._generatedNextTask) {
           setTasks((prev) => [...prev, data._generatedNextTask])
         }
       })
+      .catch((error) => {
+        console.error("タスクステータス更新エラー:", error)
+        if (backup) {
+          setTasks((prev) => prev.map((t) => (t.id === taskId ? backup! : t)))
+        }
+      })
   }, [])
 
   const handleDueDateChange = useCallback((taskId: string, dueDate: string | null) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId ? { ...t, dueDate } : t
-      )
-    )
+    let backup: TaskInfo | undefined
+    setTasks((prev) => {
+      backup = prev.find((t) => t.id === taskId)
+      return prev.map((t) => (t.id === taskId ? { ...t, dueDate } : t))
+    })
     fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId, dueDate }),
     })
+      .then((res) => {
+        if (!res.ok) throw new Error("期日更新失敗")
+      })
+      .catch((error) => {
+        console.error("タスク期日更新エラー:", error)
+        if (backup) {
+          setTasks((prev) => prev.map((t) => (t.id === taskId ? backup! : t)))
+        }
+      })
   }, [])
 
   const handleStartDateChange = useCallback((taskId: string, startDate: string | null) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId ? { ...t, startDate } : t
-      )
-    )
+    let backup: TaskInfo | undefined
+    setTasks((prev) => {
+      backup = prev.find((t) => t.id === taskId)
+      return prev.map((t) => (t.id === taskId ? { ...t, startDate } : t))
+    })
     fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId, startDate }),
     })
+      .then((res) => {
+        if (!res.ok) throw new Error("開始日更新失敗")
+      })
+      .catch((error) => {
+        console.error("タスク開始日更新エラー:", error)
+        if (backup) {
+          setTasks((prev) => prev.map((t) => (t.id === taskId ? backup! : t)))
+        }
+      })
   }, [])
 
   const handleRecurrenceChange = useCallback((taskId: string, recurrenceRule: string | null) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId ? { ...t, recurrenceRule } : t
-      )
-    )
+    let backup: TaskInfo | undefined
+    setTasks((prev) => {
+      backup = prev.find((t) => t.id === taskId)
+      return prev.map((t) => (t.id === taskId ? { ...t, recurrenceRule } : t))
+    })
     fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId, recurrenceRule }),
     })
+      .then((res) => {
+        if (!res.ok) throw new Error("繰り返し設定更新失敗")
+      })
+      .catch((error) => {
+        console.error("タスク繰り返し設定更新エラー:", error)
+        if (backup) {
+          setTasks((prev) => prev.map((t) => (t.id === taskId ? backup! : t)))
+        }
+      })
   }, [])
 
+  // 並び替えは UI 側で楽観的に setTasks 済み → 失敗時は API GET で再同期
   const handleReorder = useCallback((reorderedTasks: TaskInfo[]) => {
     const taskIds = reorderedTasks.map((t) => t.id)
     fetch("/api/internal/tasks/reorder", {
@@ -358,7 +398,15 @@ export function TaskListView({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskIds }),
     })
-  }, [])
+      .then((res) => {
+        if (!res.ok) throw new Error("並び替え保存失敗")
+      })
+      .catch((error) => {
+        console.error("タスク並び替えエラー:", error)
+        // 楽観的更新を破棄してサーバー値で再同期
+        syncInBackground()
+      })
+  }, [syncInBackground])
 
   // 楽観的タスク追加: ダイアログが即座に閉じてリストに仮追加
   const handleOptimisticTaskCreated = useCallback((tempTask: TaskInfo) => {

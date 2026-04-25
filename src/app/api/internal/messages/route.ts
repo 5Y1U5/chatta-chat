@@ -247,7 +247,12 @@ export async function POST(request: Request) {
       })
     }
 
-    return NextResponse.json({ id: message.id })
+    return NextResponse.json({
+      id: message.id,
+      // 楽観的更新でローカルタイムを使うとサーバー値とズレるため、サーバー時刻を返す
+      createdAt: message.createdAt.toISOString(),
+      updatedAt: message.updatedAt.toISOString(),
+    })
   } catch (error) {
     console.error("メッセージ送信エラー:", error)
     return NextResponse.json(

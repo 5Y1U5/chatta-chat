@@ -267,43 +267,68 @@ export function TaskDetailPanel({
     }
   }, [])
 
-  // 楽観的フィールド更新
+  // 楽観的フィールド更新（PATCH 失敗時はロールバック）
   const handleUpdate = (field: string, value: unknown) => {
     const optimistic: Partial<TaskInfo> = { [field]: value }
+    // ロールバック用: 元の値だけを保持した Partial<TaskInfo>
+    const rollback: Partial<TaskInfo> = {
+      [field]: (currentTask as unknown as Record<string, unknown>)[field],
+    }
 
     if (field === "status") {
       optimistic.completedAt = value === "done" ? new Date().toISOString() : null
+      rollback.completedAt = currentTask.completedAt
     }
     if (field === "assigneeId") {
       const member = members.find((m) => m.id === value)
       optimistic.assignee = member
         ? { id: member.id, displayName: member.displayName, avatarUrl: member.avatarUrl }
         : null
+      rollback.assignee = currentTask.assignee
     }
     if (field === "projectId") {
       const project = projects.find((p) => p.id === value)
       optimistic.project = project
         ? { id: project.id, name: project.name, color: project.color }
         : null
+      rollback.project = currentTask.project
     }
+
+    const targetTaskId = currentTask.id
+    const isRootTask = targetTaskId === task.id
 
     // スタック内のタスクも更新
     if (viewStack.length > 0) {
       setViewStack((prev) =>
-        prev.map((t) => (t.id === currentTask.id ? { ...t, ...optimistic } : t))
+        prev.map((t) => (t.id === targetTaskId ? { ...t, ...optimistic } : t))
       )
     }
 
     // ルートタスクの場合は親コンポーネントに通知
-    if (currentTask.id === task.id) {
+    if (isRootTask) {
       onOptimisticUpdate(task.id, optimistic)
     }
 
     fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: currentTask.id, [field]: value }),
+      body: JSON.stringify({ taskId: targetTaskId, [field]: value }),
     })
+      .then((res) => {
+        if (!res.ok) throw new Error(`タスク${field}更新失敗`)
+      })
+      .catch((error) => {
+        console.error("タスク更新エラー:", error)
+        // ロールバック
+        if (viewStack.length > 0) {
+          setViewStack((prev) =>
+            prev.map((t) => (t.id === targetTaskId ? { ...t, ...rollback } : t))
+          )
+        }
+        if (isRootTask) {
+          onOptimisticUpdate(task.id, rollback)
+        }
+      })
   }
 
   const handleSaveTitle = () => {
@@ -398,20 +423,31 @@ export function TaskDetailPanel({
     })
   }
 
-  // 楽観的サブタスクステータス変更
+  // 楽観的サブタスクステータス変更（PATCH 失敗時はロールバック）
   const handleSubTaskStatusChange = (subTaskId: string, status: string) => {
-    setSubTasks((prev) =>
-      prev.map((t) =>
+    let backup: TaskInfo | undefined
+    setSubTasks((prev) => {
+      backup = prev.find((t) => t.id === subTaskId)
+      return prev.map((t) =>
         t.id === subTaskId
           ? { ...t, status, completedAt: status === "done" ? new Date().toISOString() : null }
           : t
       )
-    )
+    })
     fetch("/api/internal/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: subTaskId, status }),
     })
+      .then((res) => {
+        if (!res.ok) throw new Error("サブタスクステータス更新失敗")
+      })
+      .catch((error) => {
+        console.error("サブタスクステータス更新エラー:", error)
+        if (backup) {
+          setSubTasks((prev) => prev.map((t) => (t.id === subTaskId ? backup! : t)))
+        }
+      })
   }
 
   // 楽観的メンバー追加
