@@ -44,6 +44,8 @@ export async function GET(request: NextRequest) {
     const assigneeId = params.get("assigneeId")
     const parentTaskId = params.get("parentTaskId")
     const status = params.get("status")
+    const includeArchived = params.get("includeArchived") === "true"
+    const archivedOnly = params.get("archived") === "true"
 
     const where: Record<string, unknown> = {
       workspaceId: auth.workspaceId,
@@ -58,6 +60,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) where.status = status
+
+    // アーカイブフィルタ: デフォルトは未アーカイブのみ
+    if (archivedOnly) {
+      where.archived = true
+    } else if (!includeArchived) {
+      where.archived = false
+    }
 
     // プロジェクト指定時: プロジェクトメンバーのみ閲覧可能
     if (projectId) {

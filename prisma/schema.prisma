@@ -200,6 +200,7 @@ model Task {
   fileUrl        String?   // 添付ファイルの URL
   fileName       String?   // 添付ファイル名
   fileType       String?   // MIME タイプ
+  archived       Boolean   @default(false) // アーカイブ済み（一覧から除外）
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -218,6 +219,7 @@ model Task {
   @@index([workspaceId, assigneeId, status])
   @@index([projectId, status])
   @@index([parentTaskId])
+  @@index([workspaceId, archived])
 }
 
 // === タスク添付ファイル（複数対応）===

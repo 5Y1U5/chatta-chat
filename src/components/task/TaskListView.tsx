@@ -141,6 +141,32 @@ export function TaskListView({
   const [searchQuery, setSearchQuery] = useState("")
   const pendingTempIdRef = useRef<string | null>(null)
 
+  // 複数選択モード
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkProcessing, setBulkProcessing] = useState(false)
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+  }, [])
+
+  const toggleChecked = useCallback((taskId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }, [])
+
+  const enterSelectionMode = useCallback((taskId: string) => {
+    setSelectionMode(true)
+    setSelectedIds(new Set([taskId]))
+    setSelectedTaskId(null)
+  }, [])
+
   // 日付変更時にセクション分類を再計算するためのstate
   // SSR/CSR の hydration mismatch を避けるため初期値は null。マウント後に setNow() で確定する
   const [now, setNow] = useState<Date | null>(null)
@@ -234,6 +260,11 @@ export function TaskListView({
       }
       if (change.event === "UPDATE") {
         const raw = change.row as Record<string, unknown>
+        // archived = true になったタスクは通常一覧から外す（他端末でのアーカイブを反映）
+        if (raw.archived === true) {
+          setTasks((prev) => prev.filter((t) => t.id !== change.id))
+          return
+        }
         setTasks((prev) =>
           prev.map((t) => {
             if (t.id !== change.id) return t
@@ -256,6 +287,7 @@ export function TaskListView({
               fileUrl: (raw.fileUrl as string | null) ?? null,
               fileName: (raw.fileName as string | null) ?? null,
               fileType: (raw.fileType as string | null) ?? null,
+              archived: (raw.archived as boolean | undefined) ?? false,
               updatedAt: (raw.updatedAt as string) ?? t.updatedAt,
               // 担当者・プロジェクトが変わったときのみローカルの members/projects から再解決
               assignee:
@@ -495,6 +527,72 @@ export function TaskListView({
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t)))
   }, [])
 
+  // 単一/複数タスクのアーカイブ切替
+  const handleArchive = useCallback((taskIds: string[], archived: boolean) => {
+    if (taskIds.length === 0) return
+    const ids = new Set(taskIds)
+    // 楽観的に一覧から除外（or アーカイブ解除なら戻す）
+    let backup: TaskInfo[] = []
+    setTasks((prev) => {
+      backup = prev
+      if (archived) {
+        // アーカイブ → 通常一覧から除外
+        return prev.filter((t) => !ids.has(t.id))
+      }
+      // 解除 → archived フラグだけ戻す（既に表示中なら維持）
+      return prev.map((t) => (ids.has(t.id) ? { ...t, archived: false } : t))
+    })
+    fetch("/api/internal/tasks/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskIds, action: archived ? "archive" : "unarchive" }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("一括アーカイブ失敗")
+      })
+      .catch((error) => {
+        console.error("一括アーカイブエラー:", error)
+        setTasks(backup)
+        alert("アーカイブに失敗しました")
+      })
+  }, [])
+
+  // 単一/複数タスクの削除
+  const handleDelete = useCallback((taskIds: string[]) => {
+    if (taskIds.length === 0) return
+    const ids = new Set(taskIds)
+    let backup: TaskInfo[] = []
+    setTasks((prev) => {
+      backup = prev
+      return prev.filter((t) => !ids.has(t.id))
+    })
+    const params = new URLSearchParams({ taskIds: taskIds.join(",") })
+    fetch(`/api/internal/tasks/bulk?${params}`, { method: "DELETE" })
+      .then((res) => {
+        if (!res.ok) throw new Error("一括削除失敗")
+      })
+      .catch((error) => {
+        console.error("一括削除エラー:", error)
+        setTasks(backup)
+        alert("削除に失敗しました")
+      })
+  }, [])
+
+  const handleBulkArchive = useCallback(() => {
+    const ids = Array.from(selectedIds)
+    handleArchive(ids, true)
+    exitSelectionMode()
+  }, [selectedIds, handleArchive, exitSelectionMode])
+
+  const handleBulkDelete = useCallback(async () => {
+    setBulkProcessing(true)
+    const ids = Array.from(selectedIds)
+    handleDelete(ids)
+    setBulkProcessing(false)
+    setBulkDeleteOpen(false)
+    exitSelectionMode()
+  }, [selectedIds, handleDelete, exitSelectionMode])
+
   // プロジェクト削除
   const handleDeleteProject = useCallback(async () => {
     if (!projectId) return
@@ -720,10 +818,16 @@ export function TaskListView({
               onSelect={setSelectedTaskId}
               selectedId={selectedTaskId}
               onStatusChange={handleStatusChange}
-            onDueDateChange={handleDueDateChange}
+              onDueDateChange={handleDueDateChange}
               onReorder={handleReorder}
               isMobile={isMobile}
               sortable={false}
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onToggleChecked={toggleChecked}
+              onEnterSelectionMode={enterSelectionMode}
+              onArchive={(id, archived) => handleArchive([id], archived)}
+              onDelete={(id) => handleDelete([id])}
             />
           )}
 
@@ -744,6 +848,12 @@ export function TaskListView({
             onInlineCreate={handleInlineCreate}
             defaultDueDate={formatLocalDate(todayEnd)}
             isMobile={isMobile}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onToggleChecked={toggleChecked}
+            onEnterSelectionMode={enterSelectionMode}
+            onArchive={(id, archived) => handleArchive([id], archived)}
+            onDelete={(id) => handleDelete([id])}
           />
 
           {/* 今後（期日順固定・ドラッグ不可・デフォルト折りたたみ） */}
@@ -765,6 +875,12 @@ export function TaskListView({
             defaultCollapsed
             isMobile={isMobile}
             sortable={false}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onToggleChecked={toggleChecked}
+            onEnterSelectionMode={enterSelectionMode}
+            onArchive={(id, archived) => handleArchive([id], archived)}
+            onDelete={(id) => handleDelete([id])}
           />
 
           {/* 期限なし（ドラッグで並び替え可・デフォルト折りたたみ） */}
@@ -784,6 +900,12 @@ export function TaskListView({
             onInlineCreate={handleInlineCreate}
             defaultCollapsed
             isMobile={isMobile}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onToggleChecked={toggleChecked}
+            onEnterSelectionMode={enterSelectionMode}
+            onArchive={(id, archived) => handleArchive([id], archived)}
+            onDelete={(id) => handleDelete([id])}
           />
 
           {/* 今日完了 */}
@@ -797,9 +919,15 @@ export function TaskListView({
               onSelect={setSelectedTaskId}
               selectedId={selectedTaskId}
               onStatusChange={handleStatusChange}
-            onDueDateChange={handleDueDateChange}
+              onDueDateChange={handleDueDateChange}
               onReorder={handleReorder}
               isMobile={isMobile}
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onToggleChecked={toggleChecked}
+              onEnterSelectionMode={enterSelectionMode}
+              onArchive={(id, archived) => handleArchive([id], archived)}
+              onDelete={(id) => handleDelete([id])}
             />
           )}
 
@@ -819,6 +947,12 @@ export function TaskListView({
             onReorder={handleReorder}
             defaultCollapsed
             isMobile={isMobile}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onToggleChecked={toggleChecked}
+            onEnterSelectionMode={enterSelectionMode}
+            onArchive={(id, archived) => handleArchive([id], archived)}
+            onDelete={(id) => handleDelete([id])}
           />
 
           {tasks.length === 0 && (
@@ -854,8 +988,8 @@ export function TaskListView({
         />
       )}
 
-      {/* モバイル用 FAB（右下固定） */}
-      {isMobile && (
+      {/* モバイル用 FAB（右下固定・選択モード中は非表示） */}
+      {isMobile && !selectionMode && (
         <button
           onClick={() => setCreateOpen(true)}
           className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
@@ -864,6 +998,51 @@ export function TaskListView({
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
+      )}
+
+      {/* 選択モード中のフローティングアクションバー */}
+      {selectionMode && (
+        <div
+          className={cn(
+            "fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full border bg-background/95 backdrop-blur shadow-lg px-3 py-2",
+            isMobile ? "bottom-20" : "bottom-6"
+          )}
+        >
+          <button
+            onClick={exitSelectionMode}
+            className="flex h-9 items-center justify-center rounded-full px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+            aria-label="選択モードを終了"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+            キャンセル
+          </button>
+          <span className="text-sm font-medium px-2">{selectedIds.size}件選択中</span>
+          <div className="h-5 w-px bg-border mx-1" />
+          <button
+            onClick={handleBulkArchive}
+            disabled={selectedIds.size === 0 || bulkProcessing}
+            className="flex h-9 items-center justify-center rounded-full px-3 text-sm text-foreground hover:bg-muted/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+              <rect x="2" y="3" width="20" height="5" rx="1" />
+              <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+              <line x1="10" y1="12" x2="14" y2="12" />
+            </svg>
+            アーカイブ
+          </button>
+          <button
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={selectedIds.size === 0 || bulkProcessing}
+            className="flex h-9 items-center justify-center rounded-full px-3 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+              <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            削除
+          </button>
+        </div>
       )}
 
       {/* タスク作成ダイアログ */}
@@ -901,6 +1080,28 @@ export function TaskListView({
         />
       )}
 
+      {/* 一括削除確認ダイアログ */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{selectedIds.size}件のタスクを削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              選択したタスクを削除します。サブタスクやコメントも合わせて削除され、この操作は取り消せません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkProcessing}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkProcessing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkProcessing ? "削除中..." : "削除する"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* プロジェクト削除確認ダイアログ */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
@@ -936,6 +1137,12 @@ const SortableTaskItem = memo(function SortableTaskItem({
   onStartDateChange,
   onRecurrenceChange,
   isMobile,
+  selectionMode,
+  isChecked,
+  onToggleChecked,
+  onEnterSelectionMode,
+  onArchive,
+  onDelete,
 }: {
   task: TaskInfo
   isSelected: boolean
@@ -945,6 +1152,12 @@ const SortableTaskItem = memo(function SortableTaskItem({
   onStartDateChange?: (taskId: string, startDate: string | null) => void
   onRecurrenceChange?: (taskId: string, recurrenceRule: string | null) => void
   isMobile: boolean
+  selectionMode?: boolean
+  isChecked?: boolean
+  onToggleChecked?: (taskId: string) => void
+  onEnterSelectionMode?: (taskId: string) => void
+  onArchive?: (taskId: string, archived: boolean) => void
+  onDelete?: (taskId: string) => void
 }) {
   const {
     attributes,
@@ -984,15 +1197,17 @@ const SortableTaskItem = memo(function SortableTaskItem({
     if (!isDraggingRef.current) onSelect()
   }, [onSelect])
 
+  // 選択モード中はドラッグを無効化（DnD listener を渡さない）
+  const dragBindings = selectionMode ? {} : (isMobile ? { ...attributes, ...listeners } : {})
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn("relative group/sortable", isMobile && "touch-manipulation select-none")}
-      {...(isMobile ? { ...attributes, ...listeners } : {})}
+      {...dragBindings}
     >
-      {/* ドラッグハンドル（デスクトップのみ） */}
-      {!isMobile && (
+      {/* ドラッグハンドル（デスクトップのみ・選択モード中は非表示） */}
+      {!isMobile && !selectionMode && (
         <div
           {...attributes}
           {...listeners}
@@ -1013,6 +1228,12 @@ const SortableTaskItem = memo(function SortableTaskItem({
         onDueDateChange={onDueDateChange}
         onStartDateChange={onStartDateChange}
         onRecurrenceChange={onRecurrenceChange}
+        selectionMode={selectionMode}
+        isChecked={isChecked}
+        onToggleChecked={onToggleChecked}
+        onEnterSelectionMode={onEnterSelectionMode}
+        onArchive={onArchive}
+        onDelete={onDelete}
       />
     </div>
   )
@@ -1101,6 +1322,12 @@ function TaskSection({
   defaultCollapsed = false,
   isMobile = false,
   sortable = true,
+  selectionMode = false,
+  selectedIds,
+  onToggleChecked,
+  onEnterSelectionMode,
+  onArchive,
+  onDelete,
 }: {
   label: string
   sectionTheme: string
@@ -1120,6 +1347,12 @@ function TaskSection({
   defaultCollapsed?: boolean
   isMobile?: boolean
   sortable?: boolean
+  selectionMode?: boolean
+  selectedIds?: Set<string>
+  onToggleChecked?: (taskId: string) => void
+  onEnterSelectionMode?: (taskId: string) => void
+  onArchive?: (taskId: string, archived: boolean) => void
+  onDelete?: (taskId: string) => void
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -1230,6 +1463,12 @@ function TaskSection({
                       onStartDateChange={onStartDateChange}
                       onRecurrenceChange={onRecurrenceChange}
                       isMobile={isMobile}
+                      selectionMode={selectionMode}
+                      isChecked={selectedIds?.has(task.id) || false}
+                      onToggleChecked={onToggleChecked}
+                      onEnterSelectionMode={onEnterSelectionMode}
+                      onArchive={onArchive}
+                      onDelete={onDelete}
                     />
                   ))}
                 </div>
@@ -1267,6 +1506,12 @@ function TaskSection({
                   onDueDateChange={onDueDateChange}
                   onStartDateChange={onStartDateChange}
                   onRecurrenceChange={onRecurrenceChange}
+                  selectionMode={selectionMode}
+                  isChecked={selectedIds?.has(task.id) || false}
+                  onToggleChecked={onToggleChecked}
+                  onEnterSelectionMode={onEnterSelectionMode}
+                  onArchive={onArchive}
+                  onDelete={onDelete}
                 />
               ))}
             </div>

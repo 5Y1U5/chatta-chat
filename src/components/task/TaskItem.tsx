@@ -1,12 +1,19 @@
 "use client"
 
-import { useState, memo } from "react"
+import { useState, memo, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { rruleToText } from "@/lib/recurrence"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { DueDateDrawer } from "@/components/task/DueDateDrawer"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { ja } from "date-fns/locale"
 import type { TaskInfo } from "@/types/chat"
 
@@ -18,6 +25,13 @@ type Props = {
   onDueDateChange?: (taskId: string, dueDate: string | null) => void
   onStartDateChange?: (taskId: string, startDate: string | null) => void
   onRecurrenceChange?: (taskId: string, recurrenceRule: string | null) => void
+  // 複数選択モード
+  selectionMode?: boolean
+  isChecked?: boolean
+  onToggleChecked?: (taskId: string) => void
+  onEnterSelectionMode?: (taskId: string) => void
+  onArchive?: (taskId: string, archived: boolean) => void
+  onDelete?: (taskId: string) => void
 }
 
 const priorityBarColors: Record<string, string> = {
@@ -75,7 +89,21 @@ function formatDateRange(startDate: string, dueDate: string, mobile: boolean): {
   return { text: `${fmt(start)}→${fmt(end)}`, className: `text-muted-foreground ${sz} bg-muted`, isCritical: false }
 }
 
-export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onStatusChange, onDueDateChange, onStartDateChange, onRecurrenceChange }: Props) {
+export const TaskItem = memo(function TaskItem({
+  task,
+  isSelected,
+  onSelect,
+  onStatusChange,
+  onDueDateChange,
+  onStartDateChange,
+  onRecurrenceChange,
+  selectionMode = false,
+  isChecked = false,
+  onToggleChecked,
+  onEnterSelectionMode,
+  onArchive,
+  onDelete,
+}: Props) {
   const isMobile = useIsMobile()
   const dueInfo = task.startDate && task.dueDate
     ? formatDateRange(task.startDate, task.dueDate, isMobile)
@@ -83,9 +111,25 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
   const isDone = task.status === "done"
   const [celebrating, setCelebrating] = useState(false)
   const [dueDateOpen, setDueDateOpen] = useState(false)
+  // DueDateDrawer / DropdownMenu が閉じる際、内部の「完了」タップが裏のタスク行に貫通して
+  // 詳細パネルが開いてしまうのを防ぐためのガード（閉じてから一定時間 onClick を無視）
+  const ignoreClickUntilRef = useRef(0)
+
+  const handleRowClick = () => {
+    if (Date.now() < ignoreClickUntilRef.current) return
+    if (selectionMode) {
+      onToggleChecked?.(task.id)
+      return
+    }
+    onSelect()
+  }
 
   const handleCheck = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (selectionMode) {
+      onToggleChecked?.(task.id)
+      return
+    }
     if (isDone) {
       onStatusChange(task.id, "todo")
     } else {
@@ -97,18 +141,78 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
     }
   }
 
+  // 行末の「⋯」メニュー（モバイル：常時表示・PC：ホバー時表示）
+  const handleMenuOpenChange = (open: boolean) => {
+    if (!open) {
+      // メニューを閉じた直後の bubbling click を抑止
+      ignoreClickUntilRef.current = Date.now() + 400
+    }
+  }
+  const renderMenu = () => (
+    <DropdownMenu onOpenChange={handleMenuOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <button
+          onClick={(e) => e.stopPropagation()}
+          aria-label="その他のアクション"
+          className={cn(
+            "shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors",
+            isMobile ? "h-8 w-8" : "h-7 w-7 opacity-0 group-hover:opacity-100"
+          )}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 18 : 16} height={isMobile ? 18 : 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+          </svg>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        {onEnterSelectionMode && (
+          <DropdownMenuItem onClick={() => onEnterSelectionMode(task.id)}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+            選択
+          </DropdownMenuItem>
+        )}
+        {onArchive && (
+          <DropdownMenuItem onClick={() => onArchive(task.id, !task.archived)}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+              <rect x="2" y="3" width="20" height="5" rx="1" />
+              <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+              <line x1="10" y1="12" x2="14" y2="12" />
+            </svg>
+            {task.archived ? "アーカイブ解除" : "アーカイブ"}
+          </DropdownMenuItem>
+        )}
+        {(onEnterSelectionMode || onArchive) && onDelete && <DropdownMenuSeparator />}
+        {onDelete && (
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => onDelete(task.id)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+              <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            削除
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
   // モバイル: Asana ライクなシンプルレイアウト（タイトル + 期日バッジ）
   if (isMobile) {
     return (
       <div
         className={cn(
-          "group relative flex items-center gap-4 border-b border-border/50 cursor-pointer transition-colors duration-150",
+          "group relative flex items-center gap-3 border-b border-border/50 cursor-pointer transition-colors duration-150",
           "px-4 py-4",
           "hover:bg-muted/30",
           isSelected && "bg-muted/50",
+          selectionMode && isChecked && "bg-blue-500/10",
           celebrating && "bg-blue-50 dark:bg-blue-950/20"
         )}
-        onClick={onSelect}
+        onClick={handleRowClick}
       >
         {/* 左端の優先度カラーバー */}
         <div
@@ -119,22 +223,39 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
           )}
         />
 
-        {/* チェックボックス（大きめ） */}
+        {/* チェックボックス（選択モード中は四角・通常は丸） */}
         <button
           onClick={handleCheck}
+          aria-label={selectionMode ? (isChecked ? "選択解除" : "選択") : "完了切替"}
           className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
-            isDone
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-muted-foreground/30 hover:border-primary active:scale-90",
-            celebrating && "animate-bounce border-primary bg-primary text-primary-foreground"
+            "flex shrink-0 items-center justify-center transition-all duration-200",
+            selectionMode
+              ? cn(
+                  "h-6 w-6 rounded-md border-2",
+                  isChecked
+                    ? "border-blue-500 bg-blue-500 text-white"
+                    : "border-muted-foreground/40 active:scale-90"
+                )
+              : cn(
+                  "h-7 w-7 rounded-full border-2",
+                  isDone
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-muted-foreground/30 hover:border-primary active:scale-90",
+                  celebrating && "animate-bounce border-primary bg-primary text-primary-foreground"
+                )
           )}
         >
-          {(isDone || celebrating) && (
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          )}
+          {selectionMode
+            ? isChecked && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )
+            : (isDone || celebrating) && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
         </button>
 
         {/* タイトル */}
@@ -158,8 +279,8 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
           </span>
         )}
 
-        {/* 期日バッジ（タップでボトムシート表示） */}
-        {!isDone && (
+        {/* 期日バッジ（タップでボトムシート表示） — 選択モード中は非表示 */}
+        {!isDone && !selectionMode && (
           <>
             <button
               onClick={(e) => {
@@ -184,7 +305,13 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
             </button>
             <DueDateDrawer
               open={dueDateOpen}
-              onOpenChange={setDueDateOpen}
+              onOpenChange={(open) => {
+                setDueDateOpen(open)
+                if (!open) {
+                  // Drawer が閉じる瞬間に裏の TaskItem に通る click を一定時間ブロック
+                  ignoreClickUntilRef.current = Date.now() + 600
+                }
+              }}
               value={task.dueDate ? (() => {
                 const parts = task.dueDate!.slice(0, 10).split("-")
                 return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
@@ -217,6 +344,9 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
             />
           </>
         )}
+
+        {/* 「⋯」メニュー（選択モード中は非表示・menu props 未指定時も非表示） */}
+        {!selectionMode && (onEnterSelectionMode || onArchive || onDelete) && renderMenu()}
       </div>
     )
   }
@@ -228,9 +358,10 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
         "group relative flex items-center gap-3 border-b border-border/50 px-3 py-2.5 cursor-pointer transition-colors duration-150",
         "hover:bg-muted/30",
         isSelected && "bg-muted/50",
+        selectionMode && isChecked && "bg-blue-500/10",
         celebrating && "bg-blue-50 dark:bg-blue-950/20"
       )}
-      onClick={onSelect}
+      onClick={handleRowClick}
     >
       {/* 左端の優先度カラーバー */}
       <div
@@ -241,22 +372,39 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
         )}
       />
 
-      {/* チェックボックス */}
+      {/* チェックボックス（選択モード中は四角・通常は丸） */}
       <button
         onClick={handleCheck}
+        aria-label={selectionMode ? (isChecked ? "選択解除" : "選択") : "完了切替"}
         className={cn(
-          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
-          isDone
-            ? "border-primary bg-primary text-primary-foreground scale-110"
-            : "border-muted-foreground/40 hover:border-primary hover:scale-110 active:scale-90",
-          celebrating && "animate-bounce border-primary bg-primary text-primary-foreground"
+          "flex shrink-0 items-center justify-center transition-all duration-200",
+          selectionMode
+            ? cn(
+                "h-5 w-5 rounded border-2",
+                isChecked
+                  ? "border-blue-500 bg-blue-500 text-white"
+                  : "border-muted-foreground/40 hover:border-blue-500"
+              )
+            : cn(
+                "h-5 w-5 rounded-full border-2",
+                isDone
+                  ? "border-primary bg-primary text-primary-foreground scale-110"
+                  : "border-muted-foreground/40 hover:border-primary hover:scale-110 active:scale-90",
+                celebrating && "animate-bounce border-primary bg-primary text-primary-foreground"
+              )
         )}
       >
-        {(isDone || celebrating) && (
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        )}
+        {selectionMode
+          ? isChecked && (
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )
+          : (isDone || celebrating) && (
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
       </button>
 
       {/* タスク情報 */}
@@ -353,6 +501,9 @@ export const TaskItem = memo(function TaskItem({ task, isSelected, onSelect, onS
           )}
         </div>
       )}
+
+      {/* 「⋯」メニュー（選択モード中は非表示・menu props 未指定時も非表示） */}
+      {!selectionMode && (onEnterSelectionMode || onArchive || onDelete) && renderMenu()}
     </div>
   )
 })

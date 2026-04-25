@@ -78,6 +78,7 @@ export type TaskInfo = {
   fileUrl: string | null
   fileName: string | null
   fileType: string | null
+  archived?: boolean
   createdAt: string
   updatedAt: string
   assignee: {
