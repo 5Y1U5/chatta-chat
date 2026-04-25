@@ -142,15 +142,22 @@ export function TaskListView({
   const pendingTempIdRef = useRef<string | null>(null)
 
   // 日付変更時にセクション分類を再計算するためのstate
-  const [now, setNow] = useState(() => new Date())
+  // SSR/CSR の hydration mismatch を避けるため初期値は null。マウント後に setNow() で確定する
+  const [now, setNow] = useState<Date | null>(null)
   useEffect(() => {
+    if (!now) {
+      // 初回マウント時に確定。effect 同期内 setState を避けるため setTimeout でラップ
+      const init = setTimeout(() => setNow(new Date()), 0)
+      return () => clearTimeout(init)
+    }
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
     const msUntilMidnight = tomorrow.getTime() - Date.now()
     const timer = setTimeout(() => setNow(new Date()), msUntilMidnight + 500)
     return () => clearTimeout(timer)
   }, [now])
 
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  // now が確定する前は派生値を空にしておく（後続の早期 return で UI を出さない）
+  const todayEnd = now ? new Date(now.getFullYear(), now.getMonth(), now.getDate()) : new Date(0)
   const tomorrowStart = new Date(todayEnd.getTime() + 86400000)
   const todayStart = todayEnd.getTime()
 
@@ -501,6 +508,15 @@ export function TaskListView({
   }, [projectId, workspaceId, router])
 
   const title = viewMode === "my-tasks" ? "マイタスク" : projectName || "プロジェクト"
+
+  // now が CSR で確定するまでは初期 DOM を返す（SSR と一致させて hydration mismatch を回避）
+  if (!now) {
+    return (
+      <div className="flex h-full page-enter" suppressHydrationWarning>
+        <div className="flex flex-1 flex-col overflow-hidden" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full page-enter">

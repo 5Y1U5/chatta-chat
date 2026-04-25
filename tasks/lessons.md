@@ -90,6 +90,18 @@
 - フロント側は `data.createdAt ?? fallbackNow` のようにサーバー値優先で楽観的メッセージを構築する。
 - `appendMessage` の重複排除は `id` ベースなので、サーバー返却値の id を使えば Realtime INSERT が来ても二重表示にならない。
 
+## 2026-04-26: useState(() => new Date()) は SSR/CSR で必ず hydration mismatch する
+
+**問題**: `TaskListView.tsx:145` の `const [now, setNow] = useState(() => new Date())` で React error #418 (Hydration mismatch) が連発。TaskListView が再マウントを繰り返し、`useRealtimeTasks` の subscribe が確立せず Task Realtime 配信が止まり、`onSubmit` が二重発火して DB タスク二重作成も発生していた疑いあり。
+
+**原因**: `useState` の遅延初期化は SSR と CSR の両方で評価される。サーバ評価時刻と CSR の hydrate 時刻は必ずズレるため、`new Date()` の戻り値が一致せず派生 DOM（期日切れ・今日・今後セクション）が SSR と CSR で異なる。
+
+**ルール**:
+- ブラウザ依存の値（現在時刻、`window.*`、`localStorage` 等）を `useState(() => ...)` の初期値にしない。
+- 代わりに `useState<Date | null>(null)` + `useEffect` で `setTimeout(() => setNow(new Date()), 0)` パターン。`setTimeout(0)` で包むのは `react-hooks/set-state-in-effect` リンタ回避のため（effect 同期内 setState を避ける）。
+- now が null の間は早期 return で初期 DOM を返す（SSR と CSR で同じ DOM になる）。各種 hook の順序が崩れないよう、return は **すべての hook 呼び出しの後** に置く。
+- 初回 render では UI が一瞬空になるが、hydration mismatch を起こすより遥かに安全。Skeleton を出したい場合は `<div suppressHydrationWarning>` で囲んだプレースホルダで OK。
+
 ## 2026-04-25: RLS ポリシー 0 件で Realtime が完全停止
 
 **問題**: enable-rls.sql で全テーブル RLS 有効化したものの、ポリシーを 1 件も作っていなかったため anon/authenticated ロールが SELECT 不可 →Supabase Realtime の postgres_changes が一切配信されなかった。Prisma（postgres ロール）はバイパスのためアプリ自体は動いていた。「リロードしないと反映されない」UX 問題として顕在化。
