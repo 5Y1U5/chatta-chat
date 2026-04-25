@@ -50,7 +50,7 @@ export function useRealtimeComments({ taskId, onNewComment, members }: Options) 
             fileUrl: (row.fileUrl as string) || null,
             fileName: (row.fileName as string) || null,
             fileType: (row.fileType as string) || null,
-            createdAt: row.created_at as string,
+            createdAt: row.createdAt as string,
             user: {
               id: userId,
               displayName: member?.displayName || null,
@@ -77,7 +77,7 @@ export function useRealtimeComments({ taskId, onNewComment, members }: Options) 
             fileUrl: null,
             fileName: null,
             fileType: null,
-            createdAt: row.created_at as string,
+            createdAt: row.createdAt as string,
             user: {
               id: `guest-${row.id}`,
               displayName: `${row.guestName}（ゲスト）`,
