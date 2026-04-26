@@ -47,3 +47,6 @@ src/generated/prisma/
 
 /src/generated/prisma
 .env*.local
+
+# OMC (Open Model Commander) ツール状態ディレクトリ
+.omc/

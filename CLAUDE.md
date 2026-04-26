@@ -130,6 +130,23 @@ DIRECT_URL=              # Supabase direct connection
 ANTHROPIC_API_KEY=       # Claude API キー
 ```
 
+### ローカル `.env.local` の取得方法
+
+`.env.local` は Git 管理外。新しい端末でローカル開発を始めるときは以下のいずれかで取得する:
+
+```bash
+# 推奨: Vercel から development 環境変数を pull
+vercel env pull --environment=development
+
+# または .env.example をコピーして 1Password から手動で値を埋める
+cp .env.example .env.local
+# DATABASE_URL: op read "op://Personal/DATABASE_URL_ChattaChat/password"
+# DIRECT_URL: 上記の値の :6543/ を :5432/ に置換
+```
+
+DB password は 1Password の `DATABASE_URL_ChattaChat` 経由で管理（2026-04-26 ローテ後）。
+平文を `.env.local` に書いた場合は、コマンド出力やコピペで露出しないよう注意する。
+
 ## 主要な実装パターン
 
 - **layout.tsx Suspense 分離**: DBクエリは SidebarData, ChannelListData, TaskNavData 等の Server Component に委譲し Suspense でラップ。children はクエリ完了を待たず即座にレンダリング開始。`router.refresh()` は layout 全体を再実行するため、ローカル state 更新で済む箇所では使わない
