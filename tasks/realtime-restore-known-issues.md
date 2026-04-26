@@ -20,52 +20,73 @@
 
 ## 本番に残っている既知の問題（要追加調査）
 
-### 1. Task Realtime が配信されない（最重要）
+### 1. Task Realtime が配信されない（2026-04-26 切り分け進捗あり）
 
-**症状**: Message Realtime は OK だが、Task Realtime のみ Tab 間で反映されない（リロード必須）
+**症状**: 
+- INSERT イベントは Tab 間に届く（ただし 5 秒以内では未反映、10 秒以上で反映）
+- UPDATE / DELETE イベントは反対 Tab に **完全に届かない**（21 秒経過しても反映なし）
+
+**2026-04-26 の切り分け結果**:
+- React #418 hydration error 修正（commit 836e6b9）後、TaskListView 側の subscribe 確立は安定
+- `src/hooks/useRealtimeTasks.ts` のコードは INSERT/UPDATE/DELETE すべて正しく subscribe しており、`workspaceId=eq.${workspaceId}` フィルタ + 受信ハンドラとも問題なし
+- → **原因はコード側ではなく Supabase 側の publication / REPLICA IDENTITY 設定**で確定的
+
+**次に確認すべき SQL**（Supabase SQL Editor で実行）:
+
+```sql
+-- 1. supabase_realtime publication の operation flags
+SELECT pubname, pubinsert, pubupdate, pubdelete, pubtruncate
+FROM pg_publication
+WHERE pubname = 'supabase_realtime';
+-- 期待: pubinsert=t, pubupdate=t, pubdelete=t
+
+-- 2. Task テーブルが publication に含まれているか
+SELECT * FROM pg_publication_tables
+WHERE pubname = 'supabase_realtime' AND tablename = 'Task';
+
+-- 3. Task の REPLICA IDENTITY
+SELECT relname,
+  CASE relreplident
+    WHEN 'd' THEN 'default'
+    WHEN 'n' THEN 'nothing'
+    WHEN 'f' THEN 'full'
+    WHEN 'i' THEN 'index'
+  END AS identity
+FROM pg_class
+WHERE relname = 'Task';
+-- 期待: full
+
+-- 4. RLS ポリシー（UPDATE/DELETE の SELECT 権限）
+SELECT policyname, cmd, roles, qual
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename = 'Task';
+-- 期待: select_tasks_in_my_workspaces / SELECT / {authenticated}
+```
+
+**仮説候補**:
+- (a) publication が `publish = 'insert'` のみで作成されている可能性（INSERT は来るが UPDATE/DELETE が来ない症状と一致）
+- (b) Task の REPLICA IDENTITY が default のまま（PK のみ送信される。フィルタの workspaceId が payload に含まれず CSR 側でフィルタ落ちする可能性。ただし 4-25 セッションで FULL 設定済みのはず）
+- (c) RLS ポリシーが SELECT のみで、Realtime UPDATE/DELETE 配信判定で別の cmd を要求している（仕様上は SELECT で十分なはずなので可能性低）
+
+**修正候補（仮説 (a) の場合）**:
+```sql
+ALTER PUBLICATION supabase_realtime SET (publish = 'insert, update, delete');
+```
 
 **確認済みの正常項目**:
 - Supabase RLS ポリシー（select_tasks_in_my_workspaces）は正しく定義
-- supabase_realtime publication に Task テーブル含まれている
-- Task の REPLICA IDENTITY = FULL
-- ユーザーの supabaseUserId 紐付け正常、WorkspaceMember 所属正常
-- useRealtimeTasks に workspaceId フィルタ追加済み（e3a1a37）
+- supabase_realtime publication に Task テーブル含まれている（4-25 セッション時点）
+- Task の REPLICA IDENTITY = FULL（4-25 セッション時点）
 
-**仮説**:
-- React #418 hydration error で TaskListView が正しく mount されず、useRealtimeTasks の subscribe が確立していない可能性が最有力
-- WebSocket 接続自体が成立していない可能性も Computer Use の Network 観察から示唆
+### 2. React error #418 (Hydration mismatch) — 2026-04-26 修正済み
 
-**次のステップ案**:
-- Tab B の Console で `Supabase` / `Realtime` 関連ログを見る（subscribe status を確認）
-- TaskListView の useEffect 内で `console.log` 追加して subscribe が走っているか直接確認
-- ローカル開発環境（`npm run dev`）で再現テスト
+**結果**: commit `836e6b9` で修正完了。検証で 0 件確認。
 
-### 2. React error #418 (Hydration mismatch) 連発
+**修正内容**: `TaskListView.tsx:145` の `useState(() => new Date())` を `null` 初期値 + `useEffect (setTimeout 0)` + 早期 return パターンに変更。詳細は `tasks/lessons.md` の 2026-04-26 エントリ参照。
 
-**症状**: Tab B で連続発生（5 件以上）
+### 3. タスクの DB 二重作成 — 2026-04-26 解消確認済み
 
-**疑わしい原因**: `TaskListView.tsx:145` の `useState(() => new Date())`
-- SSR と CSR で `new Date()` の値が異なる → hydration 不一致
-- 副作用で TaskListView が再マウント → 各 useEffect クリーンアップ＋再実行
-- 上記 1 の Task Realtime subscribe 不安定の根本原因の可能性大
-
-**修正案**:
-```tsx
-const [now, setNow] = useState<Date | null>(null)
-useEffect(() => {
-  setNow(new Date())
-  // 既存の midnight タイマーロジック
-}, [])
-if (!now) return <SkeletonView />  // SSR は skeleton
-```
-
-または `suppressHydrationWarning` を該当箇所に付与。
-
-### 3. タスクの DB 二重作成
-
-**症状**: Tab A でインライン作成 or ダイアログ作成すると、まれに DB に同名タスクが 2 件作成される
-
-**疑わしい原因**: 上記 React #418 で TaskListView が再マウントされ、handleInlineCreate / CreateTaskDialog の onSubmit が二重発火している
+**結果**: 上記 #2 の修正で連動解消。`POST /api/internal/tasks` が確実に 1 回のみ呼び出されることを 2 タブ環境で確認。
 
 **確認方法**:
 - 上記 2 を修正してから再現するか確認
