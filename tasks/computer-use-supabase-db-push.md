@@ -1,5 +1,8 @@
 # Computer Use 用プロンプト：Supabase に Task.archived カラムを反映
 
+> ⚠️ **このドキュメントは過去ログ（2026-04-26 に Supabase SQL Editor から直接 ALTER TABLE で対応済み）**
+> ローカルからの `prisma db push` が P1000 で失敗していたため当時作成したが、最終的には Supabase ダッシュボード SQL Editor から直接 `ALTER TABLE "Task" ADD COLUMN ... archived` を実行して解決。同時に複合インデックス `Task_workspaceId_archived_idx` も作成済み。詳細は `~/01_開発/10_その他/Vercelハッキング対応/tasks/worklog.md` の 2026-04-26 / A-2-1 セクション参照。
+
 ## 使い方
 
 1. Claude.ai（Web）の Computer Use 機能を起動

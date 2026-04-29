@@ -1,7 +1,10 @@
 # Realtime 復活 + 楽観的更新バグ修正 計画書
 
+> ⚠️ **このドキュメントは過去ログ（2026-04-29 で完全完了）**
+> 2026-04-25 にメッセージ Realtime + RLS + 楽観的更新を復活、2026-04-26 に React #418 修正、2026-04-29 に Task Realtime UPDATE/DELETE を完全解決。最新は `tasks/realtime-restore-known-issues.md` および `tasks/lessons.md` を参照。
+
 作成: 2026-04-25
-ブランチ: `refactor/realtime-restore`（予定）
+ブランチ: `refactor/realtime-restore`（main マージ後 2026-04-26 に削除）
 関連: `~/01_開発/10_その他/Vercelハッキング対応/2026-04-23_残タスク.md`
 
 ## 背景
