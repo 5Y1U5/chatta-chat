@@ -90,6 +90,22 @@
 - フロント側は `data.createdAt ?? fallbackNow` のようにサーバー値優先で楽観的メッセージを構築する。
 - `appendMessage` の重複排除は `id` ベースなので、サーバー返却値の id を使えば Realtime INSERT が来ても二重表示にならない。
 
+## 2026-04-29: RLS ポリシーのサブクエリ参照先テーブルにも SELECT ポリシーが必要
+
+**問題**: Task Realtime の INSERT は届くが UPDATE / DELETE が反対 Tab に届かない症状が長期間残っていた。診断の結果、`Task` の SELECT ポリシー USING 句が `WorkspaceMember` をサブクエリ参照しているのに、`WorkspaceMember` 自体は RLS 有効・ポリシー 0 件だったため、authenticated ロールでサブクエリが空集合を返し → Task の RLS が常に false → Realtime が「見えない行」と判定して配信を drop していた。
+
+**原因**: Postgres の RLS は SECURITY DEFINER 関数で隠蔽しない限り、サブクエリ先のテーブルにも RLS が適用される。Realtime postgres_changes の RLS 評価は購読クライアントの JWT で authenticated ロールとして再評価するため、間接参照先のテーブルにポリシーが無いと `IN (SELECT ...)` 系 USING 句が破綻する。
+
+**ルール**:
+- RLS ポリシーの USING / WITH CHECK 句で他テーブルを参照したら、**そのテーブルにも authenticated 用の SELECT ポリシーを必ず作る**（最小権限で OK）。
+- 連鎖チェック手順:
+  1. 各 SELECT ポリシーの qual に `IN (SELECT ... FROM "TableX" ...)` のようなサブクエリがあるか
+  2. ある場合、`TableX` の RLS が有効かつ authenticated 用ポリシーがあるか
+  3. 無ければ、最小限の SELECT ポリシー（`USING ("userId" = current_user_id())` 等）を追加する
+- 例外: SECURITY DEFINER 関数で参照を閉じ込めた場合は不要（owner ロールの権限で読まれるため）。`current_user_id()` の中で `User` を参照しているのはこのパターン。
+- 検証: `INSERT は通る / UPDATE/DELETE が来ない` という非対称な症状が出たら、まずこの連鎖を疑う。INSERT は楽観的更新や別経路で見えていることがあるが、UPDATE/DELETE は OLD 行に対しても RLS 評価されるため依存度が高い。
+- 設定 SQL: `supabase/enable-rls-policies.sql` セクション 7（WorkspaceMember）が代表例。
+
 ## 2026-04-26: useState(() => new Date()) は SSR/CSR で必ず hydration mismatch する
 
 **問題**: `TaskListView.tsx:145` の `const [now, setNow] = useState(() => new Date())` で React error #418 (Hydration mismatch) が連発。TaskListView が再マウントを繰り返し、`useRealtimeTasks` の subscribe が確立せず Task Realtime 配信が止まり、`onSubmit` が二重発火して DB タスク二重作成も発生していた疑いあり。

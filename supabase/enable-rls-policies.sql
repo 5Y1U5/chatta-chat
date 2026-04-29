@@ -20,7 +20,7 @@
 --   ロールバック: disable-rls-policies.sql を実行
 --
 -- 影響テーブル:
---   Message / Task / TaskComment / GuestComment / Notification / ChannelMember
+--   Message / Task / TaskComment / GuestComment / Notification / ChannelMember / WorkspaceMember
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -126,15 +126,30 @@ CREATE POLICY "select_my_channel_memberships" ON public."ChannelMember"
 FOR SELECT TO authenticated
 USING ("userId" = public.current_user_id());
 
+-- ------------------------------------------------------------
+-- 7. WorkspaceMember: 自分の所属レコードのみ閲覧可
+-- ------------------------------------------------------------
+-- 注: 上記 Task / TaskComment / GuestComment ポリシーの USING 句が
+--      authenticated ロールから WorkspaceMember を参照している。
+--      WorkspaceMember 自体に SELECT ポリシーが無いと、サブクエリが
+--      空集合になって Task の RLS が常に false を返し、Realtime
+--      postgres_changes の UPDATE/DELETE が drop される（INSERT も同様）。
+--      自分の WorkspaceMember だけ可視にすれば十分。
+DROP POLICY IF EXISTS "select_my_workspace_memberships" ON public."WorkspaceMember";
+
+CREATE POLICY "select_my_workspace_memberships" ON public."WorkspaceMember"
+FOR SELECT TO authenticated
+USING ("userId" = public.current_user_id());
+
 -- ============================================================
 -- 確認用クエリ
 -- ============================================================
--- 適用後、以下を実行して 6 件のポリシーが存在することを確認:
+-- 適用後、以下を実行して 7 件のポリシーが存在することを確認:
 --
 -- SELECT schemaname, tablename, policyname, cmd, roles
 -- FROM pg_policies
 -- WHERE schemaname = 'public'
---   AND tablename IN ('Message', 'Task', 'TaskComment', 'GuestComment', 'Notification', 'ChannelMember')
+--   AND tablename IN ('Message', 'Task', 'TaskComment', 'GuestComment', 'Notification', 'ChannelMember', 'WorkspaceMember')
 -- ORDER BY tablename, policyname;
 --
 -- 自分以外の認証ユーザーで以下を実行して、自分のデータのみ返ることを確認:

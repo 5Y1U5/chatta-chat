@@ -16,6 +16,7 @@ DROP POLICY IF EXISTS "select_taskcomments_for_my_tasks" ON public."TaskComment"
 DROP POLICY IF EXISTS "select_guestcomments_for_my_tasks" ON public."GuestComment";
 DROP POLICY IF EXISTS "select_my_notifications" ON public."Notification";
 DROP POLICY IF EXISTS "select_my_channel_memberships" ON public."ChannelMember";
+DROP POLICY IF EXISTS "select_my_workspace_memberships" ON public."WorkspaceMember";
 
 -- ヘルパー関数も削除
 DROP FUNCTION IF EXISTS public.current_user_id();
@@ -25,5 +26,5 @@ DROP FUNCTION IF EXISTS public.current_user_id();
 -- ------------------------------------------------------------
 -- SELECT count(*) FROM pg_policies
 -- WHERE schemaname = 'public'
---   AND tablename IN ('Message', 'Task', 'TaskComment', 'GuestComment', 'Notification', 'ChannelMember');
+--   AND tablename IN ('Message', 'Task', 'TaskComment', 'GuestComment', 'Notification', 'ChannelMember', 'WorkspaceMember');
 -- → 0 が期待値

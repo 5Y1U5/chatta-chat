@@ -20,63 +20,41 @@
 
 ## 本番に残っている既知の問題（要追加調査）
 
-### 1. Task Realtime が配信されない（2026-04-26 切り分け進捗あり）
+### 1. Task Realtime UPDATE/DELETE 配信不通 — 2026-04-29 解決済み 🎉
 
-**症状**: 
-- INSERT イベントは Tab 間に届く（ただし 5 秒以内では未反映、10 秒以上で反映）
-- UPDATE / DELETE イベントは反対 Tab に **完全に届かない**（21 秒経過しても反映なし）
+**結果**: `WorkspaceMember` テーブルに SELECT ポリシー追加 (`select_my_workspace_memberships`) で完全解決。本番環境で Tab 間の INSERT / UPDATE / DELETE 配信を全項目 OK 確認。
 
-**2026-04-26 の切り分け結果**:
-- React #418 hydration error 修正（commit 836e6b9）後、TaskListView 側の subscribe 確立は安定
-- `src/hooks/useRealtimeTasks.ts` のコードは INSERT/UPDATE/DELETE すべて正しく subscribe しており、`workspaceId=eq.${workspaceId}` フィルタ + 受信ハンドラとも問題なし
-- → **原因はコード側ではなく Supabase 側の publication / REPLICA IDENTITY 設定**で確定的
+**真因（2026-04-29 切り分け）**:
 
-**次に確認すべき SQL**（Supabase SQL Editor で実行）:
+`Task` の SELECT ポリシー USING 句が `WorkspaceMember` をサブクエリ参照していたが、`WorkspaceMember` 自体は RLS 有効・ポリシー 0 件だった。authenticated ロールでサブクエリが空集合を返し、`Task` の RLS が常に false → Realtime postgres_changes が「見えない行」として配信を drop していた。
 
 ```sql
--- 1. supabase_realtime publication の operation flags
-SELECT pubname, pubinsert, pubupdate, pubdelete, pubtruncate
-FROM pg_publication
-WHERE pubname = 'supabase_realtime';
--- 期待: pubinsert=t, pubupdate=t, pubdelete=t
+-- 真因に該当する状態（修正前）
+-- Task の SELECT ポリシー
+qual: ("workspaceId" IN (SELECT "workspaceId" FROM "WorkspaceMember" WHERE "userId" = current_user_id()))
 
--- 2. Task テーブルが publication に含まれているか
-SELECT * FROM pg_publication_tables
-WHERE pubname = 'supabase_realtime' AND tablename = 'Task';
-
--- 3. Task の REPLICA IDENTITY
-SELECT relname,
-  CASE relreplident
-    WHEN 'd' THEN 'default'
-    WHEN 'n' THEN 'nothing'
-    WHEN 'f' THEN 'full'
-    WHEN 'i' THEN 'index'
-  END AS identity
-FROM pg_class
-WHERE relname = 'Task';
--- 期待: full
-
--- 4. RLS ポリシー（UPDATE/DELETE の SELECT 権限）
-SELECT policyname, cmd, roles, qual
-FROM pg_policies
-WHERE schemaname = 'public' AND tablename = 'Task';
--- 期待: select_tasks_in_my_workspaces / SELECT / {authenticated}
+-- WorkspaceMember
+rls_enabled: true
+ポリシー数: 0  ← ★これが原因
 ```
 
-**仮説候補**:
-- (a) publication が `publish = 'insert'` のみで作成されている可能性（INSERT は来るが UPDATE/DELETE が来ない症状と一致）
-- (b) Task の REPLICA IDENTITY が default のまま（PK のみ送信される。フィルタの workspaceId が payload に含まれず CSR 側でフィルタ落ちする可能性。ただし 4-25 セッションで FULL 設定済みのはず）
-- (c) RLS ポリシーが SELECT のみで、Realtime UPDATE/DELETE 配信判定で別の cmd を要求している（仕様上は SELECT で十分なはずなので可能性低）
-
-**修正候補（仮説 (a) の場合）**:
+**修正 SQL**:
 ```sql
-ALTER PUBLICATION supabase_realtime SET (publish = 'insert, update, delete');
+CREATE POLICY "select_my_workspace_memberships"
+  ON public."WorkspaceMember"
+  FOR SELECT
+  TO authenticated
+  USING ("userId" = current_user_id());
 ```
 
-**確認済みの正常項目**:
-- Supabase RLS ポリシー（select_tasks_in_my_workspaces）は正しく定義
-- supabase_realtime publication に Task テーブル含まれている（4-25 セッション時点）
-- Task の REPLICA IDENTITY = FULL（4-25 セッション時点）
+`supabase/enable-rls-policies.sql` セクション 7 として恒久反映済み（disable 側にも対応 DROP 文を追加）。
+
+**INSERT は届いていたのに UPDATE/DELETE だけ来なかった理由**:
+- Realtime postgres_changes の RLS 評価は INSERT/UPDATE/DELETE 全てで動作するが、UPDATE/DELETE は OLD 行に対しても評価されるため依存度が高い
+- INSERT は表面的には届いていたが、5 秒以内では未反映で 10 秒以上経って反映 = `tab visibility change → syncInBackground()` で取得していた可能性が高く、純粋な Realtime 配信ではなかった
+- 修正後は INSERT も 5〜10 秒以内に届くようになった（純 Realtime 経由）
+
+**教訓**: `tasks/lessons.md` の 2026-04-29 エントリ参照（「RLS ポリシーのサブクエリ参照先テーブルにも SELECT ポリシーが必要」）。
 
 ### 2. React error #418 (Hydration mismatch) — 2026-04-26 修正済み
 
